@@ -4,19 +4,28 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { DashboardHeader } from '../components/DashboardHeader';
+import { useAuth } from '../context/AuthContext';
 import { StatCard } from '../components/StatCard';
-import { ConversionFunnel } from '../components/ConversionFunnel';
 import { FieldBottlenecks } from '../components/FieldBottlenecks';
-import { TopPerformingForms } from '../components/TopPerformingForms';
-import { RecentSubmissions } from '../components/RecentSubmissions';
+import {
+  Funnel,
+  DataTable,
+  BadgeCell,
+  TwoLineCell,
+  TruncatedCell,
+  RankedCards,
+  mapTrend,
+  PageHeader,
+  FilterDropdown,
+  type Column,
+  type TimeRangeValue,
+} from '../components/shared';
 import {
   fetchSummary,
   fetchFunnel,
   exportData,
 } from '../services/analyticsApi';
 import type {
-  TimeRange,
   SummaryMetrics,
   FunnelStage,
   FormStats,
@@ -49,9 +58,65 @@ const mockSubmissions: FormSubmission[] = [
   { id: '5', name: 'Emily Davis', email: 'emily.d@email.com', formType: 'Volunteer App', comments: 'Interested in the me...', date: 'Nov 29' },
 ];
 
+// Mock metrics for demo/dev mode
+const mockMetrics: SummaryMetrics = {
+  total_sessions: 1847,
+  total_events: 12543,
+  widget_opens: 1240,
+  forms_started: 843,
+  forms_completed: 521,
+  chip_clicks: 2156,
+  cta_clicks: 987,
+  conversion_rate: 42.0,
+};
+
+const mockFunnelStages: FunnelStage[] = [
+  { stage: 'Form Views', count: 1240, rate: 100 },
+  { stage: 'Form Started', count: 843, rate: 68 },
+  { stage: 'Form Completed', count: 521, rate: 42 },
+];
+
+// Dev mode: use mock data when API unavailable
+const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true' || import.meta.env.DEV;
+
+// Form type badge colors
+const formTypeBadgeColors: Record<string, string> = {
+  'Volunteer App': 'bg-blue-100 text-blue-700',
+  'Donation Req': 'bg-green-100 text-green-700',
+  'Event Reg': 'bg-purple-100 text-purple-700',
+  'General Inquiry': 'bg-gray-100 text-gray-700',
+  'Supply Request': 'bg-orange-100 text-orange-700',
+};
+
+// Column definitions for submissions table
+const submissionColumns: Column<FormSubmission>[] = [
+  {
+    key: 'name',
+    header: 'Name',
+    render: (row) => <TwoLineCell primary={row.name} secondary={row.email} />,
+  },
+  {
+    key: 'type',
+    header: 'Type',
+    render: (row) => <BadgeCell value={row.formType} colorMap={formTypeBadgeColors} />,
+  },
+  {
+    key: 'comments',
+    header: 'Comments',
+    render: (row) => <TruncatedCell text={row.comments} />,
+  },
+  {
+    key: 'date',
+    header: 'Date',
+    field: 'date',
+  },
+];
+
 export function Dashboard() {
+  const { logout } = useAuth();
+
   // State
-  const [timeRange, setTimeRange] = useState<TimeRange>('7d');
+  const [timeRange, setTimeRange] = useState<TimeRangeValue>('7d');
   const [selectedForm, setSelectedForm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
@@ -66,7 +131,7 @@ export function Dashboard() {
   const [page, setPage] = useState(1);
   const pageSize = 5;
 
-  // Fetch data
+  // Fetch data (falls back to mock in dev mode)
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -81,8 +146,17 @@ export function Dashboard() {
       setFunnelStages(funnelData.funnel);
       setConversionRate(funnelData.overall_conversion);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
       console.error('Dashboard data load error:', err);
+
+      // In dev mode, fall back to mock data
+      if (DEV_MODE) {
+        console.log('📊 Using mock data (dev mode)');
+        setMetrics(mockMetrics);
+        setFunnelStages(mockFunnelStages);
+        setConversionRate(61.8);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to load data');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -164,14 +238,21 @@ export function Dashboard() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
-        <DashboardHeader
+        <PageHeader
+          title="Form Analytics Overview"
           timeRange={timeRange}
           onTimeRangeChange={setTimeRange}
-          selectedForm={selectedForm}
-          onFormChange={setSelectedForm}
-          forms={mockForms.map(f => ({ id: f.id, name: f.name }))}
           onExport={handleExport}
           isExporting={isExporting}
+          onSignOut={logout}
+          filters={
+            <FilterDropdown
+              value={selectedForm}
+              onChange={setSelectedForm}
+              options={mockForms.map(f => ({ id: f.id, name: f.name }))}
+              placeholder="All Forms"
+            />
+          }
         />
 
         {/* Stats Cards */}
@@ -202,12 +283,25 @@ export function Dashboard() {
 
         {/* Funnel and Bottlenecks */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <ConversionFunnel
-            stages={funnelStages}
-            conversionRate={conversionRate}
-            totalViews={totalViews}
-            abandoned={abandoned}
-            completed={formsCompleted}
+          <Funnel
+            title="Conversion Funnel"
+            stages={funnelStages.map(s => ({
+              name: s.stage,
+              count: s.count,
+              displayName: {
+                'Widget Opened': 'Form Views',
+                'Chip Clicked': 'Engaged',
+                'Form Started': 'Started',
+                'Form Completed': 'Completed',
+              }[s.stage] || s.stage,
+            }))}
+            rate={conversionRate}
+            rateLabel="Conversion Rate"
+            stats={[
+              { label: 'Total Views', value: totalViews },
+              { label: 'Abandoned', value: abandoned, variant: 'danger' },
+              { label: 'Completed', value: formsCompleted, variant: 'success' },
+            ]}
           />
           <FieldBottlenecks
             bottlenecks={mockBottlenecks}
@@ -217,17 +311,32 @@ export function Dashboard() {
 
         {/* Top Performing Forms */}
         <div className="mb-8">
-          <TopPerformingForms
-            forms={mockForms}
-            totalSubmissions={521}
-            totalActiveForms={12}
+          <RankedCards
+            title="Top Performing Forms"
+            summaryValue={521}
+            summaryLabel="Total Submissions"
+            items={mockForms.map(f => ({
+              id: f.id,
+              name: f.name,
+              primaryValue: `${f.conversionRate}%`,
+              primaryLabel: 'Conv.',
+              secondaryValue: f.submissions,
+              secondaryLabel: 'submissions',
+              trend: mapTrend(f.trend),
+            }))}
             onViewAll={() => console.log('View all forms')}
+            viewAllLabel="View All Forms"
+            viewAllSublabel="12 active forms"
           />
         </div>
 
         {/* Recent Submissions */}
-        <RecentSubmissions
-          submissions={mockSubmissions}
+        <DataTable<FormSubmission>
+          title="Recent Submissions"
+          subtitle="Latest form entries"
+          columns={submissionColumns}
+          data={mockSubmissions}
+          rowKey="id"
           totalCount={128}
           page={page}
           pageSize={pageSize}
