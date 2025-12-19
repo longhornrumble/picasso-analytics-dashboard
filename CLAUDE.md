@@ -2,6 +2,19 @@
 
 Standalone analytics dashboard for Picasso AI Chat Widget form submissions and user engagement metrics.
 
+**Part of User Journey Analytics Initiative** - See [USER_JOURNEY_ANALYTICS_PLAN.md](/Picasso/docs/User_Journey/USER_JOURNEY_ANALYTICS_PLAN.md)
+
+## Implementation Status
+
+| Component | Status |
+|-----------|--------|
+| React scaffold | ✅ Complete |
+| Shared styles integration | ✅ Complete |
+| Login page | ✅ Complete |
+| Forms Dashboard components | ✅ Complete (mock data) |
+| API integration | 🔶 In Progress |
+| Conversations Dashboard | ⏳ Not Started |
+
 ## Quick Start
 
 ```bash
@@ -17,8 +30,9 @@ npm run preview # Preview production build
 - **React 18** - UI framework
 - **TypeScript** - Type safety
 - **Vite** - Build tool
-- **Tailwind CSS** - Styling
-- **Analytics Dashboard API** - Backend (Lambda Function URL)
+- **Tailwind CSS 3** - Styling (with shared preset)
+- **@picasso/shared-styles** - Centralized design tokens
+- **Analytics Dashboard API** - Backend (Lambda + Athena)
 
 ### Project Structure
 
@@ -144,14 +158,44 @@ The dashboard UI is based on the Form Analytics Overview mockup:
 - **Top Forms**: Card grid with trend indicators
 - **Recent Submissions**: Paginated table with search
 
-### Color Palette
-- Primary Green: `#10b981` (success metrics)
-- Danger Red: `#ef4444` (abandons, errors)
-- Background: `#f9fafb` (gray-50)
-- Cards: `#ffffff` with subtle shadow
+### Color Palette (via @picasso/shared-styles)
+
+Colors are centralized in `/picasso-shared-styles/src/tokens.css`:
+
+- **Primary Green**: `#50C878` (brand color, success metrics)
+- **Danger Red**: `#ef4444` (abandons, errors)
+- **Info Blue**: `#3b82f6` (links, informational)
+- **Warning Amber**: `#f59e0b` (warnings)
+- **Background**: `#f9fafb` (gray-50)
+- **Cards**: `#ffffff` with subtle shadow
+
+### Shared Styles Integration
+
+This project uses centralized design tokens:
+
+```css
+/* src/index.css */
+@import '@picasso/shared-styles/tokens';
+```
+
+```js
+/* tailwind.config.js */
+presets: [require('@picasso/shared-styles/tailwind-preset')]
+```
+
+To update brand colors across all dashboards, edit `/picasso-shared-styles/src/tokens.css`.
 
 ## Related Projects
 
-- **Picasso Widget**: `/Picasso` - Chat widget frontend
-- **Analytics Lambda**: `/Lambdas/lambda/Analytics_Dashboard_API` - Backend API
-- **Event Processor**: `/Lambdas/lambda/Analytics_Event_Processor` - SQS → S3
+| Project | Path | Description |
+|---------|------|-------------|
+| **Picasso Widget** | `/Picasso` | Chat widget frontend |
+| **Shared Styles** | `/picasso-shared-styles` | Centralized design tokens |
+| **Analytics API** | `/Lambdas/lambda/Analytics_Dashboard_API` | Backend API (Athena) |
+| **Event Processor** | `/Lambdas/lambda/Analytics_Event_Processor` | SQS → S3 pipeline |
+
+## Documentation
+
+- [USER_JOURNEY_ANALYTICS_PLAN.md](/Picasso/docs/User_Journey/USER_JOURNEY_ANALYTICS_PLAN.md) - Full implementation plan
+- [USER_JOURNEY_ANALYTICS_PRD.md](/Picasso/docs/User_Journey/USER_JOURNEY_ANALYTICS_PRD.md) - Product requirements
+- [ANNEX_C_FORMS_DASHBOARD.md](/Picasso/docs/User_Journey/ANNEX_C_FORMS_DASHBOARD.md) - Forms dashboard spec
