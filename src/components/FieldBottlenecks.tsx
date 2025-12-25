@@ -34,24 +34,34 @@ export function FieldBottlenecks({ bottlenecks, totalAbandons }: FieldBottleneck
 
       {/* Bottleneck bars */}
       <div className="space-y-3">
-        {bottlenecks.map((bottleneck) => (
-          <div key={bottleneck.fieldName} className="flex items-center gap-3">
-            <div className="w-28 text-sm text-gray-600 truncate" title={bottleneck.fieldName}>
-              {bottleneck.fieldName}
-            </div>
-            <div className="flex-1 relative">
-              <div className="h-6 bg-gray-100 rounded overflow-hidden">
-                <div
-                  className="h-full bg-red-400 rounded transition-all duration-500"
-                  style={{ width: `${bottleneck.abandonRate}%` }}
-                />
+        {bottlenecks.length > 0 ? (
+          bottlenecks.map((bottleneck) => (
+            <div key={bottleneck.fieldName} className="flex items-center gap-3">
+              <div className="w-28 text-sm text-gray-600 truncate" title={bottleneck.fieldName}>
+                {bottleneck.fieldName}
+              </div>
+              <div className="flex-1 relative">
+                <div className="h-6 bg-gray-100 rounded overflow-hidden">
+                  <div
+                    className="h-full bg-red-400 rounded transition-all duration-500"
+                    style={{ width: `${bottleneck.abandonRate}%` }}
+                  />
+                </div>
+              </div>
+              <div className="w-12 text-right text-sm font-medium text-red-500">
+                {bottleneck.abandonRate}%
               </div>
             </div>
-            <div className="w-12 text-right text-sm font-medium text-red-500">
-              {bottleneck.abandonRate}%
-            </div>
+          ))
+        ) : (
+          <div className="py-8 text-center text-gray-500">
+            <svg className="w-12 h-12 mx-auto mb-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="font-medium">No bottlenecks detected</p>
+            <p className="text-sm">All forms are completing without drop-offs</p>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Insight box */}

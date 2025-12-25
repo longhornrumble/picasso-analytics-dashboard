@@ -21,16 +21,20 @@ import {
   type TimeRangeValue,
 } from '../components/shared';
 import {
-  fetchSummary,
-  fetchFunnel,
+  fetchFormSummary,
+  fetchBottlenecks,
+  fetchSubmissions,
+  fetchTopPerformers,
   exportData,
 } from '../services/analyticsApi';
 import type {
-  SummaryMetrics,
-  FunnelStage,
+  FormSummaryMetrics,
   FormStats,
   FieldBottleneck,
   FormSubmission,
+  FieldBottleneckAPI,
+  FormSubmissionAPI,
+  FormPerformerAPI,
 } from '../types/analytics';
 
 // Mock data for sections not yet supported by API
@@ -56,24 +60,6 @@ const mockSubmissions: FormSubmission[] = [
   { id: '3', name: 'Jessica Ford', email: 'jess.ford@email.com', formType: 'Event Reg', comments: 'Dietary restriction: P...', date: 'Nov 30' },
   { id: '4', name: 'Robert Smith', email: 'rob.smith@email.com', formType: 'General Inquiry', comments: 'What are your openi...', date: 'Nov 30' },
   { id: '5', name: 'Emily Davis', email: 'emily.d@email.com', formType: 'Volunteer App', comments: 'Interested in the me...', date: 'Nov 29' },
-];
-
-// Mock metrics for demo/dev mode
-const mockMetrics: SummaryMetrics = {
-  total_sessions: 1847,
-  total_events: 12543,
-  widget_opens: 1240,
-  forms_started: 843,
-  forms_completed: 521,
-  chip_clicks: 2156,
-  cta_clicks: 987,
-  conversion_rate: 42.0,
-};
-
-const mockFunnelStages: FunnelStage[] = [
-  { stage: 'Form Views', count: 1240, rate: 100 },
-  { stage: 'Form Started', count: 843, rate: 68 },
-  { stage: 'Form Completed', count: 521, rate: 42 },
 ];
 
 // Dev mode: use mock data when API unavailable
@@ -122,10 +108,17 @@ export function Dashboard() {
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Data state
-  const [metrics, setMetrics] = useState<SummaryMetrics | null>(null);
-  const [funnelStages, setFunnelStages] = useState<FunnelStage[]>([]);
-  const [conversionRate, setConversionRate] = useState(0);
+  // Data state - formMetrics for form-specific stats
+  const [formMetrics, setFormMetrics] = useState<FormSummaryMetrics | null>(null);
+
+  // Forms-specific data state
+  const [bottlenecks, setBottlenecks] = useState<FieldBottleneckAPI[]>([]);
+  const [totalAbandons, setTotalAbandons] = useState(0);
+  const [topForms, setTopForms] = useState<FormPerformerAPI[]>([]);
+  const [totalCompletions, setTotalCompletions] = useState(0);
+  const [submissions, setSubmissions] = useState<FormSubmissionAPI[]>([]);
+  const [submissionsTotalCount, setSubmissionsTotalCount] = useState(0);
+  const [avgCompletionTime, setAvgCompletionTime] = useState(0);
 
   // Pagination for submissions
   const [page, setPage] = useState(1);
@@ -137,30 +130,58 @@ export function Dashboard() {
     setError(null);
 
     try {
-      const [summaryData, funnelData] = await Promise.all([
-        fetchSummary(timeRange),
-        fetchFunnel(timeRange),
+      const [formSummaryData, bottlenecksData, topPerformersData, submissionsData] = await Promise.all([
+        fetchFormSummary(timeRange, selectedForm || undefined),
+        fetchBottlenecks(timeRange, selectedForm || undefined, 5),
+        fetchTopPerformers(timeRange, 5, 'conversion_rate'),
+        fetchSubmissions(timeRange, page, pageSize, selectedForm || undefined),
       ]);
 
-      setMetrics(summaryData.metrics);
-      setFunnelStages(funnelData.funnel);
-      setConversionRate(funnelData.overall_conversion);
+      setFormMetrics(formSummaryData.metrics);
+
+      // Set forms-specific data
+      setBottlenecks(bottlenecksData.bottlenecks);
+      setTotalAbandons(bottlenecksData.total_abandonments);
+      setTopForms(topPerformersData.forms);
+      setTotalCompletions(topPerformersData.total_completions);
+      setSubmissions(submissionsData.submissions);
+      setSubmissionsTotalCount(submissionsData.pagination.total_count);
+
+      // Calculate average completion time from top performers
+      if (topPerformersData.forms.length > 0) {
+        const totalTime = topPerformersData.forms.reduce((acc, f) => acc + f.avg_completion_time_seconds, 0);
+        setAvgCompletionTime(Math.round(totalTime / topPerformersData.forms.length));
+      }
     } catch (err) {
       console.error('Dashboard data load error:', err);
 
       // In dev mode, fall back to mock data
       if (DEV_MODE) {
         console.log('📊 Using mock data (dev mode)');
-        setMetrics(mockMetrics);
-        setFunnelStages(mockFunnelStages);
-        setConversionRate(61.8);
+        setFormMetrics({
+          form_views: 1240,
+          forms_started: 843,
+          forms_completed: 521,
+          forms_abandoned: 322,
+          completion_rate: 61.8,
+          abandon_rate: 38.2,
+          avg_completion_time_seconds: 134,
+        });
+        // Keep mock data for forms sections when API fails
+        setBottlenecks([]);
+        setTotalAbandons(0);
+        setTopForms([]);
+        setTotalCompletions(0);
+        setSubmissions([]);
+        setSubmissionsTotalCount(0);
+        setAvgCompletionTime(134);
       } else {
         setError(err instanceof Error ? err.message : 'Failed to load data');
       }
     } finally {
       setIsLoading(false);
     }
-  }, [timeRange]);
+  }, [timeRange, selectedForm, page]);
 
   useEffect(() => {
     loadData();
@@ -193,13 +214,14 @@ export function Dashboard() {
     return `${mins}m ${secs}s`;
   };
 
-  // Calculate derived metrics
-  const totalViews = metrics?.widget_opens || 0;
-  const formsCompleted = metrics?.forms_completed || 0;
-  const formsStarted = metrics?.forms_started || 0;
-  const abandoned = formsStarted - formsCompleted;
-  const abandonRate = formsStarted > 0 ? ((abandoned / formsStarted) * 100).toFixed(1) : '0';
-  const avgCompletionTime = 134; // Mock: 2m 14s in seconds
+  // Calculate derived metrics - use formMetrics for form-specific data
+  const totalViews = formMetrics?.form_views || 0;
+  const formsCompleted = formMetrics?.forms_completed || 0;
+  const formsStarted = formMetrics?.forms_started || 0;
+  const formsAbandoned = formMetrics?.forms_abandoned || 0;
+  const completionRate = formMetrics?.completion_rate || 0;
+  const abandonRate = formMetrics?.abandon_rate || 0;
+  const displayAvgCompletionTime = formMetrics?.avg_completion_time_seconds || avgCompletionTime || 0;
 
   if (isLoading) {
     return (
@@ -260,23 +282,23 @@ export function Dashboard() {
           <StatCard
             title="Total Form Views"
             value={totalViews.toLocaleString()}
-            subtitle="Across all active forms"
+            subtitle={`${formsStarted} forms started`}
           />
           <StatCard
             title="Total Completions"
             value={formsCompleted.toLocaleString()}
-            subtitle={`${metrics?.conversion_rate || 0}% Completion Rate`}
+            subtitle={`${completionRate.toFixed(1)}% Completion Rate`}
             variant="success"
           />
           <StatCard
             title="Avg. Completion Time"
-            value={formatTime(avgCompletionTime)}
+            value={formatTime(displayAvgCompletionTime)}
             subtitle="From start to submit"
           />
           <StatCard
             title="Abandon Rate"
-            value={`${abandonRate}%`}
-            subtitle={`${abandoned} Incomplete starts`}
+            value={`${abandonRate.toFixed(1)}%`}
+            subtitle={`${formsAbandoned} Abandoned`}
             variant="danger"
           />
         </div>
@@ -284,28 +306,28 @@ export function Dashboard() {
         {/* Funnel and Bottlenecks */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Funnel
-            title="Conversion Funnel"
-            stages={funnelStages.map(s => ({
-              name: s.stage,
-              count: s.count,
-              displayName: {
-                'Widget Opened': 'Form Views',
-                'Chip Clicked': 'Engaged',
-                'Form Started': 'Started',
-                'Form Completed': 'Completed',
-              }[s.stage] || s.stage,
-            }))}
-            rate={conversionRate}
-            rateLabel="Conversion Rate"
+            title="Form Conversion Funnel"
+            stages={[
+              { name: 'FORM_VIEWED', count: totalViews, displayName: 'Form Views' },
+              { name: 'FORM_STARTED', count: formsStarted, displayName: 'Started' },
+              { name: 'FORM_COMPLETED', count: formsCompleted, displayName: 'Completed' },
+            ]}
+            rate={completionRate}
+            rateLabel="Completion Rate"
             stats={[
               { label: 'Total Views', value: totalViews },
-              { label: 'Abandoned', value: abandoned, variant: 'danger' },
+              { label: 'Abandoned', value: formsAbandoned, variant: 'danger' },
               { label: 'Completed', value: formsCompleted, variant: 'success' },
             ]}
           />
           <FieldBottlenecks
-            bottlenecks={mockBottlenecks}
-            totalAbandons={742}
+            bottlenecks={formMetrics ? bottlenecks.map(b => ({
+              fieldName: b.field_label || b.field_id,
+              abandonRate: b.abandon_percentage,
+              insight: b.insight,
+              recommendation: b.recommendation,
+            })) : mockBottlenecks}
+            totalAbandons={formMetrics ? formsAbandoned : 742}
           />
         </div>
 
@@ -313,9 +335,17 @@ export function Dashboard() {
         <div className="mb-8">
           <RankedCards
             title="Top Performing Forms"
-            summaryValue={521}
+            summaryValue={totalCompletions || 521}
             summaryLabel="Total Submissions"
-            items={mockForms.map(f => ({
+            items={topForms.length > 0 ? topForms.map(f => ({
+              id: f.form_id,
+              name: f.form_label || f.form_id,
+              primaryValue: `${f.conversion_rate}%`,
+              primaryLabel: 'Conv.',
+              secondaryValue: f.completions,
+              secondaryLabel: 'submissions',
+              trend: mapTrend(f.trend),
+            })) : mockForms.map(f => ({
               id: f.id,
               name: f.name,
               primaryValue: `${f.conversionRate}%`,
@@ -326,7 +356,7 @@ export function Dashboard() {
             }))}
             onViewAll={() => console.log('View all forms')}
             viewAllLabel="View All Forms"
-            viewAllSublabel="12 active forms"
+            viewAllSublabel={`${topForms.length || 5} active forms`}
           />
         </div>
 
@@ -335,9 +365,16 @@ export function Dashboard() {
           title="Recent Submissions"
           subtitle="Latest form entries"
           columns={submissionColumns}
-          data={mockSubmissions}
+          data={submissions.length > 0 ? submissions.map(s => ({
+            id: s.submission_id,
+            name: s.fields?.name || s.fields?.full_name || 'Anonymous',
+            email: s.fields?.email || '',
+            formType: s.form_label || s.form_id,
+            comments: s.fields?.comments || s.fields?.message || '',
+            date: s.submitted_date,
+          })) : mockSubmissions}
           rowKey="id"
-          totalCount={128}
+          totalCount={submissionsTotalCount || 128}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}

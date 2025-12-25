@@ -62,7 +62,92 @@ export interface FunnelResponse {
   overall_conversion: number;
 }
 
-// Dashboard-specific types (UI enriched)
+// =============================================================================
+// Forms API Response Types
+// =============================================================================
+
+export interface FormSummaryMetrics {
+  form_views: number;
+  forms_started: number;
+  forms_completed: number;
+  forms_abandoned: number;
+  completion_rate: number;
+  abandon_rate: number;
+  avg_completion_time_seconds: number;
+}
+
+export interface FormSummaryResponse {
+  tenant_id: string;
+  range: string;
+  metrics: FormSummaryMetrics;
+}
+
+export interface FieldBottleneckAPI {
+  field_id: string;
+  field_label: string;
+  form_id: string | null;
+  abandon_count: number;
+  abandon_percentage: number;
+  insight: string;
+  recommendation: string;
+}
+
+export interface BottlenecksResponse {
+  tenant_id: string;
+  range: string;
+  bottlenecks: FieldBottleneckAPI[];
+  total_abandonments: number;
+}
+
+export interface FormSubmissionAPI {
+  submission_id: string;
+  session_id: string;
+  form_id: string;
+  form_label: string;
+  submitted_at: string;
+  submitted_date: string;
+  duration_seconds: number;
+  fields_completed: number;
+  fields: Record<string, string>;
+}
+
+export interface SubmissionsResponse {
+  tenant_id: string;
+  range: string;
+  submissions: FormSubmissionAPI[];
+  pagination: {
+    total_count: number;
+    page: number;
+    limit: number;
+    total_pages: number;
+    has_next_page: boolean;
+    has_previous_page: boolean;
+  };
+}
+
+export interface FormPerformerAPI {
+  form_id: string;
+  form_label: string;
+  views: number;
+  started: number;
+  completions: number;
+  conversion_rate: number;
+  abandon_rate: number;
+  avg_completion_time_seconds: number;
+  trend: 'trending' | 'stable' | 'low';
+}
+
+export interface TopPerformersResponse {
+  tenant_id: string;
+  range: string;
+  forms: FormPerformerAPI[];
+  total_completions: number;
+}
+
+// =============================================================================
+// Dashboard-specific types (UI enriched / legacy)
+// =============================================================================
+
 export interface FormStats {
   id: string;
   name: string;
@@ -74,6 +159,8 @@ export interface FormStats {
 export interface FieldBottleneck {
   fieldName: string;
   abandonRate: number;
+  insight?: string;
+  recommendation?: string;
 }
 
 export interface FormSubmission {

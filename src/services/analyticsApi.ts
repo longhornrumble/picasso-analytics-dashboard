@@ -8,6 +8,10 @@ import type {
   SessionsResponse,
   EventsResponse,
   FunnelResponse,
+  BottlenecksResponse,
+  SubmissionsResponse,
+  TopPerformersResponse,
+  FormSummaryResponse,
   TimeRange,
 } from '../types/analytics';
 
@@ -90,6 +94,80 @@ export async function fetchEvents(
  */
 export async function fetchFunnel(range: TimeRange = '30d'): Promise<FunnelResponse> {
   return apiRequest<FunnelResponse>('/analytics/funnel', { range });
+}
+
+// =============================================================================
+// Forms API Functions
+// =============================================================================
+
+/**
+ * Fetch form-specific summary metrics
+ * This returns metrics specific to forms (views, starts, completions, abandons)
+ * as opposed to fetchSummary which returns general widget analytics
+ */
+export async function fetchFormSummary(
+  range: TimeRange = '30d',
+  formId?: string
+): Promise<FormSummaryResponse> {
+  const params: Record<string, string> = { range };
+  if (formId) {
+    params.form_id = formId;
+  }
+  return apiRequest<FormSummaryResponse>('/forms/summary', params);
+}
+
+/**
+ * Fetch field bottleneck analysis
+ */
+export async function fetchBottlenecks(
+  range: TimeRange = '30d',
+  formId?: string,
+  limit: number = 5
+): Promise<BottlenecksResponse> {
+  const params: Record<string, string> = { range, limit: String(limit) };
+  if (formId) {
+    params.form_id = formId;
+  }
+  return apiRequest<BottlenecksResponse>('/forms/bottlenecks', params);
+}
+
+/**
+ * Fetch form submissions with pagination
+ */
+export async function fetchSubmissions(
+  range: TimeRange = '30d',
+  page: number = 1,
+  limit: number = 25,
+  formId?: string,
+  search?: string
+): Promise<SubmissionsResponse> {
+  const params: Record<string, string> = {
+    range,
+    page: String(page),
+    limit: String(limit),
+  };
+  if (formId) {
+    params.form_id = formId;
+  }
+  if (search) {
+    params.search = search;
+  }
+  return apiRequest<SubmissionsResponse>('/forms/submissions', params);
+}
+
+/**
+ * Fetch top performing forms
+ */
+export async function fetchTopPerformers(
+  range: TimeRange = '30d',
+  limit: number = 5,
+  sortBy: 'conversion_rate' | 'completions' | 'avg_time' = 'conversion_rate'
+): Promise<TopPerformersResponse> {
+  return apiRequest<TopPerformersResponse>('/forms/top-performers', {
+    range,
+    limit: String(limit),
+    sort_by: sortBy,
+  });
 }
 
 /**
