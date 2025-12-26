@@ -9,6 +9,7 @@ import { StatCard } from '../components/StatCard';
 import { ConversationHeatMap } from '../components/ConversationHeatMap';
 import { TopQuestions } from '../components/TopQuestions';
 import { RecentConversations } from '../components/RecentConversations';
+import { SessionsList, SessionTimeline } from '../components/sessions';
 import {
   PageHeader,
   SimpleTrendChart,
@@ -28,11 +29,16 @@ import type {
   TopQuestion,
   RecentConversation,
   ConversationTrendPoint,
+  TimeRange,
 } from '../types/analytics';
 
 // Dev mode: use mock data when explicitly enabled (VITE_DEV_MODE=true)
 // Note: Setting VITE_DEV_MODE=false allows testing real API in dev server
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
+
+// Feature flag for new Sessions API (User Journey Analytics)
+// When enabled, replaces RecentConversations with SessionsList + SessionTimeline
+const USE_SESSIONS_API = import.meta.env.VITE_USE_SESSIONS_API === 'true';
 
 // Mock data for development
 const mockSummary: ConversationSummaryMetrics = {
@@ -118,6 +124,9 @@ export function ConversationsDashboard() {
   const [timeRange, setTimeRange] = useState<TimeRangeValue>('30d');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Session timeline state (for new Sessions API)
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
   // Data state
   const [summary, setSummary] = useState<ConversationSummaryMetrics | null>(null);
@@ -306,14 +315,27 @@ export function ConversationsDashboard() {
           />
         </div>
 
-        {/* Recent Conversations */}
-        <RecentConversations
-          conversations={conversations}
-          totalCount={conversationsTotal}
-          loading={loadingMore}
-          hasMore={conversationsHasMore}
-          onLoadMore={handleLoadMoreConversations}
-        />
+        {/* Recent Conversations / Sessions List */}
+        {USE_SESSIONS_API ? (
+          <>
+            <SessionsList
+              timeRange={timeRange as TimeRange}
+              onSessionClick={setSelectedSessionId}
+            />
+            <SessionTimeline
+              sessionId={selectedSessionId}
+              onClose={() => setSelectedSessionId(null)}
+            />
+          </>
+        ) : (
+          <RecentConversations
+            conversations={conversations}
+            totalCount={conversationsTotal}
+            loading={loadingMore}
+            hasMore={conversationsHasMore}
+            onLoadMore={handleLoadMoreConversations}
+          />
+        )}
 
         {/* Footer */}
         <footer className="mt-12 text-center py-6 border-t border-gray-200">
