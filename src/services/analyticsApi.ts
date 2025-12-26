@@ -12,6 +12,11 @@ import type {
   SubmissionsResponse,
   TopPerformersResponse,
   FormSummaryResponse,
+  ConversationSummaryResponse,
+  HeatmapResponse,
+  TopQuestionsResponse,
+  RecentConversationsResponse,
+  ConversationTrendResponse,
   TimeRange,
 } from '../types/analytics';
 
@@ -167,6 +172,77 @@ export async function fetchTopPerformers(
     range,
     limit: String(limit),
     sort_by: sortBy,
+  });
+}
+
+// =============================================================================
+// Conversations API Functions
+// =============================================================================
+
+/**
+ * Fetch conversation summary metrics
+ * Returns total conversations, messages, response time, after-hours %
+ */
+export async function fetchConversationSummary(
+  range: TimeRange = '30d'
+): Promise<ConversationSummaryResponse> {
+  return apiRequest<ConversationSummaryResponse>('/conversations/summary', { range });
+}
+
+/**
+ * Fetch conversation heatmap data
+ * Returns day x hour grid with conversation counts
+ * Automatically passes the user's timezone for correct local time display
+ */
+export async function fetchConversationHeatmap(
+  range: TimeRange = '30d'
+): Promise<HeatmapResponse> {
+  // Get user's timezone (e.g., "America/Chicago")
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return apiRequest<HeatmapResponse>('/conversations/heatmap', { range, timezone });
+}
+
+/**
+ * Fetch top questions
+ * Returns most frequently asked questions with counts
+ */
+export async function fetchTopQuestions(
+  range: TimeRange = '30d',
+  limit: number = 5
+): Promise<TopQuestionsResponse> {
+  return apiRequest<TopQuestionsResponse>('/conversations/top-questions', {
+    range,
+    limit: String(limit),
+  });
+}
+
+/**
+ * Fetch recent conversations
+ * Returns recent Q&A pairs with details
+ */
+export async function fetchRecentConversations(
+  range: TimeRange = '30d',
+  page: number = 1,
+  limit: number = 10
+): Promise<RecentConversationsResponse> {
+  return apiRequest<RecentConversationsResponse>('/conversations/recent', {
+    range,
+    page: String(page),
+    limit: String(limit),
+  });
+}
+
+/**
+ * Fetch conversation trend data
+ * Returns conversation counts over time for line chart
+ */
+export async function fetchConversationTrend(
+  range: TimeRange = '30d',
+  granularity: 'hour' | 'day' = 'hour'
+): Promise<ConversationTrendResponse> {
+  return apiRequest<ConversationTrendResponse>('/conversations/trend', {
+    range,
+    granularity,
   });
 }
 

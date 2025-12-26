@@ -12,7 +12,7 @@ interface StatCardProps {
     value: number;
     label: string;
   };
-  variant?: 'default' | 'success' | 'danger';
+  variant?: 'default' | 'success' | 'danger' | 'primary' | 'info';
 }
 
 export function StatCard({
@@ -24,8 +24,10 @@ export function StatCard({
 }: StatCardProps) {
   const valueColorClass = {
     default: 'text-gray-900',
-    success: 'text-green-500',
-    danger: 'text-red-500',
+    success: 'text-primary-500',
+    danger: 'text-danger-500',
+    primary: 'text-primary-600',
+    info: 'text-info-500',
   }[variant];
 
   return (

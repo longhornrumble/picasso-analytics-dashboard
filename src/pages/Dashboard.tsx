@@ -62,8 +62,9 @@ const mockSubmissions: FormSubmission[] = [
   { id: '5', name: 'Emily Davis', email: 'emily.d@email.com', formType: 'Volunteer App', comments: 'Interested in the me...', date: 'Nov 29' },
 ];
 
-// Dev mode: use mock data when API unavailable
-const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true' || import.meta.env.DEV;
+// Dev mode: use mock data when explicitly enabled (VITE_DEV_MODE=true)
+// Note: Setting VITE_DEV_MODE=false allows testing real API in dev server
+const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
 // Form type badge colors
 const formTypeBadgeColors: Record<string, string> = {
@@ -113,7 +114,7 @@ export function Dashboard() {
 
   // Forms-specific data state
   const [bottlenecks, setBottlenecks] = useState<FieldBottleneckAPI[]>([]);
-  const [totalAbandons, setTotalAbandons] = useState(0);
+  const [_totalAbandons, setTotalAbandons] = useState(0);
   const [topForms, setTopForms] = useState<FormPerformerAPI[]>([]);
   const [totalCompletions, setTotalCompletions] = useState(0);
   const [submissions, setSubmissions] = useState<FormSubmissionAPI[]>([]);

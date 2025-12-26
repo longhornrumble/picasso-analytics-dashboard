@@ -195,3 +195,96 @@ export interface FilterState {
   dateFrom: string | null;
   dateTo: string | null;
 }
+
+// =============================================================================
+// Conversations API Response Types
+// =============================================================================
+
+export interface ConversationSummaryMetrics {
+  total_conversations: number;
+  total_messages: number;
+  avg_response_time_seconds: number;
+  after_hours_percentage: number;
+}
+
+export interface ConversationSummaryResponse {
+  tenant_id: string;
+  range: string;
+  metrics: ConversationSummaryMetrics;
+  date_range: {
+    start: string;
+    end: string;
+  };
+}
+
+export interface HeatmapCell {
+  day: string;  // "Mon", "Tue", etc.
+  value: number;
+}
+
+export interface HeatmapRow {
+  hour_block: string;  // "12AM", "3AM", "6AM", etc.
+  data: HeatmapCell[];
+}
+
+export interface HeatmapPeak {
+  day: string;
+  hour_block: string;
+  count: number;
+}
+
+export interface HeatmapResponse {
+  tenant_id: string;
+  range: string;
+  heatmap: HeatmapRow[];
+  peak: HeatmapPeak | null;
+  total_conversations: number;
+}
+
+export interface TopQuestion {
+  question_text: string;
+  count: number;
+  percentage: number;
+}
+
+export interface TopQuestionsResponse {
+  tenant_id: string;
+  range: string;
+  questions: TopQuestion[];
+  total_questions: number;
+}
+
+export interface RecentConversation {
+  session_id: string;
+  started_at: string;
+  topic: string;
+  first_question: string;
+  first_answer: string;
+  response_time_seconds: number;
+  message_count: number;
+  outcome: string | null;
+}
+
+export interface RecentConversationsResponse {
+  tenant_id: string;
+  range: string;
+  conversations: RecentConversation[];
+  pagination: {
+    total_count: number;
+    page: number;
+    limit: number;
+    has_next: boolean;
+  };
+}
+
+export interface ConversationTrendPoint {
+  period: string;  // "12am", "2am", etc. or "Dec 1", "Dec 2"
+  value: number;
+}
+
+export interface ConversationTrendResponse {
+  tenant_id: string;
+  range: string;
+  trend: ConversationTrendPoint[];
+  legend: string;
+}
