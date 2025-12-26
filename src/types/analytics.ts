@@ -288,3 +288,96 @@ export interface ConversationTrendResponse {
   trend: ConversationTrendPoint[];
   legend: string;
 }
+
+// =============================================================================
+// Session Timeline API Response Types (User Journey Analytics)
+// =============================================================================
+
+/** Valid session outcome values */
+export type SessionOutcome =
+  | 'form_completed'
+  | 'cta_clicked'
+  | 'link_clicked'
+  | 'browsing'
+  | 'abandoned';
+
+/**
+ * Discriminated union for session event payloads.
+ * Each event type has specific payload fields for type-safe access.
+ */
+export type SessionEventPayload =
+  | { type: 'WIDGET_OPENED'; trigger?: 'button' | 'auto' }
+  | { type: 'MESSAGE_SENT'; content_preview: string; content_length?: number }
+  | { type: 'MESSAGE_RECEIVED'; content_preview?: string; content_length?: number }
+  | { type: 'CTA_CLICKED'; cta_id: string; cta_label: string; cta_action: string; triggers_form?: boolean }
+  | { type: 'LINK_CLICKED'; url: string; link_text: string; link_domain: string; category: 'email' | 'phone' | 'web' }
+  | { type: 'ACTION_CHIP_CLICKED'; chip_label: string; chip_value: string }
+  | { type: 'FORM_STARTED'; form_id: string; form_label: string }
+  | { type: 'FORM_COMPLETED'; form_id: string; form_label: string; duration_seconds: number; fields_completed: number }
+  | { type: 'FORM_ABANDONED'; form_id: string; form_label?: string; last_field?: string; reason: string; fields_completed: number };
+
+/** Supported session event types */
+export type SessionEventType = SessionEventPayload['type'];
+
+/** A single event in a session timeline */
+export interface SessionEvent {
+  step_number: number;
+  event_type: SessionEventType;
+  timestamp: string;
+  payload: SessionEventPayload | null;
+}
+
+/** Session summary for list view */
+export interface SessionSummary {
+  session_id: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_seconds: number;
+  outcome: SessionOutcome;
+  message_count: number;
+  user_message_count: number;
+  bot_message_count: number;
+  first_question: string | null;
+  form_id?: string;
+}
+
+/** Pagination info for sessions list */
+export interface SessionsPagination {
+  limit: number;
+  count: number;
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
+/** API response for GET /sessions/list */
+export interface SessionsListResponse {
+  tenant_id: string;
+  range: string;
+  sessions: SessionSummary[];
+  pagination: SessionsPagination;
+  filters?: {
+    outcome?: SessionOutcome;
+  };
+}
+
+/** Session detail summary (computed from events) */
+export interface SessionDetailSummary {
+  message_count: number;
+  user_message_count: number;
+  bot_message_count: number;
+  outcome: SessionOutcome;
+  first_question: string | null;
+  form_id?: string;
+}
+
+/** API response for GET /sessions/{session_id} */
+export interface SessionDetailResponse {
+  session_id: string;
+  tenant_id: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_seconds: number;
+  summary: SessionDetailSummary;
+  events: SessionEvent[];
+  event_count: number;
+}

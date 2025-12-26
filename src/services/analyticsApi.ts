@@ -18,6 +18,9 @@ import type {
   RecentConversationsResponse,
   ConversationTrendResponse,
   TimeRange,
+  SessionsListResponse,
+  SessionDetailResponse,
+  SessionOutcome,
 } from '../types/analytics';
 
 // API endpoint - configurable via environment variable
@@ -244,6 +247,58 @@ export async function fetchConversationTrend(
     range,
     granularity,
   });
+}
+
+// =============================================================================
+// Sessions API Functions (User Journey Analytics)
+// =============================================================================
+
+/**
+ * Fetch paginated list of sessions with optional outcome filter
+ * Uses cursor-based pagination for infinite scroll
+ *
+ * @param range - Time range filter (1d, 7d, 30d, 90d)
+ * @param limit - Number of sessions per page (1-100, default 25)
+ * @param cursor - Base64-encoded cursor for next page
+ * @param outcome - Filter by session outcome
+ */
+export async function fetchSessionsList(
+  range: TimeRange = '30d',
+  limit: number = 25,
+  cursor?: string,
+  outcome?: SessionOutcome
+): Promise<SessionsListResponse> {
+  const params: Record<string, string> = {
+    range,
+    limit: String(Math.min(Math.max(limit, 1), 100)), // Clamp to 1-100
+  };
+
+  if (cursor) {
+    params.cursor = cursor;
+  }
+
+  if (outcome) {
+    params.outcome = outcome;
+  }
+
+  return apiRequest<SessionsListResponse>('/sessions/list', params);
+}
+
+/**
+ * Fetch full session detail with event timeline
+ * Returns all events in chronological order by step_number
+ *
+ * @param sessionId - The session ID to fetch
+ */
+export async function fetchSessionDetail(
+  sessionId: string
+): Promise<SessionDetailResponse> {
+  // Validate session ID format (alphanumeric, underscores, hyphens)
+  if (!sessionId || !/^[a-zA-Z0-9_-]+$/.test(sessionId)) {
+    throw new Error('Invalid session ID format');
+  }
+
+  return apiRequest<SessionDetailResponse>(`/sessions/${encodeURIComponent(sessionId)}`);
 }
 
 /**
