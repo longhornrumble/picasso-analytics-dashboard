@@ -62,9 +62,74 @@ const mockSubmissions: FormSubmission[] = [
   { id: '5', name: 'Emily Davis', email: 'emily.d@email.com', formType: 'Volunteer App', comments: 'Interested in the me...', date: 'Nov 29' },
 ];
 
-// Dev mode: use mock data when explicitly enabled (VITE_DEV_MODE=true)
-// Note: Setting VITE_DEV_MODE=false allows testing real API in dev server
-const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
+// Form-specific mock metrics (keyed by form ID, empty string = all forms)
+const mockFormMetrics: Record<string, {
+  views: number;
+  started: number;
+  completed: number;
+  abandoned: number;
+  completionRate: number;
+  abandonRate: number;
+  avgTime: number;
+}> = {
+  '': { views: 1240, started: 843, completed: 521, abandoned: 322, completionRate: 61.8, abandonRate: 38.2, avgTime: 134 },
+  '1': { views: 320, started: 280, completed: 185, abandoned: 95, completionRate: 78.2, abandonRate: 21.8, avgTime: 95 },  // Volunteer Application
+  '2': { views: 280, started: 220, completed: 142, abandoned: 78, completionRate: 64.5, abandonRate: 35.5, avgTime: 120 }, // Donation Request
+  '3': { views: 240, started: 188, completed: 98, abandoned: 90, completionRate: 52.1, abandonRate: 47.9, avgTime: 145 },  // Event Registration
+  '4': { views: 220, started: 166, completed: 76, abandoned: 90, completionRate: 45.8, abandonRate: 54.2, avgTime: 85 },   // General Inquiry
+  '5': { views: 180, started: 89, completed: 20, abandoned: 69, completionRate: 22.4, abandonRate: 77.6, avgTime: 180 },   // Supply Request
+};
+
+// Form-specific mock bottlenecks
+const mockFormBottlenecks: Record<string, FieldBottleneck[]> = {
+  '': mockBottlenecks,
+  '1': [
+    { fieldName: 'Background Check', abandonRate: 42 },
+    { fieldName: 'References (3 required)', abandonRate: 28 },
+    { fieldName: 'Availability Schedule', abandonRate: 15 },
+    { fieldName: 'Skills Assessment', abandonRate: 10 },
+    { fieldName: 'Photo Upload', abandonRate: 5 },
+  ],
+  '2': [
+    { fieldName: 'Payment Method', abandonRate: 35 },
+    { fieldName: 'Recurring Options', abandonRate: 25 },
+    { fieldName: 'Dedication Message', abandonRate: 20 },
+    { fieldName: 'Tax Receipt Info', abandonRate: 12 },
+    { fieldName: 'Newsletter Signup', abandonRate: 8 },
+  ],
+  '3': [
+    { fieldName: 'Dietary Restrictions', abandonRate: 30 },
+    { fieldName: 'Emergency Contact', abandonRate: 25 },
+    { fieldName: 'T-Shirt Size', abandonRate: 22 },
+    { fieldName: 'Accessibility Needs', abandonRate: 15 },
+    { fieldName: 'Carpool Interest', abandonRate: 8 },
+  ],
+  '4': [
+    { fieldName: 'Detailed Message', abandonRate: 45 },
+    { fieldName: 'Category Selection', abandonRate: 25 },
+    { fieldName: 'Preferred Contact', abandonRate: 18 },
+    { fieldName: 'Best Time to Call', abandonRate: 8 },
+    { fieldName: 'How Did You Hear', abandonRate: 4 },
+  ],
+  '5': [
+    { fieldName: 'Item List (5+ items)', abandonRate: 55 },
+    { fieldName: 'Delivery Address', abandonRate: 20 },
+    { fieldName: 'Urgency Level', abandonRate: 12 },
+    { fieldName: 'Organization Info', abandonRate: 8 },
+    { fieldName: 'Follow-up Consent', abandonRate: 5 },
+  ],
+};
+
+/**
+ * MOCK DATA SWITCH (Demo Mode)
+ * ============================
+ * When VITE_USE_MOCK_DATA=true AND tenant is MYR384719, shows mock data for demos.
+ * Otherwise, shows live data from API.
+ *
+ * This is NOT a fallback - when enabled for the demo tenant, mock data is shown
+ * instead of real data. Used only for sales demos and presentations.
+ */
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
 // Form type badge colors
 const formTypeBadgeColors: Record<string, string> = {
@@ -155,30 +220,7 @@ export function Dashboard() {
       }
     } catch (err) {
       console.error('Dashboard data load error:', err);
-
-      // In dev mode, fall back to mock data
-      if (DEV_MODE) {
-        console.log('📊 Using mock data (dev mode)');
-        setFormMetrics({
-          form_views: 1240,
-          forms_started: 843,
-          forms_completed: 521,
-          forms_abandoned: 322,
-          completion_rate: 61.8,
-          abandon_rate: 38.2,
-          avg_completion_time_seconds: 134,
-        });
-        // Keep mock data for forms sections when API fails
-        setBottlenecks([]);
-        setTotalAbandons(0);
-        setTopForms([]);
-        setTotalCompletions(0);
-        setSubmissions([]);
-        setSubmissionsTotalCount(0);
-        setAvgCompletionTime(134);
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to load data');
-      }
+      setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
       setIsLoading(false);
     }
@@ -215,14 +257,18 @@ export function Dashboard() {
     return `${mins}m ${secs}s`;
   };
 
-  // Calculate derived metrics - use formMetrics for form-specific data
-  const totalViews = formMetrics?.form_views || 0;
-  const formsCompleted = formMetrics?.forms_completed || 0;
-  const formsStarted = formMetrics?.forms_started || 0;
-  const formsAbandoned = formMetrics?.forms_abandoned || 0;
-  const completionRate = formMetrics?.completion_rate || 0;
-  const abandonRate = formMetrics?.abandon_rate || 0;
-  const displayAvgCompletionTime = formMetrics?.avg_completion_time_seconds || avgCompletionTime || 0;
+  // Calculate derived metrics - use form-specific mock values in demo mode, otherwise use formMetrics
+  const currentMockMetrics = mockFormMetrics[selectedForm] || mockFormMetrics[''];
+  const totalViews = USE_MOCK_DATA ? currentMockMetrics.views : (formMetrics?.form_views || 0);
+  const formsCompleted = USE_MOCK_DATA ? currentMockMetrics.completed : (formMetrics?.forms_completed || 0);
+  const formsStarted = USE_MOCK_DATA ? currentMockMetrics.started : (formMetrics?.forms_started || 0);
+  const formsAbandoned = USE_MOCK_DATA ? currentMockMetrics.abandoned : (formMetrics?.forms_abandoned || 0);
+  const completionRate = USE_MOCK_DATA ? currentMockMetrics.completionRate : (formMetrics?.completion_rate || 0);
+  const abandonRate = USE_MOCK_DATA ? currentMockMetrics.abandonRate : (formMetrics?.abandon_rate || 0);
+  const displayAvgCompletionTime = USE_MOCK_DATA ? currentMockMetrics.avgTime : (formMetrics?.avg_completion_time_seconds || avgCompletionTime || 0);
+
+  // Get form-specific bottlenecks for mock data
+  const currentMockBottlenecks = mockFormBottlenecks[selectedForm] || mockFormBottlenecks[''];
 
   if (isLoading) {
     return (
@@ -272,7 +318,9 @@ export function Dashboard() {
             <FilterDropdown
               value={selectedForm}
               onChange={setSelectedForm}
-              options={mockForms.map(f => ({ id: f.id, name: f.name }))}
+              options={USE_MOCK_DATA
+                ? mockForms.map(f => ({ id: f.id, name: f.name }))
+                : topForms.map(f => ({ id: f.form_id, name: f.form_label || f.form_id }))}
               placeholder="All Forms"
             />
           }
@@ -322,13 +370,13 @@ export function Dashboard() {
             ]}
           />
           <FieldBottlenecks
-            bottlenecks={formMetrics ? bottlenecks.map(b => ({
+            bottlenecks={USE_MOCK_DATA ? currentMockBottlenecks : bottlenecks.map(b => ({
               fieldName: b.field_label || b.field_id,
               abandonRate: b.abandon_percentage,
               insight: b.insight,
               recommendation: b.recommendation,
-            })) : mockBottlenecks}
-            totalAbandons={formMetrics ? formsAbandoned : 742}
+            }))}
+            totalAbandons={formsAbandoned}
           />
         </div>
 
@@ -336,17 +384,9 @@ export function Dashboard() {
         <div className="mb-8">
           <RankedCards
             title="Top Performing Forms"
-            summaryValue={totalCompletions || 521}
+            summaryValue={USE_MOCK_DATA ? 521 : totalCompletions}
             summaryLabel="Total Submissions"
-            items={topForms.length > 0 ? topForms.map(f => ({
-              id: f.form_id,
-              name: f.form_label || f.form_id,
-              primaryValue: `${f.conversion_rate}%`,
-              primaryLabel: 'Conv.',
-              secondaryValue: f.completions,
-              secondaryLabel: 'submissions',
-              trend: mapTrend(f.trend),
-            })) : mockForms.map(f => ({
+            items={USE_MOCK_DATA ? mockForms.map(f => ({
               id: f.id,
               name: f.name,
               primaryValue: `${f.conversionRate}%`,
@@ -354,10 +394,18 @@ export function Dashboard() {
               secondaryValue: f.submissions,
               secondaryLabel: 'submissions',
               trend: mapTrend(f.trend),
+            })) : topForms.map(f => ({
+              id: f.form_id,
+              name: f.form_label || f.form_id,
+              primaryValue: `${f.conversion_rate}%`,
+              primaryLabel: 'Conv.',
+              secondaryValue: f.completions,
+              secondaryLabel: 'submissions',
+              trend: mapTrend(f.trend),
             }))}
             onViewAll={() => console.log('View all forms')}
             viewAllLabel="View All Forms"
-            viewAllSublabel={`${topForms.length || 5} active forms`}
+            viewAllSublabel={`${USE_MOCK_DATA ? 5 : topForms.length} active forms`}
           />
         </div>
 
@@ -366,16 +414,16 @@ export function Dashboard() {
           title="Recent Submissions"
           subtitle="Latest form entries"
           columns={submissionColumns}
-          data={submissions.length > 0 ? submissions.map(s => ({
+          data={USE_MOCK_DATA ? mockSubmissions : submissions.map(s => ({
             id: s.submission_id,
             name: s.fields?.name || s.fields?.full_name || 'Anonymous',
             email: s.fields?.email || '',
             formType: s.form_label || s.form_id,
             comments: s.fields?.comments || s.fields?.message || '',
             date: s.submitted_date,
-          })) : mockSubmissions}
+          }))}
           rowKey="id"
-          totalCount={submissionsTotalCount || 128}
+          totalCount={USE_MOCK_DATA ? 128 : submissionsTotalCount}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}

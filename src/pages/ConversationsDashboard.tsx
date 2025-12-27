@@ -30,14 +30,19 @@ import type {
   RecentConversation,
   ConversationTrendPoint,
   TimeRange,
+  SessionSummary,
+  SessionDetailResponse,
 } from '../types/analytics';
 
-// Dev mode: use mock data when explicitly enabled (VITE_DEV_MODE=true)
-// Note: Setting VITE_DEV_MODE=false allows testing real API in dev server
-const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
+/**
+ * MOCK DATA SWITCH (Demo Mode)
+ * When VITE_USE_MOCK_DATA=true, shows mock data for demos.
+ * When false (default), shows live data from API.
+ */
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
-// Feature flag for new Sessions API (User Journey Analytics)
-// When enabled, replaces RecentConversations with SessionsList + SessionTimeline
+// Feature flag: Use new SessionsList component instead of legacy RecentConversations
+// Both use DynamoDB backend, but SessionsList has richer session timeline support
 const USE_SESSIONS_API = import.meta.env.VITE_USE_SESSIONS_API === 'true';
 
 // Mock data for development
@@ -117,6 +122,142 @@ const mockTrend: ConversationTrendPoint[] = [
   { period: '10pm', value: 12 },
 ];
 
+// Mock sessions for SessionsList component
+const mockSessions: SessionSummary[] = [
+  {
+    session_id: 'sess_mock_001',
+    started_at: '2025-12-01T17:34:00Z',
+    ended_at: '2025-12-01T17:42:00Z',
+    duration_seconds: 480,
+    outcome: 'form_completed',
+    message_count: 8,
+    user_message_count: 4,
+    bot_message_count: 4,
+    first_question: 'What volunteer opportunities are available?',
+    form_id: 'volunteer_application',
+  },
+  {
+    session_id: 'sess_mock_002',
+    started_at: '2025-12-01T16:01:00Z',
+    ended_at: '2025-12-01T16:08:00Z',
+    duration_seconds: 420,
+    outcome: 'cta_clicked',
+    message_count: 5,
+    user_message_count: 2,
+    bot_message_count: 3,
+    first_question: 'How can I donate to your organization?',
+  },
+  {
+    session_id: 'sess_mock_003',
+    started_at: '2025-12-01T14:22:00Z',
+    ended_at: '2025-12-01T14:30:00Z',
+    duration_seconds: 480,
+    outcome: 'link_clicked',
+    message_count: 6,
+    user_message_count: 3,
+    bot_message_count: 3,
+    first_question: 'How can I make a donation?',
+  },
+  {
+    session_id: 'sess_mock_004',
+    started_at: '2025-12-01T12:15:00Z',
+    ended_at: '2025-12-01T12:18:00Z',
+    duration_seconds: 180,
+    outcome: 'browsing',
+    message_count: 3,
+    user_message_count: 1,
+    bot_message_count: 2,
+    first_question: 'What services do you offer?',
+  },
+  {
+    session_id: 'sess_mock_005',
+    started_at: '2025-12-01T10:45:00Z',
+    ended_at: '2025-12-01T10:47:00Z',
+    duration_seconds: 120,
+    outcome: 'abandoned',
+    message_count: 2,
+    user_message_count: 1,
+    bot_message_count: 1,
+    first_question: 'Hello',
+  },
+];
+
+// Mock session detail for SessionTimeline modal
+const mockSessionDetails: Record<string, SessionDetailResponse> = {
+  'sess_mock_001': {
+    session_id: 'sess_mock_001',
+    tenant_id: 'MYR384719',
+    started_at: '2025-12-01T17:34:00Z',
+    ended_at: '2025-12-01T17:42:00Z',
+    duration_seconds: 480,
+    event_count: 10,
+    summary: {
+      message_count: 8,
+      user_message_count: 4,
+      bot_message_count: 4,
+      outcome: 'form_completed',
+      first_question: 'What volunteer opportunities are available?',
+      form_id: 'volunteer_application',
+    },
+    events: [
+      { step_number: 1, event_type: 'WIDGET_OPENED', timestamp: '2025-12-01T17:34:00Z', payload: { type: 'WIDGET_OPENED', trigger: 'button' } },
+      { step_number: 2, event_type: 'MESSAGE_SENT', timestamp: '2025-12-01T17:34:15Z', payload: { type: 'MESSAGE_SENT', content_preview: 'What volunteer opportunities are available?', content_length: 42 } },
+      { step_number: 3, event_type: 'MESSAGE_RECEIVED', timestamp: '2025-12-01T17:34:17Z', payload: { type: 'MESSAGE_RECEIVED', content_preview: 'We offer several meaningful volunteer opportunities for those passionate about supporting...', content_length: 245 } },
+      { step_number: 4, event_type: 'CTA_CLICKED', timestamp: '2025-12-01T17:35:30Z', payload: { type: 'CTA_CLICKED', cta_id: 'volunteer_apply', cta_label: 'Apply to Volunteer', cta_action: 'form', triggers_form: true } },
+      { step_number: 5, event_type: 'FORM_STARTED', timestamp: '2025-12-01T17:35:32Z', payload: { type: 'FORM_STARTED', form_id: 'volunteer_application', form_label: 'Volunteer Application' } },
+      { step_number: 6, event_type: 'MESSAGE_SENT', timestamp: '2025-12-01T17:38:00Z', payload: { type: 'MESSAGE_SENT', content_preview: 'Sarah Jenkins', content_length: 13 } },
+      { step_number: 7, event_type: 'MESSAGE_SENT', timestamp: '2025-12-01T17:39:00Z', payload: { type: 'MESSAGE_SENT', content_preview: 'sarah.j@email.com', content_length: 18 } },
+      { step_number: 8, event_type: 'MESSAGE_SENT', timestamp: '2025-12-01T17:40:00Z', payload: { type: 'MESSAGE_SENT', content_preview: '512-555-1234', content_length: 12 } },
+      { step_number: 9, event_type: 'FORM_COMPLETED', timestamp: '2025-12-01T17:41:30Z', payload: { type: 'FORM_COMPLETED', form_id: 'volunteer_application', form_label: 'Volunteer Application', duration_seconds: 358, fields_completed: 5 } },
+    ],
+  },
+  'sess_mock_002': {
+    session_id: 'sess_mock_002',
+    tenant_id: 'MYR384719',
+    started_at: '2025-12-01T16:01:00Z',
+    ended_at: '2025-12-01T16:08:00Z',
+    duration_seconds: 420,
+    event_count: 6,
+    summary: {
+      message_count: 5,
+      user_message_count: 2,
+      bot_message_count: 3,
+      outcome: 'cta_clicked',
+      first_question: 'How can I donate to your organization?',
+    },
+    events: [
+      { step_number: 1, event_type: 'WIDGET_OPENED', timestamp: '2025-12-01T16:01:00Z', payload: { type: 'WIDGET_OPENED', trigger: 'button' } },
+      { step_number: 2, event_type: 'MESSAGE_SENT', timestamp: '2025-12-01T16:01:30Z', payload: { type: 'MESSAGE_SENT', content_preview: 'How can I donate to your organization?', content_length: 39 } },
+      { step_number: 3, event_type: 'MESSAGE_RECEIVED', timestamp: '2025-12-01T16:01:32Z', payload: { type: 'MESSAGE_RECEIVED', content_preview: 'Thank you for your interest in supporting our mission! You can donate online...', content_length: 180 } },
+      { step_number: 4, event_type: 'CTA_CLICKED', timestamp: '2025-12-01T16:03:00Z', payload: { type: 'CTA_CLICKED', cta_id: 'donate_now', cta_label: 'Donate Now', cta_action: 'link' } },
+      { step_number: 5, event_type: 'MESSAGE_SENT', timestamp: '2025-12-01T16:07:00Z', payload: { type: 'MESSAGE_SENT', content_preview: 'Thank you!', content_length: 10 } },
+    ],
+  },
+  'sess_mock_003': {
+    session_id: 'sess_mock_003',
+    tenant_id: 'MYR384719',
+    started_at: '2025-12-01T14:22:00Z',
+    ended_at: '2025-12-01T14:30:00Z',
+    duration_seconds: 480,
+    event_count: 7,
+    summary: {
+      message_count: 6,
+      user_message_count: 3,
+      bot_message_count: 3,
+      outcome: 'link_clicked',
+      first_question: 'How can I make a donation?',
+    },
+    events: [
+      { step_number: 1, event_type: 'WIDGET_OPENED', timestamp: '2025-12-01T14:22:00Z', payload: { type: 'WIDGET_OPENED', trigger: 'auto' } },
+      { step_number: 2, event_type: 'MESSAGE_SENT', timestamp: '2025-12-01T14:22:30Z', payload: { type: 'MESSAGE_SENT', content_preview: 'How can I make a donation?', content_length: 26 } },
+      { step_number: 3, event_type: 'MESSAGE_RECEIVED', timestamp: '2025-12-01T14:22:32Z', payload: { type: 'MESSAGE_RECEIVED', content_preview: 'Thank you for wanting to support our cause! You can make a donation...', content_length: 200 } },
+      { step_number: 4, event_type: 'MESSAGE_SENT', timestamp: '2025-12-01T14:25:00Z', payload: { type: 'MESSAGE_SENT', content_preview: 'What payment methods do you accept?', content_length: 35 } },
+      { step_number: 5, event_type: 'MESSAGE_RECEIVED', timestamp: '2025-12-01T14:25:02Z', payload: { type: 'MESSAGE_RECEIVED', content_preview: 'We accept credit cards, debit cards, PayPal, and bank transfers...', content_length: 150 } },
+      { step_number: 6, event_type: 'LINK_CLICKED', timestamp: '2025-12-01T14:28:00Z', payload: { type: 'LINK_CLICKED', url: 'https://donate.example.org', link_text: 'Online Donation Portal', link_domain: 'donate.example.org', category: 'web' } },
+    ],
+  },
+};
+
 export function ConversationsDashboard() {
   const { logout } = useAuth();
 
@@ -128,7 +269,7 @@ export function ConversationsDashboard() {
   // Session timeline state (for new Sessions API)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
-  // Data state
+  // Data state (only used when USE_SESSIONS_API is false)
   const [summary, setSummary] = useState<ConversationSummaryMetrics | null>(null);
   const [heatmap, setHeatmap] = useState<HeatmapRow[]>([]);
   const [peak, setPeak] = useState<HeatmapPeak | null>(null);
@@ -142,7 +283,7 @@ export function ConversationsDashboard() {
   const [conversationsPage, setConversationsPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Fetch data
+  // Fetch data from DynamoDB (all endpoints now use fast DynamoDB queries)
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -169,23 +310,7 @@ export function ConversationsDashboard() {
       setConversationsPage(1);
     } catch (err) {
       console.error('Conversations dashboard load error:', err);
-
-      // In dev mode, fall back to mock data
-      if (DEV_MODE) {
-        console.log('📊 Using mock conversation data (dev mode)');
-        setSummary(mockSummary);
-        setHeatmap(mockHeatmap);
-        setPeak(mockPeak);
-        setTotalConversations(276);
-        setQuestions(mockQuestions);
-        setTotalQuestions(276);
-        setConversations(mockRecentConversations);
-        setConversationsTotal(50);
-        setConversationsHasMore(true);
-        setTrend(mockTrend);
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to load data');
-      }
+      setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
       setIsLoading(false);
     }
@@ -267,24 +392,24 @@ export function ConversationsDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatCard
             title="Total Conversations"
-            value={(summary?.total_conversations ?? 0).toLocaleString()}
+            value={(USE_MOCK_DATA ? mockSummary.total_conversations : (summary?.total_conversations ?? 0)).toLocaleString()}
             subtitle="Unique chat sessions"
             variant="primary"
           />
           <StatCard
             title="Total Messages"
-            value={(summary?.total_messages ?? 0).toLocaleString()}
+            value={(USE_MOCK_DATA ? mockSummary.total_messages : (summary?.total_messages ?? 0)).toLocaleString()}
             subtitle="User + bot messages"
           />
           <StatCard
             title="Response Time"
-            value={formatResponseTime(summary?.avg_response_time_seconds ?? 0)}
+            value={formatResponseTime(USE_MOCK_DATA ? mockSummary.avg_response_time_seconds : (summary?.avg_response_time_seconds ?? 0))}
             subtitle="Average bot response"
             variant="success"
           />
           <StatCard
             title="After Hours"
-            value={`${(summary?.after_hours_percentage ?? 0).toFixed(1)}%`}
+            value={`${(USE_MOCK_DATA ? mockSummary.after_hours_percentage : (summary?.after_hours_percentage ?? 0)).toFixed(1)}%`}
             subtitle="Outside 9am-5pm"
             variant="info"
           />
@@ -293,13 +418,13 @@ export function ConversationsDashboard() {
         {/* Heat Map and Top Questions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <ConversationHeatMap
-            data={heatmap}
-            peak={peak}
-            totalConversations={totalConversations}
+            data={USE_MOCK_DATA ? mockHeatmap : heatmap}
+            peak={USE_MOCK_DATA ? mockPeak : peak}
+            totalConversations={USE_MOCK_DATA ? 276 : totalConversations}
           />
           <TopQuestions
-            questions={questions}
-            totalQuestions={totalQuestions}
+            questions={USE_MOCK_DATA ? mockQuestions : questions}
+            totalQuestions={USE_MOCK_DATA ? 276 : totalQuestions}
           />
         </div>
 
@@ -308,7 +433,7 @@ export function ConversationsDashboard() {
           <SimpleTrendChart
             title="Conversations Trend"
             subtitle={timeRange === '1d' ? 'Questions per hour' : 'Questions per day'}
-            data={trend.map(t => ({ label: t.period, value: t.value }))}
+            data={(USE_MOCK_DATA ? mockTrend : trend).map(t => ({ label: t.period, value: t.value }))}
             color="green"
             height={200}
             showArea
@@ -321,18 +446,20 @@ export function ConversationsDashboard() {
             <SessionsList
               timeRange={timeRange as TimeRange}
               onSessionClick={setSelectedSessionId}
+              mockSessions={USE_MOCK_DATA ? mockSessions : undefined}
             />
             <SessionTimeline
               sessionId={selectedSessionId}
               onClose={() => setSelectedSessionId(null)}
+              mockSessionDetail={USE_MOCK_DATA && selectedSessionId ? mockSessionDetails[selectedSessionId] : undefined}
             />
           </>
         ) : (
           <RecentConversations
-            conversations={conversations}
-            totalCount={conversationsTotal}
+            conversations={USE_MOCK_DATA ? mockRecentConversations : conversations}
+            totalCount={USE_MOCK_DATA ? 50 : conversationsTotal}
             loading={loadingMore}
-            hasMore={conversationsHasMore}
+            hasMore={USE_MOCK_DATA ? true : conversationsHasMore}
             onLoadMore={handleLoadMoreConversations}
           />
         )}

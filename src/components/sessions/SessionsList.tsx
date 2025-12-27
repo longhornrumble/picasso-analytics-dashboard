@@ -12,6 +12,8 @@ import { SessionCard, SessionCardSkeleton } from './SessionCard';
 interface SessionsListProps {
   timeRange: TimeRange;
   onSessionClick: (sessionId: string) => void;
+  /** Optional mock data - when provided, API calls are skipped */
+  mockSessions?: SessionSummary[];
 }
 
 /** Valid outcome filter values */
@@ -27,13 +29,16 @@ const OUTCOME_OPTIONS: { value: SessionOutcome | 'all'; label: string }[] = [
 /** Number of sessions to fetch per page */
 const PAGE_SIZE = 25;
 
-export function SessionsList({ timeRange, onSessionClick }: SessionsListProps) {
+export function SessionsList({ timeRange, onSessionClick, mockSessions }: SessionsListProps) {
+  // Check if using mock data
+  const useMockData = !!mockSessions;
+
   // State
-  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [sessions, setSessions] = useState<SessionSummary[]>(mockSessions || []);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(!useMockData);
   const [isLoading, setIsLoading] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(!useMockData);
   const [error, setError] = useState<string | null>(null);
   const [outcomeFilter, setOutcomeFilter] = useState<SessionOutcome | 'all'>('all');
 
@@ -86,6 +91,17 @@ export function SessionsList({ timeRange, onSessionClick }: SessionsListProps) {
    * Reset and reload when filters change
    */
   useEffect(() => {
+    // Skip API calls when using mock data
+    if (useMockData) {
+      // Apply outcome filter to mock data
+      if (outcomeFilter === 'all') {
+        setSessions(mockSessions || []);
+      } else {
+        setSessions((mockSessions || []).filter(s => s.outcome === outcomeFilter));
+      }
+      return;
+    }
+
     setIsInitialLoad(true);
     setSessions([]);
     setNextCursor(null);
@@ -97,7 +113,7 @@ export function SessionsList({ timeRange, onSessionClick }: SessionsListProps) {
         abortControllerRef.current.abort();
       }
     };
-  }, [timeRange, outcomeFilter, loadSessions]);
+  }, [timeRange, outcomeFilter, loadSessions, useMockData, mockSessions]);
 
   /**
    * Intersection Observer for infinite scroll

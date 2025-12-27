@@ -13,6 +13,8 @@ import { SessionTimelineEvent } from './SessionTimelineEvent';
 interface SessionTimelineProps {
   sessionId: string | null;
   onClose: () => void;
+  /** Optional mock session detail - when provided, API calls are skipped */
+  mockSessionDetail?: SessionDetailResponse | null;
 }
 
 /**
@@ -81,11 +83,14 @@ function TimelineSkeleton() {
   );
 }
 
-export function SessionTimeline({ sessionId, onClose }: SessionTimelineProps) {
+export function SessionTimeline({ sessionId, onClose, mockSessionDetail }: SessionTimelineProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [session, setSession] = useState<SessionDetailResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Check if using mock data
+  const useMockData = mockSessionDetail !== undefined;
 
   /**
    * Load session detail when sessionId changes
@@ -114,11 +119,18 @@ export function SessionTimeline({ sessionId, onClose }: SessionTimelineProps) {
 
     if (sessionId) {
       dialog.showModal();
-      loadSession(sessionId);
+      // Use mock data if provided, otherwise fetch from API
+      if (useMockData && mockSessionDetail) {
+        setSession(mockSessionDetail);
+        setIsLoading(false);
+        setError(null);
+      } else if (!useMockData) {
+        loadSession(sessionId);
+      }
     } else {
       dialog.close();
     }
-  }, [sessionId, loadSession]);
+  }, [sessionId, loadSession, useMockData, mockSessionDetail]);
 
   /**
    * Handle dialog close (ESC key or backdrop click)
