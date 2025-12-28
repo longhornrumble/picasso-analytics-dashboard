@@ -41,10 +41,25 @@ import type {
 
 /**
  * MOCK DATA SWITCH (Demo Mode)
- * When VITE_USE_MOCK_DATA=true, shows mock data for demos.
- * When false (default), shows live data from API.
+ * ============================
+ * Mock data is ONLY shown when BOTH conditions are met:
+ * 1. VITE_USE_MOCK_DATA=true (environment variable)
+ * 2. Tenant ID is MYR384719 (demo tenant)
+ *
+ * This prevents mock data from accidentally appearing for real tenants.
+ * Used only for sales demos and presentations.
  */
-const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
+const DEMO_TENANT_ID = 'MYR384719';
+const MOCK_DATA_ENV_ENABLED = import.meta.env.VITE_USE_MOCK_DATA === 'true';
+
+/**
+ * Check if mock data should be used for a given tenant
+ * @param tenantId - The current tenant's ID
+ * @returns true only if env var is enabled AND tenant is the demo tenant
+ */
+function shouldUseMockData(tenantId: string | undefined): boolean {
+  return MOCK_DATA_ENV_ENABLED && tenantId === DEMO_TENANT_ID;
+}
 
 // Feature flag: Use new SessionsList component instead of legacy RecentConversations
 // Both use DynamoDB backend, but SessionsList has richer session timeline support
@@ -264,7 +279,10 @@ const mockSessionDetails: Record<string, SessionDetailResponse> = {
 };
 
 export function ConversationsDashboard() {
-  useAuth(); // For authentication context
+  const { user } = useAuth();
+
+  // Mock data is ONLY enabled for demo tenant MYR384719
+  const useMockData = shouldUseMockData(user?.tenant_id);
 
   // State
   const [timeRange, setTimeRange] = useState<TimeRangeValue>('30d');
@@ -392,11 +410,11 @@ export function ConversationsDashboard() {
         showToast('success', 'Sessions exported as CSV');
       } else if (format === 'pdf') {
         // PDF export - summary report
-        const pdfSummary = USE_MOCK_DATA ? mockSummary : summary;
-        const pdfQuestions = USE_MOCK_DATA ? mockQuestions : questions;
-        const pdfHeatmap = USE_MOCK_DATA ? mockHeatmap : heatmap;
-        const pdfPeak = USE_MOCK_DATA ? mockPeak : peak;
-        const pdfTrend = USE_MOCK_DATA ? mockTrend : trend;
+        const pdfSummary = useMockData ? mockSummary : summary;
+        const pdfQuestions = useMockData ? mockQuestions : questions;
+        const pdfHeatmap = useMockData ? mockHeatmap : heatmap;
+        const pdfPeak = useMockData ? mockPeak : peak;
+        const pdfTrend = useMockData ? mockTrend : trend;
 
         if (pdfSummary) {
           await generateConversationsPDF({
@@ -518,27 +536,27 @@ export function ConversationsDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard
             title="Total Conversations"
-            value={(USE_MOCK_DATA ? mockSummary.total_conversations : (summary?.total_conversations ?? 0)).toLocaleString()}
+            value={(useMockData ? mockSummary.total_conversations : (summary?.total_conversations ?? 0)).toLocaleString()}
             subtitle="Unique chat sessions"
             variant="primary"
             tier="hero"
           />
           <StatCard
             title="Total Messages"
-            value={(USE_MOCK_DATA ? mockSummary.total_messages : (summary?.total_messages ?? 0)).toLocaleString()}
+            value={(useMockData ? mockSummary.total_messages : (summary?.total_messages ?? 0)).toLocaleString()}
             subtitle="User + bot messages"
             tier="hero"
           />
           <StatCard
             title="Response Time"
-            value={formatResponseTime(USE_MOCK_DATA ? mockSummary.avg_response_time_seconds : (summary?.avg_response_time_seconds ?? 0))}
+            value={formatResponseTime(useMockData ? mockSummary.avg_response_time_seconds : (summary?.avg_response_time_seconds ?? 0))}
             subtitle="Average bot response"
             variant="success"
             tier="hero"
           />
           <StatCard
             title="After Hours"
-            value={`${(USE_MOCK_DATA ? mockSummary.after_hours_percentage : (summary?.after_hours_percentage ?? 0)).toFixed(1)}%`}
+            value={`${(useMockData ? mockSummary.after_hours_percentage : (summary?.after_hours_percentage ?? 0)).toFixed(1)}%`}
             subtitle="Outside 9am-5pm"
             variant="info"
             tier="hero"
@@ -548,13 +566,13 @@ export function ConversationsDashboard() {
         {/* Heat Map and Top Questions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <ConversationHeatMap
-            data={USE_MOCK_DATA ? mockHeatmap : heatmap}
-            peak={USE_MOCK_DATA ? mockPeak : peak}
-            totalConversations={USE_MOCK_DATA ? 276 : totalConversations}
+            data={useMockData ? mockHeatmap : heatmap}
+            peak={useMockData ? mockPeak : peak}
+            totalConversations={useMockData ? 276 : totalConversations}
           />
           <TopQuestions
-            questions={USE_MOCK_DATA ? mockQuestions : questions}
-            totalQuestions={USE_MOCK_DATA ? 276 : totalQuestions}
+            questions={useMockData ? mockQuestions : questions}
+            totalQuestions={useMockData ? 276 : totalQuestions}
           />
         </div>
 
@@ -563,7 +581,7 @@ export function ConversationsDashboard() {
           <SimpleTrendChart
             title="Conversations Trend"
             subtitle="Questions per hour"
-            data={(USE_MOCK_DATA ? mockTrend : trend).map(t => ({ label: t.period, value: t.value }))}
+            data={(useMockData ? mockTrend : trend).map(t => ({ label: t.period, value: t.value }))}
             color="green"
             height={200}
             showArea
@@ -576,20 +594,20 @@ export function ConversationsDashboard() {
             <SessionsList
               timeRange={timeRange as TimeRange}
               onSessionClick={setSelectedSessionId}
-              mockSessions={USE_MOCK_DATA ? mockSessions : undefined}
+              mockSessions={useMockData ? mockSessions : undefined}
             />
             <SessionTimeline
               sessionId={selectedSessionId}
               onClose={() => setSelectedSessionId(null)}
-              mockSessionDetail={USE_MOCK_DATA && selectedSessionId ? mockSessionDetails[selectedSessionId] : undefined}
+              mockSessionDetail={useMockData && selectedSessionId ? mockSessionDetails[selectedSessionId] : undefined}
             />
           </>
         ) : (
           <RecentConversations
-            conversations={USE_MOCK_DATA ? mockRecentConversations : conversations}
-            totalCount={USE_MOCK_DATA ? 50 : conversationsTotal}
+            conversations={useMockData ? mockRecentConversations : conversations}
+            totalCount={useMockData ? 50 : conversationsTotal}
             loading={loadingMore}
-            hasMore={USE_MOCK_DATA ? true : conversationsHasMore}
+            hasMore={useMockData ? true : conversationsHasMore}
             onLoadMore={handleLoadMoreConversations}
           />
         )}

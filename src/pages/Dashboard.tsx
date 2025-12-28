@@ -131,13 +131,24 @@ const mockFormBottlenecks: Record<string, FieldBottleneck[]> = {
 /**
  * MOCK DATA SWITCH (Demo Mode)
  * ============================
- * When VITE_USE_MOCK_DATA=true AND tenant is MYR384719, shows mock data for demos.
- * Otherwise, shows live data from API.
+ * Mock data is ONLY shown when BOTH conditions are met:
+ * 1. VITE_USE_MOCK_DATA=true (environment variable)
+ * 2. Tenant ID is MYR384719 (demo tenant)
  *
- * This is NOT a fallback - when enabled for the demo tenant, mock data is shown
- * instead of real data. Used only for sales demos and presentations.
+ * This prevents mock data from accidentally appearing for real tenants.
+ * Used only for sales demos and presentations.
  */
-const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
+const DEMO_TENANT_ID = 'MYR384719';
+const MOCK_DATA_ENV_ENABLED = import.meta.env.VITE_USE_MOCK_DATA === 'true';
+
+/**
+ * Check if mock data should be used for a given tenant
+ * @param tenantId - The current tenant's ID
+ * @returns true only if env var is enabled AND tenant is the demo tenant
+ */
+function shouldUseMockData(tenantId: string | undefined): boolean {
+  return MOCK_DATA_ENV_ENABLED && tenantId === DEMO_TENANT_ID;
+}
 
 // Form type badge colors
 const formTypeBadgeColors: Record<string, string> = {
@@ -201,7 +212,10 @@ const getSubmissionColumns = (onTypeClick?: (formType: string) => void): Column<
 ];
 
 export function Dashboard() {
-  useAuth(); // For authentication context
+  const { user } = useAuth();
+
+  // Mock data is ONLY enabled for demo tenant MYR384719
+  const useMockData = shouldUseMockData(user?.tenant_id);
 
   // State
   const [timeRange, setTimeRange] = useState<TimeRangeValue>('7d');
@@ -319,7 +333,7 @@ export function Dashboard() {
         // CSV export - form submissions from Recent Submissions table
         let blob: Blob;
 
-        if (USE_MOCK_DATA) {
+        if (useMockData) {
           // Use mock data for CSV export
           const csvData = mockSubmissions.map(s => ({
             'Submission ID': s.id,
@@ -348,7 +362,7 @@ export function Dashboard() {
         showToast('success', 'Form submissions exported as CSV');
       } else if (format === 'pdf') {
         // PDF export - summary report
-        const pdfMetrics = USE_MOCK_DATA ? {
+        const pdfMetrics = useMockData ? {
           form_views: currentMockMetrics.views,
           forms_started: currentMockMetrics.started,
           forms_completed: currentMockMetrics.completed,
@@ -358,12 +372,12 @@ export function Dashboard() {
           avg_completion_time_seconds: currentMockMetrics.avgTime,
         } : formMetrics;
 
-        const pdfBottlenecks = USE_MOCK_DATA ? currentMockBottlenecks : bottlenecks.map(b => ({
+        const pdfBottlenecks = useMockData ? currentMockBottlenecks : bottlenecks.map(b => ({
           fieldName: b.field_label || b.field_id,
           abandonRate: b.abandon_percentage,
         }));
 
-        const pdfTopForms = USE_MOCK_DATA ? mockForms : topForms.map(f => ({
+        const pdfTopForms = useMockData ? mockForms : topForms.map(f => ({
           id: f.form_id,
           name: f.form_label || f.form_id,
           submissions: f.completions,
@@ -402,13 +416,13 @@ export function Dashboard() {
 
   // Calculate derived metrics - use form-specific mock values in demo mode, otherwise use formMetrics
   const currentMockMetrics = mockFormMetrics[selectedForm] || mockFormMetrics[''];
-  const totalViews = USE_MOCK_DATA ? currentMockMetrics.views : (formMetrics?.form_views || 0);
-  const formsCompleted = USE_MOCK_DATA ? currentMockMetrics.completed : (formMetrics?.forms_completed || 0);
-  const formsStarted = USE_MOCK_DATA ? currentMockMetrics.started : (formMetrics?.forms_started || 0);
-  const formsAbandoned = USE_MOCK_DATA ? currentMockMetrics.abandoned : (formMetrics?.forms_abandoned || 0);
-  const completionRate = USE_MOCK_DATA ? currentMockMetrics.completionRate : (formMetrics?.completion_rate || 0);
-  const abandonRate = USE_MOCK_DATA ? currentMockMetrics.abandonRate : (formMetrics?.abandon_rate || 0);
-  const displayAvgCompletionTime = USE_MOCK_DATA ? currentMockMetrics.avgTime : (formMetrics?.avg_completion_time_seconds || avgCompletionTime || 0);
+  const totalViews = useMockData ? currentMockMetrics.views : (formMetrics?.form_views || 0);
+  const formsCompleted = useMockData ? currentMockMetrics.completed : (formMetrics?.forms_completed || 0);
+  const formsStarted = useMockData ? currentMockMetrics.started : (formMetrics?.forms_started || 0);
+  const formsAbandoned = useMockData ? currentMockMetrics.abandoned : (formMetrics?.forms_abandoned || 0);
+  const completionRate = useMockData ? currentMockMetrics.completionRate : (formMetrics?.completion_rate || 0);
+  const abandonRate = useMockData ? currentMockMetrics.abandonRate : (formMetrics?.abandon_rate || 0);
+  const displayAvgCompletionTime = useMockData ? currentMockMetrics.avgTime : (formMetrics?.avg_completion_time_seconds || avgCompletionTime || 0);
 
   // Get form-specific bottlenecks for mock data
   const currentMockBottlenecks = mockFormBottlenecks[selectedForm] || mockFormBottlenecks[''];
@@ -500,7 +514,7 @@ export function Dashboard() {
             <FilterDropdown
               value={selectedForm}
               onChange={setSelectedForm}
-              options={USE_MOCK_DATA
+              options={useMockData
                 ? mockForms.map(f => ({ id: f.id, name: f.name }))
                 : topForms.map(f => ({ id: f.form_id, name: f.form_label || f.form_id }))}
               placeholder="All Forms"
@@ -563,7 +577,7 @@ export function Dashboard() {
             ]}
           />
           <FieldBottlenecks
-            bottlenecks={USE_MOCK_DATA ? currentMockBottlenecks : bottlenecks.map(b => ({
+            bottlenecks={useMockData ? currentMockBottlenecks : bottlenecks.map(b => ({
               fieldName: b.field_label || b.field_id,
               abandonRate: b.abandon_percentage,
               insight: b.insight,
@@ -577,9 +591,9 @@ export function Dashboard() {
         <div className="mb-8">
           <RankedCards
             title="Top Performing Forms"
-            summaryValue={USE_MOCK_DATA ? 521 : totalCompletions}
+            summaryValue={useMockData ? 521 : totalCompletions}
             summaryLabel="Total Submissions"
-            items={USE_MOCK_DATA ? mockForms.map(f => ({
+            items={useMockData ? mockForms.map(f => ({
               id: f.id,
               name: f.name,
               primaryValue: `${f.conversionRate}%`,
@@ -598,7 +612,7 @@ export function Dashboard() {
             }))}
             onViewAll={() => console.log('View all forms')}
             viewAllLabel="View All Forms"
-            viewAllSublabel={`${USE_MOCK_DATA ? 5 : topForms.length} active forms`}
+            viewAllSublabel={`${useMockData ? 5 : topForms.length} active forms`}
           />
         </div>
 
@@ -688,7 +702,7 @@ export function Dashboard() {
             };
 
             // Transform API data to FormSubmission format
-            const transformedData: FormSubmission[] = USE_MOCK_DATA
+            const transformedData: FormSubmission[] = useMockData
               ? mockSubmissions
               : submissions.map(s => ({
                   id: s.submission_id,
@@ -805,7 +819,7 @@ export function Dashboard() {
               }
             };
 
-            if (!USE_MOCK_DATA) return submissionsTotalCount;
+            if (!useMockData) return submissionsTotalCount;
 
             let data = mockSubmissions;
 
