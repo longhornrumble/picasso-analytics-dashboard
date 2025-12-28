@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { StatCard } from '../components/StatCard';
 import { FieldBottlenecks } from '../components/FieldBottlenecks';
+import { LeadWorkspaceDrawer } from '../components/lead-workspace';
 import {
   Funnel,
   DataTable,
@@ -152,25 +153,26 @@ const getSubmissionColumns = (onTypeClick?: (formType: string) => void): Column<
   {
     key: 'date',
     header: 'Date',
-    field: 'date',
+    render: (row) => <span className="text-sm text-slate-700">{row.date}</span>,
     sortable: true,
+    sortKey: 'date',
   },
   {
     key: 'name',
     header: 'Name',
-    render: (row) => <span className="text-sm font-medium text-gray-900">{row.name}</span>,
+    render: (row) => <span className="text-sm font-medium text-slate-700">{row.name}</span>,
     sortable: true,
     sortKey: 'name',
   },
   {
     key: 'email',
     header: 'Email',
-    render: (row) => <span className="text-sm text-gray-600">{row.email}</span>,
+    render: (row) => <span className="text-sm text-slate-700">{row.email}</span>,
   },
   {
     key: 'phone',
     header: 'Phone',
-    render: (row) => <span className="text-sm text-gray-600">{row.phone || '—'}</span>,
+    render: (row) => <span className="text-sm text-slate-700">{row.phone || '—'}</span>,
   },
   {
     key: 'type',
@@ -239,6 +241,22 @@ export function Dashboard() {
   const [tableDateFilter, setTableDateFilter] = useState<DateFilterRange>({ value: 'all' });
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+
+  // Lead Workspace Drawer state
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // Drawer handlers
+  const openDrawer = useCallback((leadId: string) => {
+    setSelectedLeadId(leadId);
+    setIsDrawerOpen(true);
+  }, []);
+
+  const closeDrawer = useCallback(() => {
+    setIsDrawerOpen(false);
+    // Delay clearing the leadId to allow close animation
+    setTimeout(() => setSelectedLeadId(null), 300);
+  }, []);
 
   // Fetch data (falls back to mock in dev mode)
   const loadData = useCallback(async () => {
@@ -826,6 +844,21 @@ export function Dashboard() {
             setSortDirection(direction);
           }}
           reorderable
+          renderActions={(row) => (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                openDrawer(row.id);
+              }}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors duration-150"
+              title="Open lead workspace"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+              </svg>
+            </button>
+          )}
         />
 
         {/* Footer */}
@@ -834,6 +867,13 @@ export function Dashboard() {
           <img src="/myrecruiter-logo.png" alt="MyRecruiter" className="h-6 w-auto" />
         </footer>
       </div>
+
+      {/* Lead Workspace Drawer */}
+      <LeadWorkspaceDrawer
+        leadId={selectedLeadId}
+        isOpen={isDrawerOpen}
+        onClose={closeDrawer}
+      />
     </div>
   );
 }

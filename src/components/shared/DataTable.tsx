@@ -507,7 +507,7 @@ export function TruncatedCell({
       onMouseLeave={() => setShowTooltip(false)}
     >
       <p
-        className="text-sm text-gray-600 truncate cursor-default"
+        className="text-sm text-slate-700 truncate cursor-default"
         style={{ maxWidth }}
       >
         {text}

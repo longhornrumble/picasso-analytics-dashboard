@@ -403,3 +403,64 @@ export interface SessionDetailResponse {
   events: SessionEvent[];
   event_count: number;
 }
+
+// =============================================================================
+// Lead Workspace Types (High-Velocity Lead Processing)
+// =============================================================================
+
+/** Pipeline status values for lead processing */
+export type PipelineStatus = 'new' | 'reviewing' | 'contacted' | 'archived';
+
+/** Submission type for badge coloring */
+export type SubmissionType = 'volunteer' | 'donor' | 'general';
+
+/** Extended form submission with pipeline data */
+export interface LeadWorkspaceData extends FormSubmissionAPI {
+  pipeline_status: PipelineStatus;
+  internal_notes?: string;
+  processed_by?: string;
+  contacted_at?: string;
+  archived_at?: string;
+  submission_type: SubmissionType;
+  /** Tenant name for email subject lines */
+  tenant_name?: string;
+  /** Program ID extracted from form */
+  program_id?: string;
+  /** Zip code extracted from form */
+  zip_code?: string;
+}
+
+/** Parsed form field for display */
+export interface ParsedFormField {
+  label: string;          // Title Case converted
+  value: string;          // Formatted value
+  rawKey: string;         // Original snake_case key
+  type: 'text' | 'email' | 'tel' | 'boolean' | 'array' | 'composite';
+  isExpandable: boolean;  // For truncated values
+}
+
+/** API response for lead detail */
+export interface LeadDetailResponse {
+  lead: LeadWorkspaceData;
+  tenant_name: string;    // For email subject
+}
+
+/** API response for status update */
+export interface StatusUpdateResponse {
+  ref_id: string;
+  pipeline_status: PipelineStatus;
+  updated_at: string;
+}
+
+/** API response for notes update */
+export interface NotesUpdateResponse {
+  ref_id: string;
+  internal_notes: string;
+  updated_at: string;
+}
+
+/** Lead queue for Next Lead navigation */
+export interface LeadQueueResponse {
+  next_lead_id: string | null;
+  queue_count: number;
+}

@@ -139,3 +139,298 @@ body {
   transform: scale(1.1);
   z-index: 10;
 }
+
+/* ========================================
+   LEAD WORKSPACE DRAWER - Light Theme Design
+   Matches brand mockup specifications
+   ======================================== */
+
+.lead-workspace-drawer {
+  @apply fixed top-0 right-0 h-full z-50 overflow-hidden;
+  width: 576px; /* max-w-xl */
+  background: #ffffff; /* white */
+  /* Premium elevation */
+  box-shadow: -16px 0 48px rgba(0, 0, 0, 0.1),
+              -8px 0 24px rgba(0, 0, 0, 0.06);
+  transform: translateX(100%);
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lead-workspace-drawer.open {
+  transform: translateX(0);
+}
+
+@media (max-width: 640px) {
+  .lead-workspace-drawer {
+    width: 90vw;
+  }
+}
+
+/* Drawer backdrop - Subtle blur */
+.drawer-backdrop {
+  @apply fixed inset-0 z-40;
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms ease;
+}
+
+.drawer-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ========================================
+   DRAWER CARDS - Light theme cards
+   ======================================== */
+
+.drawer-card {
+  @apply p-5 border border-gray-200;
+  border-radius: 1rem; /* 16px */
+  background: #f8fafc; /* slate-50 */
+}
+
+/* ========================================
+   PIPELINE STEPPER - Light theme pill buttons
+   ======================================== */
+
+.pipeline-stepper-btn {
+  @apply px-5 py-2.5 font-semibold text-sm border-2 cursor-pointer;
+  border-radius: 9999px; /* pill shape */
+  border-color: #e2e8f0; /* slate-200 */
+  color: #64748b; /* slate-500 */
+  background: white;
+  transition: all 200ms ease;
+}
+
+.pipeline-stepper-btn:hover {
+  border-color: #50C878;
+  color: #50C878;
+}
+
+.pipeline-stepper-btn:active {
+  transform: scale(0.97);
+}
+
+.pipeline-stepper-btn.completed {
+  background: #50C878;
+  border-color: #50C878;
+  color: white;
+}
+
+.pipeline-stepper-btn.current {
+  border-color: #50C878;
+  background: #50C878;
+  color: white;
+}
+
+/* ========================================
+   LEAD VOICE BLOCK - Quote styling (light theme)
+   ======================================== */
+
+.lead-voice-block {
+  @apply p-4;
+  border-radius: 0.75rem; /* 12px */
+  background: #f8fafc; /* slate-50 */
+  border-left: 3px solid #50C878;
+}
+
+/* ========================================
+   COMMUNICATIONS CARD - Primary contact card
+   ======================================== */
+
+.communications-card {
+  @apply border border-gray-200 p-5;
+  border-radius: 1rem; /* 16px */
+  background: #f8fafc; /* slate-50 */
+  transition: all 200ms ease;
+}
+
+.communications-card:hover {
+  border-color: #50C878;
+  box-shadow: 0 4px 12px rgba(80, 200, 120, 0.1);
+}
+
+/* ========================================
+   TERMINAL ACTIONS - Light theme buttons
+   ======================================== */
+
+/* Primary CTA - "Next Record" - dark charcoal filled */
+.btn-next-lead {
+  @apply px-6 py-3.5 text-white font-semibold flex items-center gap-2;
+  border-radius: 0.75rem; /* 12px */
+  background-color: #1e293b; /* slate-800 */
+  transition: all 200ms ease;
+}
+
+.btn-next-lead:hover {
+  background-color: #334155; /* slate-700 */
+}
+
+.btn-next-lead:active {
+  transform: scale(0.98);
+}
+
+.btn-next-lead:disabled {
+  @apply opacity-50 cursor-not-allowed;
+  transform: none;
+}
+
+/* Archive button - coral/red outline */
+.btn-archive {
+  @apply px-5 py-3 font-semibold border-2 flex items-center gap-2;
+  border-radius: 0.75rem; /* 12px */
+  border-color: #fca5a5; /* red-300 */
+  color: #ef4444; /* red-500 */
+  background: white;
+  transition: all 200ms ease;
+}
+
+.btn-archive:hover {
+  background: #fef2f2; /* red-50 */
+  border-color: #f87171; /* red-400 */
+}
+
+.btn-archive:active {
+  transform: scale(0.98);
+}
+
+/* Ghost Button - "Save & Exit Workspace" */
+.btn-ghost {
+  @apply px-5 py-3 font-semibold border-2 border-gray-300 flex items-center gap-2 justify-center;
+  border-radius: 0.75rem; /* 12px */
+  color: #64748b; /* slate-500 */
+  background: white;
+  transition: all 200ms ease;
+}
+
+.btn-ghost:hover {
+  @apply bg-gray-50 border-gray-400;
+}
+
+/* ========================================
+   AVIATION-STYLE LABELS
+   Style Guide: text-[10px] font-black uppercase tracking-[0.2em]
+   ======================================== */
+
+.label-aviation {
+  @apply text-[10px] font-black uppercase;
+  letter-spacing: 0.2em;
+  color: #50C878;
+}
+
+.label-aviation-muted {
+  @apply text-[10px] font-black uppercase;
+  letter-spacing: 0.2em;
+  color: #64748b; /* slate-500 */
+}
+
+/* ========================================
+   METADATA GRID - Attribution info
+   ======================================== */
+
+.metadata-badge {
+  @apply px-3 py-1.5 text-xs font-semibold;
+  border-radius: 2rem; /* pill shape */
+}
+
+.metadata-badge-emerald {
+  background: rgba(80, 200, 120, 0.12);
+  color: #50C878;
+}
+
+.metadata-badge-blue {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+}
+
+.metadata-badge-slate {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+}
+
+/* ========================================
+   DRAWER SCROLLBAR - Light theme
+   ======================================== */
+
+.lead-workspace-drawer ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.lead-workspace-drawer ::-webkit-scrollbar-track {
+  background: #f1f5f9; /* slate-100 */
+}
+
+.lead-workspace-drawer ::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: #cbd5e1; /* slate-300 */
+  transition: background-color 200ms ease;
+}
+
+.lead-workspace-drawer ::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8; /* slate-400 */
+}
+
+/* Firefox scrollbar */
+.lead-workspace-drawer * {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+/* ========================================
+   INTERNAL NOTES - Light theme textarea
+   ======================================== */
+
+.notes-textarea {
+  @apply w-full px-4 py-3 border border-gray-200 text-sm text-slate-700;
+  @apply focus:outline-none resize-none;
+  border-radius: 0.75rem; /* 12px */
+  background: #f8fafc; /* slate-50 */
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+  min-height: 100px;
+}
+
+.notes-textarea:focus {
+  border-color: #50C878;
+  box-shadow: 0 0 0 3px rgba(80, 200, 120, 0.1);
+}
+
+.notes-textarea::placeholder {
+  color: #94a3b8; /* slate-400 */
+}
+
+/* Save indicator */
+.save-indicator {
+  @apply text-xs font-medium;
+  transition: opacity 200ms ease;
+}
+
+.save-indicator.saving {
+  color: #f59e0b; /* amber-500 */
+}
+
+.save-indicator.saved {
+  color: #50C878;
+}
+
+/* ========================================
+   DRAWER CLOSE BUTTON
+   ======================================== */
+
+.drawer-close-btn {
+  @apply p-2 rounded-full transition-all duration-200;
+  background: transparent;
+  color: #64748b; /* slate-500 */
+}
+
+.drawer-close-btn:hover {
+  background: #f1f5f9; /* slate-100 */
+  color: #334155; /* slate-700 */
+}
+
+.drawer-close-btn:active {
+  transform: scale(0.95);
+}
