@@ -1,11 +1,16 @@
 /**
  * Login Page
- * Displays when user is not authenticated
- * Supports Bubble SSO redirect and manual token entry (for testing)
+ * Premium Emerald Design System
+ *
+ * An aspirational gateway that welcomes users into the
+ * Mission Intelligence Platform with world-class design.
  */
 
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+
+// Brand emerald color
+const EMERALD = '#50C878';
 
 const BUBBLE_AUTH_URL = import.meta.env.VITE_BUBBLE_AUTH_URL || '';
 
@@ -30,95 +35,194 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full">
-        {/* Logo/Brand */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-green-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Background "Vortex" - Atmospheric emerald glow */}
+      <div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full pointer-events-none"
+        style={{
+          background: `radial-gradient(circle, ${EMERALD}12 0%, transparent 60%)`,
+          filter: 'blur(120px)',
+        }}
+      />
+
+      {/* Main Container - animate-in */}
+      <div className="max-w-[480px] w-full relative animate-in fade-in zoom-in-95 duration-500">
+        {/* Master Card - Ultra-round cornering */}
+        <div
+          className="bg-white p-10 md:p-12 text-center relative"
+          style={{
+            borderRadius: '3rem',
+            boxShadow: '0 25px 80px -20px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.02)',
+          }}
+        >
+          {/* Logo */}
+          <div className="mb-8">
+            <img
+              src="/myrecruiter-logo.png"
+              alt="MyRecruiter"
+              className="h-12 w-auto mx-auto"
+            />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Form Analytics</h1>
-          <p className="text-gray-500 mt-2">Sign in to view your analytics dashboard</p>
+
+          {/* Meta Badge */}
+          <span
+            className="inline-flex items-center px-4 py-1.5 mb-6 font-black uppercase"
+            style={{
+              fontSize: '10px',
+              letterSpacing: '0.25em',
+              borderRadius: '2rem',
+              backgroundColor: `${EMERALD}12`,
+              color: EMERALD,
+            }}
+          >
+            Mission Intelligence
+          </span>
+
+          {/* Headline */}
+          <h1
+            className="text-3xl md:text-4xl font-black text-slate-900 mb-3"
+            style={{ letterSpacing: '-0.02em' }}
+          >
+            Analytics Dashboard
+          </h1>
+
+          {/* Subtitle */}
+          <p className="text-lg font-medium text-slate-500 mb-10">
+            Sign in to access your intelligence platform
+          </p>
+
+          {/* Error message */}
+          {error && (
+            <div
+              className="mb-8 p-4 text-left"
+              style={{
+                borderRadius: '1rem',
+                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.15)',
+              }}
+            >
+              <p className="text-sm text-red-600 font-medium">{error}</p>
+            </div>
+          )}
+
+          {/* Login options */}
+          {!showManualLogin ? (
+            <div className="space-y-5">
+              {/* Primary CTA - Bubble SSO */}
+              <button
+                onClick={handleBubbleLogin}
+                className="w-full py-4 px-6 text-white font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
+                style={{
+                  borderRadius: '1.25rem',
+                  backgroundColor: EMERALD,
+                  boxShadow: `0 16px 32px -8px rgba(80, 200, 120, 0.4), 0 6px 12px -6px rgba(80, 200, 120, 0.3)`,
+                }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+                Sign in with MyRecruiter
+              </button>
+
+              {/* Divider */}
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-100" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span
+                    className="px-4 bg-white font-black uppercase text-slate-300"
+                    style={{ fontSize: '10px', letterSpacing: '0.2em' }}
+                  >
+                    or
+                  </span>
+                </div>
+              </div>
+
+              {/* Secondary CTA - Ghost Button */}
+              <button
+                onClick={() => setShowManualLogin(true)}
+                className="w-full py-4 px-6 border-2 border-slate-100 text-slate-600 font-semibold hover:bg-slate-50 hover:border-slate-200 transition-all duration-200"
+                style={{ borderRadius: '1.25rem' }}
+              >
+                Enter Token Manually
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleManualLogin} className="text-left">
+              {/* Token Input Section */}
+              <div
+                className="p-6 mb-6"
+                style={{
+                  borderRadius: '1.5rem',
+                  backgroundColor: 'rgba(248, 250, 252, 0.6)',
+                  backdropFilter: 'blur(8px)',
+                }}
+              >
+                {/* Meta Label */}
+                <label
+                  htmlFor="token"
+                  className="block font-black uppercase text-slate-400 mb-4"
+                  style={{ fontSize: '10px', letterSpacing: '0.25em' }}
+                >
+                  JWT Token
+                </label>
+                <textarea
+                  id="token"
+                  value={manualToken}
+                  onChange={(e) => setManualToken(e.target.value)}
+                  placeholder="Paste your JWT token here..."
+                  className="w-full px-4 py-3 border-2 border-slate-100 text-sm focus:border-emerald-300 focus:outline-none resize-none h-28 font-mono text-slate-700 placeholder-slate-300 transition-colors duration-200"
+                  style={{ borderRadius: '1rem' }}
+                />
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={!manualToken.trim()}
+                className="w-full py-4 px-6 text-white font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                style={{
+                  borderRadius: '1.25rem',
+                  backgroundColor: EMERALD,
+                  boxShadow: manualToken.trim()
+                    ? `0 16px 32px -8px rgba(80, 200, 120, 0.4), 0 6px 12px -6px rgba(80, 200, 120, 0.3)`
+                    : 'none',
+                }}
+              >
+                Sign In
+              </button>
+
+              {/* Back Link */}
+              <button
+                type="button"
+                onClick={() => setShowManualLogin(false)}
+                className="w-full mt-4 py-3 text-slate-400 hover:text-slate-600 text-sm font-medium transition-colors duration-200 flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to login options
+              </button>
+            </form>
+          )}
+
+          {/* Help text */}
+          <p className="mt-10 text-sm text-slate-400">
+            Having trouble signing in?{' '}
+            <a
+              href="mailto:support@myrecruiter.ai"
+              className="font-medium transition-colors duration-200 hover:underline"
+              style={{ color: EMERALD }}
+            >
+              Contact support
+            </a>
+          </p>
         </div>
 
-        {/* Error message */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-600">{error}</p>
-          </div>
-        )}
-
-        {/* Login options */}
-        {!showManualLogin ? (
-          <div className="space-y-4">
-            {/* Bubble SSO button */}
-            <button
-              onClick={handleBubbleLogin}
-              className="w-full py-3 px-4 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-              </svg>
-              Sign in with MyRecruiter
-            </button>
-
-            {/* Divider */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">or</span>
-              </div>
-            </div>
-
-            {/* Manual token entry toggle */}
-            <button
-              onClick={() => setShowManualLogin(true)}
-              className="w-full py-3 px-4 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-            >
-              Enter Token Manually
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleManualLogin} className="space-y-4">
-            <div>
-              <label htmlFor="token" className="block text-sm font-medium text-gray-700 mb-2">
-                JWT Token
-              </label>
-              <textarea
-                id="token"
-                value={manualToken}
-                onChange={(e) => setManualToken(e.target.value)}
-                placeholder="Paste your JWT token here..."
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none h-32 font-mono"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={!manualToken.trim()}
-              className="w-full py-3 px-4 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowManualLogin(false)}
-              className="w-full py-3 px-4 text-gray-600 hover:text-gray-900 text-sm"
-            >
-              Back to login options
-            </button>
-          </form>
-        )}
-
-        {/* Help text */}
-        <p className="mt-8 text-center text-xs text-gray-400">
-          Having trouble signing in?{' '}
-          <a href="mailto:support@myrecruiter.ai" className="text-green-500 hover:underline">
-            Contact support
-          </a>
+        {/* Footer */}
+        <p className="mt-8 text-center text-xs text-slate-400">
+          Mission Intelligence Platform
         </p>
       </div>
     </div>
