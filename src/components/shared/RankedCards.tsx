@@ -120,7 +120,7 @@ export function RankedCards<T extends RankedItem>({
   const defaultCardRender = (item: T) => (
     <div
       key={item.id}
-      className={`border border-gray-200 rounded-lg p-4 hover:border-green-300 hover:shadow-sm transition-all ${
+      className={`border border-gray-200 rounded-lg p-4 hover:border-gray-300 hover:shadow-sm transition-all ${
         onCardClick ? 'cursor-pointer' : ''
       }`}
       onClick={() => onCardClick?.(item)}
@@ -146,12 +146,12 @@ export function RankedCards<T extends RankedItem>({
   );
 
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+    <div className="card-analytical">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
         {summaryValue !== undefined && (
-          <span className="text-sm text-green-500 font-medium">
+          <span className="text-sm text-gray-600 font-medium">
             {typeof summaryValue === 'number' ? summaryValue.toLocaleString() : summaryValue}{' '}
             {summaryLabel}
           </span>
@@ -172,16 +172,16 @@ export function RankedCards<T extends RankedItem>({
         {showViewAll && onViewAll && (
           <button
             onClick={onViewAll}
-            className="border-2 border-dashed border-gray-200 rounded-lg p-4 hover:border-green-300 hover:bg-green-50 transition-all flex flex-col items-center justify-center min-h-[80px]"
+            className="border-2 border-dashed border-gray-200 rounded-lg p-4 hover:border-gray-400 hover:bg-gray-50 transition-all flex flex-col items-center justify-center min-h-[80px]"
           >
-            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mb-2">
-              <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-2">
+              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
             </div>
             <span className="text-sm font-medium text-gray-700">{viewAllLabel}</span>
             {viewAllSublabel && (
-              <span className="text-xs text-green-500">{viewAllSublabel}</span>
+              <span className="text-xs text-gray-500">{viewAllSublabel}</span>
             )}
           </button>
         )}

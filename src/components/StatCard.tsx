@@ -1,18 +1,34 @@
 /**
  * StatCard Component
- * Displays a single metric card with value and description
+ * Premium Emerald Design System
+ *
+ * Displays a centered metric card with:
+ * - Large emerald-colored hero value (5xl)
+ * - Aviation-style uppercase label (text-[10px], font-black, tracking-[0.2em])
+ * - Subtle subtitle in slate-400
+ * - Super-ellipse border radius (40px)
+ * - Micro-shadow with hover lift effect
  */
 
+// Brand emerald color
+const EMERALD = '#50C878';
 
 interface StatCardProps {
+  /** Aviation-style label (uppercase, wide tracking) */
   title: string;
+  /** Large hero value */
   value: string | number;
+  /** Subtle gray subtitle */
   subtitle?: string;
+  /** Trend indicator with percentage */
   trend?: {
     value: number;
     label: string;
   };
+  /** @deprecated - All hero cards now use emerald. Kept for backward compatibility. */
   variant?: 'default' | 'success' | 'danger' | 'primary' | 'info';
+  /** Visual hierarchy tier - hero for primary KPIs, standard for secondary */
+  tier?: 'hero' | 'standard';
 }
 
 export function StatCard({
@@ -20,36 +36,54 @@ export function StatCard({
   value,
   subtitle,
   trend,
-  variant = 'default',
+  tier = 'standard',
 }: StatCardProps) {
-  const valueColorClass = {
-    default: 'text-gray-900',
-    success: 'text-primary-500',
-    danger: 'text-danger-500',
-    primary: 'text-primary-600',
-    info: 'text-info-500',
-  }[variant];
+  // Hero tier uses premium emerald design, standard uses neutral
+  const isHero = tier === 'hero';
 
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-      <div className="text-center">
-        <p className={`text-4xl font-bold ${valueColorClass}`}>
-          {value}
+    <div className={isHero ? 'card-hero' : 'card-analytical'}>
+      {/* Hero Value - Large Emerald Number */}
+      <p
+        className={
+          isHero
+            ? 'text-5xl font-extrabold leading-none'
+            : 'text-3xl font-bold text-slate-900'
+        }
+        style={isHero ? { color: EMERALD } : undefined}
+      >
+        {value}
+      </p>
+
+      {/* Aviation-Style Label */}
+      <p
+        className={
+          isHero
+            ? 'text-[10px] font-black uppercase text-slate-700 mt-4'
+            : 'text-xs font-semibold text-slate-500 uppercase tracking-wider mt-2'
+        }
+        style={isHero ? { letterSpacing: '0.2em' } : undefined}
+      >
+        {title}
+      </p>
+
+      {/* Subtitle */}
+      {subtitle && (
+        <p className="text-sm text-slate-400 mt-1">
+          {subtitle}
         </p>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-2">
-          {title}
+      )}
+
+      {/* Trend indicator */}
+      {trend && (
+        <p
+          className={`text-xs mt-2 font-semibold ${
+            trend.value >= 0 ? 'text-emerald-600' : 'text-rose-500'
+          }`}
+        >
+          {trend.value >= 0 ? '↑' : '↓'} {Math.abs(trend.value)}% {trend.label}
         </p>
-        {subtitle && (
-          <p className="text-xs text-gray-400 mt-1">
-            {subtitle}
-          </p>
-        )}
-        {trend && (
-          <p className={`text-xs mt-1 ${trend.value >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {trend.value >= 0 ? '+' : ''}{trend.value}% {trend.label}
-          </p>
-        )}
-      </div>
+      )}
     </div>
   );
 }

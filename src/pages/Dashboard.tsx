@@ -11,21 +11,28 @@ import {
   Funnel,
   DataTable,
   BadgeCell,
-  TwoLineCell,
   TruncatedCell,
   RankedCards,
   mapTrend,
   PageHeader,
   FilterDropdown,
+  ExportDropdown,
+  DateFilter,
   type Column,
   type TimeRangeValue,
+  type ExportFormat,
+  type DateRange,
+  type DateFilterRange,
+  type SortDirection,
 } from '../components/shared';
+import { generateFormsPDF } from '../components/export';
+import Papa from 'papaparse';
 import {
   fetchFormSummary,
   fetchBottlenecks,
   fetchSubmissions,
   fetchTopPerformers,
-  exportData,
+  exportFormSubmissionsData,
 } from '../services/analyticsApi';
 import type {
   FormSummaryMetrics,
@@ -55,11 +62,11 @@ const mockBottlenecks: FieldBottleneck[] = [
 ];
 
 const mockSubmissions: FormSubmission[] = [
-  { id: '1', name: 'Sarah Jenkins', email: 'sarah.j@email.com', formType: 'Volunteer App', comments: 'I have 5 years of ex...', date: 'Dec 01' },
-  { id: '2', name: 'Michael Chen', email: 'm.chen@email.com', formType: 'Donation Req', comments: 'Looking to donate of...', date: 'Dec 01' },
-  { id: '3', name: 'Jessica Ford', email: 'jess.ford@email.com', formType: 'Event Reg', comments: 'Dietary restriction: P...', date: 'Nov 30' },
-  { id: '4', name: 'Robert Smith', email: 'rob.smith@email.com', formType: 'General Inquiry', comments: 'What are your openi...', date: 'Nov 30' },
-  { id: '5', name: 'Emily Davis', email: 'emily.d@email.com', formType: 'Volunteer App', comments: 'Interested in the me...', date: 'Nov 29' },
+  { id: '1', name: 'Sarah Jenkins', email: 'sarah.j@email.com', phone: '(555) 123-4567', formType: 'Volunteer App', comments: 'I have 5 years of experience working with youth programs and would love to contribute to your mentorship initiative.', date: 'Dec 01' },
+  { id: '2', name: 'Michael Chen', email: 'm.chen@email.com', phone: '(555) 234-5678', formType: 'Donation Req', comments: 'Looking to donate office supplies and furniture from our company that is relocating. Can arrange pickup or delivery.', date: 'Dec 01' },
+  { id: '3', name: 'Jessica Ford', email: 'jess.ford@email.com', phone: '(555) 345-6789', formType: 'Event Reg', comments: 'Dietary restriction: Please note I am vegetarian and allergic to nuts. Will need accommodation for the lunch portion.', date: 'Nov 30' },
+  { id: '4', name: 'Robert Smith', email: 'rob.smith@email.com', phone: '(555) 456-7890', formType: 'General Inquiry', comments: 'What are your opening hours on weekends? I work during the week and can only visit on Saturdays or Sundays.', date: 'Nov 30' },
+  { id: '5', name: 'Emily Davis', email: 'emily.d@email.com', phone: '(555) 567-8901', formType: 'Volunteer App', comments: 'Interested in the mentorship program. I am a retired teacher with 30 years of experience in elementary education.', date: 'Nov 29' },
 ];
 
 // Form-specific mock metrics (keyed by form ID, empty string = all forms)
@@ -140,39 +147,77 @@ const formTypeBadgeColors: Record<string, string> = {
   'Supply Request': 'bg-orange-100 text-orange-700',
 };
 
-// Column definitions for submissions table
-const submissionColumns: Column<FormSubmission>[] = [
-  {
-    key: 'name',
-    header: 'Name',
-    render: (row) => <TwoLineCell primary={row.name} secondary={row.email} />,
-  },
-  {
-    key: 'type',
-    header: 'Type',
-    render: (row) => <BadgeCell value={row.formType} colorMap={formTypeBadgeColors} />,
-  },
-  {
-    key: 'comments',
-    header: 'Comments',
-    render: (row) => <TruncatedCell text={row.comments} />,
-  },
+// Column definitions for submissions table (function to allow filter callback)
+const getSubmissionColumns = (onTypeClick?: (formType: string) => void): Column<FormSubmission>[] => [
   {
     key: 'date',
     header: 'Date',
     field: 'date',
+    sortable: true,
+  },
+  {
+    key: 'name',
+    header: 'Name',
+    render: (row) => <span className="text-sm font-medium text-gray-900">{row.name}</span>,
+    sortable: true,
+    sortKey: 'name',
+  },
+  {
+    key: 'email',
+    header: 'Email',
+    render: (row) => <span className="text-sm text-gray-600">{row.email}</span>,
+  },
+  {
+    key: 'phone',
+    header: 'Phone',
+    render: (row) => <span className="text-sm text-gray-600">{row.phone || '—'}</span>,
+  },
+  {
+    key: 'type',
+    header: 'Type',
+    render: (row) => (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onTypeClick?.(row.formType);
+        }}
+        className="cursor-pointer hover:opacity-80 transition-opacity"
+        title={`Filter by ${row.formType}`}
+      >
+        <BadgeCell value={row.formType} colorMap={formTypeBadgeColors} />
+      </button>
+    ),
+    sortable: true,
+    sortKey: 'formType',
+  },
+  {
+    key: 'comments',
+    header: 'Comments',
+    render: (row) => <TruncatedCell text={row.comments} maxWidth="150px" />,
   },
 ];
 
 export function Dashboard() {
-  const { logout } = useAuth();
+  useAuth(); // For authentication context
 
   // State
   const [timeRange, setTimeRange] = useState<TimeRangeValue>('7d');
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [selectedForm, setSelectedForm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
+  const [exportToast, setExportToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Handle time range change - clear custom date range when switching to preset
+  const handleTimeRangeChange = (range: TimeRangeValue) => {
+    setTimeRange(range);
+    if (range !== 'custom') {
+      setDateRange(null);
+    }
+  };
 
   // Data state - formMetrics for form-specific stats
   const [formMetrics, setFormMetrics] = useState<FormSummaryMetrics | null>(null);
@@ -186,21 +231,32 @@ export function Dashboard() {
   const [submissionsTotalCount, setSubmissionsTotalCount] = useState(0);
   const [avgCompletionTime, setAvgCompletionTime] = useState(0);
 
-  // Pagination for submissions
+  // Pagination, search, and table filter for submissions
   const [page, setPage] = useState(1);
   const pageSize = 5;
+  const [searchQuery, setSearchQuery] = useState('');
+  const [tableFormTypeFilter, setTableFormTypeFilter] = useState<string | null>(null);
+  const [tableDateFilter, setTableDateFilter] = useState<DateFilterRange>({ value: 'all' });
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
 
   // Fetch data (falls back to mock in dev mode)
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
+    // Build date range options for custom range
+    const dateRangeOptions = timeRange === 'custom' && dateRange ? {
+      startDate: dateRange.startDate.toISOString().split('T')[0],
+      endDate: dateRange.endDate.toISOString().split('T')[0],
+    } : undefined;
+
     try {
       const [formSummaryData, bottlenecksData, topPerformersData, submissionsData] = await Promise.all([
-        fetchFormSummary(timeRange, selectedForm || undefined),
-        fetchBottlenecks(timeRange, selectedForm || undefined, 5),
-        fetchTopPerformers(timeRange, 5, 'conversion_rate'),
-        fetchSubmissions(timeRange, page, pageSize, selectedForm || undefined),
+        fetchFormSummary(timeRange, selectedForm || undefined, dateRangeOptions),
+        fetchBottlenecks(timeRange, selectedForm || undefined, 5, dateRangeOptions),
+        fetchTopPerformers(timeRange, 5, 'conversion_rate', dateRangeOptions),
+        fetchSubmissions(timeRange, page, pageSize, selectedForm || undefined, undefined, dateRangeOptions),
       ]);
 
       setFormMetrics(formSummaryData.metrics);
@@ -224,29 +280,98 @@ export function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [timeRange, selectedForm, page]);
+  }, [timeRange, dateRange, selectedForm, page]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
+  // Show toast notification
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setExportToast({ type, message });
+    setTimeout(() => setExportToast(null), 4000);
+  };
+
   // Export handler
-  const handleExport = async () => {
+  const handleExport = async (format: ExportFormat) => {
     setIsExporting(true);
+    setExportingFormat(format);
     try {
-      const blob = await exportData(timeRange);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `analytics-${timeRange}-${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      if (format === 'csv') {
+        // CSV export - form submissions from Recent Submissions table
+        let blob: Blob;
+
+        if (USE_MOCK_DATA) {
+          // Use mock data for CSV export
+          const csvData = mockSubmissions.map(s => ({
+            'Submission ID': s.id,
+            'Name': s.name,
+            'Email': s.email,
+            'Form': s.formType,
+            'Comments': s.comments,
+            'Submitted Date': s.date,
+          }));
+          const csv = Papa.unparse(csvData, { header: true, quotes: true });
+          const BOM = '\uFEFF';
+          blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8' });
+        } else {
+          // Use live API data
+          blob = await exportFormSubmissionsData(timeRange, selectedForm || undefined);
+        }
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `form-submissions-${timeRange}-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('success', 'Form submissions exported as CSV');
+      } else if (format === 'pdf') {
+        // PDF export - summary report
+        const pdfMetrics = USE_MOCK_DATA ? {
+          form_views: currentMockMetrics.views,
+          forms_started: currentMockMetrics.started,
+          forms_completed: currentMockMetrics.completed,
+          forms_abandoned: currentMockMetrics.abandoned,
+          completion_rate: currentMockMetrics.completionRate,
+          abandon_rate: currentMockMetrics.abandonRate,
+          avg_completion_time_seconds: currentMockMetrics.avgTime,
+        } : formMetrics;
+
+        const pdfBottlenecks = USE_MOCK_DATA ? currentMockBottlenecks : bottlenecks.map(b => ({
+          fieldName: b.field_label || b.field_id,
+          abandonRate: b.abandon_percentage,
+        }));
+
+        const pdfTopForms = USE_MOCK_DATA ? mockForms : topForms.map(f => ({
+          id: f.form_id,
+          name: f.form_label || f.form_id,
+          submissions: f.completions,
+          conversionRate: f.conversion_rate,
+          trend: f.trend,
+        }));
+
+        if (pdfMetrics) {
+          await generateFormsPDF({
+            metrics: pdfMetrics,
+            bottlenecks: pdfBottlenecks,
+            topForms: pdfTopForms,
+            timeRange,
+            tenantName: 'MyRecruiter',
+          });
+          showToast('success', 'Forms report exported as PDF');
+        } else {
+          showToast('error', 'No data available to export');
+        }
+      }
     } catch (err) {
       console.error('Export error:', err);
+      showToast('error', 'Export failed. Please try again.');
     } finally {
       setIsExporting(false);
+      setExportingFormat(null);
     }
   };
 
@@ -272,10 +397,16 @@ export function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading analytics...</p>
+          <div
+            className="w-12 h-12 rounded-full animate-spin mx-auto mb-4"
+            style={{
+              border: '4px solid rgba(80, 200, 120, 0.2)',
+              borderTopColor: '#50C878',
+            }}
+          />
+          <p className="text-slate-500 font-medium">Loading analytics...</p>
         </div>
       </div>
     );
@@ -283,18 +414,19 @@ export function Dashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center bg-white p-8 rounded-xl shadow-sm max-w-md">
-          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-2xl shadow-sm max-w-md border border-slate-100">
+          <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Failed to load data</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <h2 className="text-lg font-bold text-slate-900 mb-2">Failed to load data</h2>
+          <p className="text-slate-500 mb-4">{error}</p>
           <button
             onClick={loadData}
-            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+            className="px-5 py-2.5 text-white rounded-xl font-semibold transition-all duration-200 hover:opacity-90"
+            style={{ backgroundColor: '#50C878' }}
           >
             Try Again
           </button>
@@ -304,16 +436,48 @@ export function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
+      {/* Export Toast Notification */}
+      {exportToast && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 ${
+            exportToast.type === 'success'
+              ? 'bg-green-50 border border-green-200 text-green-800'
+              : 'bg-red-50 border border-red-200 text-red-800'
+          }`}
+        >
+          {exportToast.type === 'success' ? (
+            <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          )}
+          <span className="text-sm font-medium">{exportToast.message}</span>
+          <button
+            onClick={() => setExportToast(null)}
+            className="ml-2 text-gray-400 hover:text-gray-600"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
         <PageHeader
-          title="Form Analytics Overview"
+          sectionLabel="ENTERPRISE INTELLIGENCE"
+          title="Form Performance"
           timeRange={timeRange}
-          onTimeRangeChange={setTimeRange}
-          onExport={handleExport}
-          isExporting={isExporting}
-          onSignOut={logout}
+          onTimeRangeChange={handleTimeRangeChange}
+          showExport={false}
+          showDatePicker={true}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
           filters={
             <FilterDropdown
               value={selectedForm}
@@ -324,31 +488,42 @@ export function Dashboard() {
               placeholder="All Forms"
             />
           }
+          actions={
+            <ExportDropdown
+              onExport={handleExport}
+              isExporting={isExporting}
+              exportingFormat={exportingFormat}
+            />
+          }
         />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {/* Stats Cards - Hero Tier */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard
             title="Total Form Views"
             value={totalViews.toLocaleString()}
             subtitle={`${formsStarted} forms started`}
+            tier="hero"
           />
           <StatCard
             title="Total Completions"
             value={formsCompleted.toLocaleString()}
             subtitle={`${completionRate.toFixed(1)}% Completion Rate`}
             variant="success"
+            tier="hero"
           />
           <StatCard
             title="Avg. Completion Time"
             value={formatTime(displayAvgCompletionTime)}
             subtitle="From start to submit"
+            tier="hero"
           />
           <StatCard
             title="Abandon Rate"
             value={`${abandonRate.toFixed(1)}%`}
             subtitle={`${formsAbandoned} Abandoned`}
             variant="danger"
+            tier="hero"
           />
         </div>
 
@@ -412,30 +587,251 @@ export function Dashboard() {
         {/* Recent Submissions */}
         <DataTable<FormSubmission>
           title="Recent Submissions"
-          subtitle="Latest form entries"
-          columns={submissionColumns}
-          data={USE_MOCK_DATA ? mockSubmissions : submissions.map(s => ({
-            id: s.submission_id,
-            name: s.fields?.name || s.fields?.full_name || 'Anonymous',
-            email: s.fields?.email || '',
-            formType: s.form_label || s.form_id,
-            comments: s.fields?.comments || s.fields?.message || '',
-            date: s.submitted_date,
-          }))}
+          subtitle={
+            <span>
+              Latest form entries - Search by name, email, phone, or form type
+              {tableFormTypeFilter && (
+                <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
+                  Type: {tableFormTypeFilter}
+                  <button
+                    type="button"
+                    onClick={() => setTableFormTypeFilter(null)}
+                    className="ml-1 hover:text-primary-900"
+                    title="Clear filter"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )}
+            </span>
+          }
+          columns={getSubmissionColumns((formType) => {
+            // Toggle filter: click same type to clear, different type to set
+            setTableFormTypeFilter(prev => prev === formType ? null : formType);
+            setPage(1);
+          })}
+          filterComponent={
+            <DateFilter
+              value={tableDateFilter}
+              onChange={(range) => {
+                setTableDateFilter(range);
+                setPage(1);
+              }}
+            />
+          }
+          data={(() => {
+            // Helper to check if date matches filter
+            const matchesDateFilter = (dateStr: string): boolean => {
+              if (tableDateFilter.value === 'all') return true;
+
+              // Parse the date string (e.g., "Dec 01" or "2025-12-01")
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+
+              let rowDate: Date;
+              if (dateStr.includes('-')) {
+                // ISO format
+                rowDate = new Date(dateStr);
+              } else {
+                // "Dec 01" format - assume current year
+                const [month, day] = dateStr.split(' ');
+                const monthIndex = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].indexOf(month);
+                rowDate = new Date(today.getFullYear(), monthIndex, parseInt(day));
+              }
+              rowDate.setHours(0, 0, 0, 0);
+
+              switch (tableDateFilter.value) {
+                case 'today':
+                  return rowDate.getTime() === today.getTime();
+                case '7d': {
+                  const sevenDaysAgo = new Date(today);
+                  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                  return rowDate >= sevenDaysAgo && rowDate <= today;
+                }
+                case '30d': {
+                  const thirtyDaysAgo = new Date(today);
+                  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                  return rowDate >= thirtyDaysAgo && rowDate <= today;
+                }
+                case 'custom':
+                  if (tableDateFilter.startDate && tableDateFilter.endDate) {
+                    const start = new Date(tableDateFilter.startDate);
+                    start.setHours(0, 0, 0, 0);
+                    const end = new Date(tableDateFilter.endDate);
+                    end.setHours(23, 59, 59, 999);
+                    return rowDate >= start && rowDate <= end;
+                  }
+                  return true;
+                default:
+                  return true;
+              }
+            };
+
+            // Transform API data to FormSubmission format
+            const transformedData: FormSubmission[] = USE_MOCK_DATA
+              ? mockSubmissions
+              : submissions.map(s => ({
+                  id: s.submission_id,
+                  name: s.fields?.name || s.fields?.full_name || 'Anonymous',
+                  email: s.fields?.email || '',
+                  phone: s.fields?.phone || s.fields?.phone_number || '',
+                  formType: s.form_label || s.form_id,
+                  comments: s.fields?.comments || s.fields?.message || '',
+                  date: s.submitted_date,
+                }));
+
+            // Apply date filter
+            let filteredData = transformedData.filter(row => matchesDateFilter(row.date));
+
+            // Apply type filter
+            if (tableFormTypeFilter) {
+              filteredData = filteredData.filter(row => row.formType === tableFormTypeFilter);
+            }
+
+            // Then apply search filter
+            if (searchQuery.trim()) {
+              const query = searchQuery.toLowerCase().trim();
+              filteredData = filteredData.filter(row =>
+                row.name.toLowerCase().includes(query) ||
+                row.email.toLowerCase().includes(query) ||
+                (row.phone && row.phone.toLowerCase().includes(query)) ||
+                row.formType.toLowerCase().includes(query)
+              );
+            }
+
+            // Apply sorting
+            if (sortColumn && sortDirection) {
+              filteredData = [...filteredData].sort((a, b) => {
+                let aVal: string = '';
+                let bVal: string = '';
+
+                if (sortColumn === 'date') {
+                  // Parse dates for comparison
+                  const parseDate = (dateStr: string): Date => {
+                    if (dateStr.includes('-')) return new Date(dateStr);
+                    const [month, day] = dateStr.split(' ');
+                    const monthIndex = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].indexOf(month);
+                    return new Date(new Date().getFullYear(), monthIndex, parseInt(day));
+                  };
+                  const aDate = parseDate(a.date);
+                  const bDate = parseDate(b.date);
+                  return sortDirection === 'asc'
+                    ? aDate.getTime() - bDate.getTime()
+                    : bDate.getTime() - aDate.getTime();
+                }
+
+                // String comparison for other fields
+                if (sortColumn === 'name') {
+                  aVal = a.name.toLowerCase();
+                  bVal = b.name.toLowerCase();
+                } else if (sortColumn === 'formType') {
+                  aVal = a.formType.toLowerCase();
+                  bVal = b.formType.toLowerCase();
+                }
+
+                if (sortDirection === 'asc') {
+                  return aVal.localeCompare(bVal);
+                } else {
+                  return bVal.localeCompare(aVal);
+                }
+              });
+            }
+
+            return filteredData;
+          })()}
           rowKey="id"
-          totalCount={USE_MOCK_DATA ? 128 : submissionsTotalCount}
+          totalCount={(() => {
+            // Helper to check if date matches filter (duplicated for totalCount)
+            const matchesDateFilter = (dateStr: string): boolean => {
+              if (tableDateFilter.value === 'all') return true;
+
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+
+              let rowDate: Date;
+              if (dateStr.includes('-')) {
+                rowDate = new Date(dateStr);
+              } else {
+                const [month, day] = dateStr.split(' ');
+                const monthIndex = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].indexOf(month);
+                rowDate = new Date(today.getFullYear(), monthIndex, parseInt(day));
+              }
+              rowDate.setHours(0, 0, 0, 0);
+
+              switch (tableDateFilter.value) {
+                case 'today':
+                  return rowDate.getTime() === today.getTime();
+                case '7d': {
+                  const sevenDaysAgo = new Date(today);
+                  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                  return rowDate >= sevenDaysAgo && rowDate <= today;
+                }
+                case '30d': {
+                  const thirtyDaysAgo = new Date(today);
+                  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                  return rowDate >= thirtyDaysAgo && rowDate <= today;
+                }
+                case 'custom':
+                  if (tableDateFilter.startDate && tableDateFilter.endDate) {
+                    const start = new Date(tableDateFilter.startDate);
+                    start.setHours(0, 0, 0, 0);
+                    const end = new Date(tableDateFilter.endDate);
+                    end.setHours(23, 59, 59, 999);
+                    return rowDate >= start && rowDate <= end;
+                  }
+                  return true;
+                default:
+                  return true;
+              }
+            };
+
+            if (!USE_MOCK_DATA) return submissionsTotalCount;
+
+            let data = mockSubmissions;
+
+            // Apply date filter
+            data = data.filter(row => matchesDateFilter(row.date));
+
+            // Apply type filter
+            if (tableFormTypeFilter) {
+              data = data.filter(row => row.formType === tableFormTypeFilter);
+            }
+
+            // Apply search filter
+            if (searchQuery.trim()) {
+              const query = searchQuery.toLowerCase();
+              data = data.filter(row =>
+                row.name.toLowerCase().includes(query) ||
+                row.email.toLowerCase().includes(query) ||
+                (row.phone && row.phone.toLowerCase().includes(query)) ||
+                row.formType.toLowerCase().includes(query)
+              );
+            }
+
+            return data.length;
+          })()}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}
-          onSearch={(query) => console.log('Search:', query)}
+          onSearch={(query) => {
+            setSearchQuery(query);
+            setPage(1); // Reset to first page when searching
+          }}
+          sortColumn={sortColumn}
+          sortDirection={sortDirection}
+          onSort={(column, direction) => {
+            setSortColumn(direction ? column : null);
+            setSortDirection(direction);
+          }}
+          reorderable
         />
 
         {/* Footer */}
-        <footer className="mt-12 text-center py-6 border-t border-gray-200">
-          <p className="text-sm text-gray-500">
-            Mission Intelligence Platform powered by{' '}
-            <span className="font-semibold text-gray-700">MyRecruiter</span>
-          </p>
+        <footer className="mt-12 py-6 border-t border-slate-100 flex items-center justify-center gap-2">
+          <span className="text-sm text-slate-400">Mission Intelligence Platform powered by</span>
+          <img src="/myrecruiter-logo.png" alt="MyRecruiter" className="h-6 w-auto" />
         </footer>
       </div>
     </div>

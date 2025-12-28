@@ -5,7 +5,9 @@
  * Used by: Forms Dashboard, Conversations Dashboard, Attribution Dashboard
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+
+export type SortDirection = 'asc' | 'desc' | null;
 
 export interface Column<T> {
   /** Unique key for the column */
@@ -20,13 +22,19 @@ export interface Column<T> {
   render?: (row: T) => React.ReactNode;
   /** If no render, use this field from the row object */
   field?: keyof T;
+  /** Whether this column is sortable */
+  sortable?: boolean;
+  /** Key to use for sorting (defaults to field or key) */
+  sortKey?: string;
+  /** Whether this column contains numeric data (enables tabular-nums, right-align) */
+  isNumeric?: boolean;
 }
 
 interface DataTableProps<T extends object> {
   /** Title displayed in header */
   title: string;
   /** Subtitle/description */
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   /** Column definitions */
   columns: Column<T>[];
   /** Data rows */
@@ -49,6 +57,14 @@ interface DataTableProps<T extends object> {
   showFilter?: boolean;
   /** Filter click handler */
   onFilter?: () => void;
+  /** Custom filter component (replaces default filter button) */
+  filterComponent?: React.ReactNode;
+  /** Current sort column key */
+  sortColumn?: string | null;
+  /** Current sort direction */
+  sortDirection?: SortDirection;
+  /** Sort change handler */
+  onSort?: (column: string, direction: SortDirection) => void;
   /** Row click handler */
   onRowClick?: (row: T) => void;
   /** Show actions column */
@@ -57,6 +73,10 @@ interface DataTableProps<T extends object> {
   renderActions?: (row: T) => React.ReactNode;
   /** Empty state message */
   emptyMessage?: string;
+  /** Enable column reordering via drag and drop */
+  reorderable?: boolean;
+  /** Callback when columns are reordered */
+  onColumnReorder?: (columnKeys: string[]) => void;
 }
 
 export function DataTable<T extends object>({
@@ -73,15 +93,42 @@ export function DataTable<T extends object>({
   showSearch = true,
   showFilter = true,
   onFilter,
+  filterComponent,
+  sortColumn = null,
+  sortDirection = null,
+  onSort,
   onRowClick,
   showActions = true,
   renderActions,
   emptyMessage = 'No data available',
+  reorderable = false,
+  onColumnReorder,
 }: DataTableProps<T>) {
   const [searchQuery, setSearchQuery] = useState('');
   const totalPages = Math.ceil(totalCount / pageSize);
   const startIndex = (page - 1) * pageSize + 1;
   const endIndex = Math.min(page * pageSize, totalCount);
+
+  // Column reordering state
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => columns.map(c => c.key));
+  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+
+  // Sync column order when columns prop changes
+  useEffect(() => {
+    const newKeys = columns.map(c => c.key);
+    setColumnOrder(prev => {
+      // Keep existing order for columns that still exist, add new ones at the end
+      const existingOrder = prev.filter(key => newKeys.includes(key));
+      const newColumns = newKeys.filter(key => !prev.includes(key));
+      return [...existingOrder, ...newColumns];
+    });
+  }, [columns]);
+
+  // Get ordered columns based on current order
+  const orderedColumns = columnOrder
+    .map(key => columns.find(c => c.key === key))
+    .filter((c): c is Column<T> => c !== undefined);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -98,6 +145,62 @@ export function DataTable<T extends object>({
     }
     return null;
   };
+
+  // Drag and drop handlers
+  const handleDragStart = useCallback((e: React.DragEvent, columnKey: string) => {
+    setDraggedColumn(columnKey);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', columnKey);
+    // Add a slight delay to allow the drag image to be captured
+    setTimeout(() => {
+      (e.target as HTMLElement).style.opacity = '0.5';
+    }, 0);
+  }, []);
+
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
+    (e.target as HTMLElement).style.opacity = '1';
+    setDraggedColumn(null);
+    setDragOverColumn(null);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, columnKey: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (columnKey !== draggedColumn) {
+      setDragOverColumn(columnKey);
+    }
+  }, [draggedColumn]);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverColumn(null);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, targetKey: string) => {
+    e.preventDefault();
+    const sourceKey = e.dataTransfer.getData('text/plain');
+
+    if (sourceKey && sourceKey !== targetKey) {
+      setColumnOrder(prev => {
+        const newOrder = [...prev];
+        const sourceIndex = newOrder.indexOf(sourceKey);
+        const targetIndex = newOrder.indexOf(targetKey);
+
+        if (sourceIndex !== -1 && targetIndex !== -1) {
+          // Remove source and insert at target position
+          newOrder.splice(sourceIndex, 1);
+          newOrder.splice(targetIndex, 0, sourceKey);
+
+          // Notify parent
+          onColumnReorder?.(newOrder);
+        }
+
+        return newOrder;
+      });
+    }
+
+    setDraggedColumn(null);
+    setDragOverColumn(null);
+  }, [onColumnReorder]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100">
@@ -129,16 +232,18 @@ export function DataTable<T extends object>({
                 </svg>
               </div>
             )}
-            {/* Filter button */}
+            {/* Filter button or custom filter component */}
             {showFilter && (
-              <button
-                onClick={onFilter}
-                className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50"
-              >
-                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                </svg>
-              </button>
+              filterComponent || (
+                <button
+                  onClick={onFilter}
+                  className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                </button>
+              )
             )}
           </div>
         </div>
@@ -149,16 +254,81 @@ export function DataTable<T extends object>({
         <table className="w-full">
           <thead>
             <tr className="bg-gray-50">
-              {columns.map((column) => (
-                <th
-                  key={column.key}
-                  className={`px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider ${
-                    column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'
-                  } ${column.width || ''}`}
-                >
-                  {column.header}
-                </th>
-              ))}
+              {orderedColumns.map((column) => {
+                const sortKey = column.sortKey || (column.field as string) || column.key;
+                const isSorted = sortColumn === sortKey;
+                const isAsc = isSorted && sortDirection === 'asc';
+                const isDesc = isSorted && sortDirection === 'desc';
+                const isDragging = draggedColumn === column.key;
+                const isDragOver = dragOverColumn === column.key;
+
+                const handleSortClick = () => {
+                  if (!column.sortable || !onSort) return;
+                  // Cycle: null -> asc -> desc -> null
+                  let newDirection: SortDirection;
+                  if (!isSorted || sortDirection === null) {
+                    newDirection = 'asc';
+                  } else if (sortDirection === 'asc') {
+                    newDirection = 'desc';
+                  } else {
+                    newDirection = null;
+                  }
+                  onSort(sortKey, newDirection);
+                };
+
+                return (
+                  <th
+                    key={column.key}
+                    draggable={reorderable}
+                    onDragStart={reorderable ? (e) => handleDragStart(e, column.key) : undefined}
+                    onDragEnd={reorderable ? handleDragEnd : undefined}
+                    onDragOver={reorderable ? (e) => handleDragOver(e, column.key) : undefined}
+                    onDragLeave={reorderable ? handleDragLeave : undefined}
+                    onDrop={reorderable ? (e) => handleDrop(e, column.key) : undefined}
+                    className={`px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider transition-all ${
+                      column.isNumeric ? 'text-right' :
+                      column.align === 'right' ? 'text-right' :
+                      column.align === 'center' ? 'text-center' : 'text-left'
+                    } ${column.width || ''} ${column.sortable ? 'cursor-pointer select-none hover:bg-gray-100' : ''} ${
+                      reorderable ? 'cursor-grab active:cursor-grabbing' : ''
+                    } ${isDragging ? 'opacity-50' : ''} ${
+                      isDragOver ? 'bg-primary-50 border-l-2 border-primary-400' : ''
+                    }`}
+                    onClick={handleSortClick}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {reorderable && (
+                        <svg
+                          className="w-3 h-3 text-gray-400 mr-1 flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
+                        </svg>
+                      )}
+                      {column.header}
+                      {column.sortable && (
+                        <span className="inline-flex flex-col ml-1">
+                          <svg
+                            className={`w-3 h-3 -mb-1 ${isAsc ? 'text-primary-600' : 'text-gray-300'}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M10 5l5 5H5l5-5z" />
+                          </svg>
+                          <svg
+                            className={`w-3 h-3 -mt-1 ${isDesc ? 'text-primary-600' : 'text-gray-300'}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M10 15l-5-5h10l-5 5z" />
+                          </svg>
+                        </span>
+                      )}
+                    </span>
+                  </th>
+                );
+              })}
               {showActions && (
                 <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Actions
@@ -170,24 +340,30 @@ export function DataTable<T extends object>({
             {data.length === 0 ? (
               <tr>
                 <td
-                  colSpan={columns.length + (showActions ? 1 : 0)}
+                  colSpan={orderedColumns.length + (showActions ? 1 : 0)}
                   className="px-6 py-12 text-center text-gray-500"
                 >
                   {emptyMessage}
                 </td>
               </tr>
             ) : (
-              data.map((row) => (
+              data.map((row, rowIndex) => (
                 <tr
                   key={String((row as Record<string, unknown>)[rowKey as string])}
-                  className={`hover:bg-gray-50 ${onRowClick ? 'cursor-pointer' : ''}`}
+                  className={`
+                    ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-[var(--table-stripe-color)]'}
+                    hover:bg-[var(--table-hover-color)] transition-colors duration-150
+                    ${onRowClick ? 'cursor-pointer' : ''}
+                  `}
                   onClick={() => onRowClick?.(row)}
                 >
-                  {columns.map((column) => (
+                  {orderedColumns.map((column) => (
                     <td
                       key={column.key}
                       className={`px-6 py-4 ${column.width || ''} ${
-                        column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''
+                        column.isNumeric ? 'text-right tabular-nums' :
+                        column.align === 'right' ? 'text-right' :
+                        column.align === 'center' ? 'text-center' : ''
                       }`}
                     >
                       {renderCell(column, row)}
@@ -282,8 +458,9 @@ export function TwoLineCell({
 }
 
 /**
- * Helper: Truncated text cell
+ * Helper: Truncated text cell with hover tooltip
  * Use for long text fields like comments
+ * Tooltip automatically positions above or below based on available space
  */
 export function TruncatedCell({
   text,
@@ -292,13 +469,68 @@ export function TruncatedCell({
   text: string;
   maxWidth?: string;
 }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [showAbove, setShowAbove] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // Only show tooltip if text is actually truncated
+  const isTruncated = text && text.length > 20;
+
+  const handleMouseEnter = () => {
+    if (!isTruncated || !containerRef.current) return;
+
+    // Get element position relative to viewport
+    const rect = containerRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+
+    const spaceAbove = rect.top;
+    const spaceBelow = viewportHeight - rect.bottom;
+
+    // Show tooltip above if:
+    // - There's enough space above (>150px for tooltip)
+    // - AND not enough space below (<300px accounts for tooltip height + rows below + footer)
+    // Otherwise default to showing below
+    const shouldShowAbove = spaceAbove > 150 && spaceBelow < 300;
+    setShowAbove(shouldShowAbove);
+    setShowTooltip(true);
+  };
+
+  if (!text) {
+    return <span className="text-sm text-gray-400">—</span>;
+  }
+
   return (
-    <p
-      className="text-sm text-gray-600 truncate"
-      style={{ maxWidth }}
-      title={text}
+    <div
+      ref={containerRef}
+      className="relative"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setShowTooltip(false)}
     >
-      {text}
-    </p>
+      <p
+        className="text-sm text-gray-600 truncate cursor-default"
+        style={{ maxWidth }}
+      >
+        {text}
+      </p>
+
+      {/* Styled tooltip on hover - position based on available space */}
+      {showTooltip && (
+        <div
+          className={`absolute z-50 left-0 max-w-sm animate-in fade-in duration-150 ${
+            showAbove ? 'bottom-full mb-2' : 'top-full mt-2'
+          }`}
+        >
+          {/* Tooltip arrow - points toward the text */}
+          {showAbove ? (
+            <div className="absolute left-4 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-gray-900" />
+          ) : (
+            <div className="absolute left-4 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-gray-900" />
+          )}
+          <div className="bg-gray-900 text-white text-sm rounded-lg px-3 py-2 shadow-lg">
+            <p className="whitespace-pre-wrap break-words">{text}</p>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

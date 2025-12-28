@@ -1,34 +1,141 @@
 /* Shared Picasso design tokens - single source of truth */
-@import '@picasso/shared-styles/tokens';
+@import '../../picasso-shared-styles/src/tokens.css';
 
-/* Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Google Fonts - Plus Jakarta Sans (Premium SaaS typography) */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
-  @apply bg-gray-50 text-gray-900 antialiased;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  @apply bg-slate-50 text-slate-900 antialiased;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   margin: 0;
   min-height: 100vh;
 }
 
-/* Custom scrollbar */
+/* ========================================
+   CUSTOM SCROLLBAR - Thin Emerald Accent
+   ======================================== */
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-100;
+  @apply bg-transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded-full;
+  @apply rounded-full;
+  background-color: rgba(80, 200, 120, 0.3);
+  transition: background-color 200ms ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400;
+  background-color: rgba(80, 200, 120, 0.5);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(80, 200, 120, 0.3) transparent;
+}
+
+/* ========================================
+   CARD VARIANTS - Premium Emerald Design System
+   ======================================== */
+
+/* Tier 1: Hero KPI Cards - centered metrics with premium depth */
+.card-hero {
+  @apply bg-white p-8 border border-slate-100 text-center;
+  border-radius: 2.5rem; /* 40px super-ellipse */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  transition: transform 500ms ease, box-shadow 500ms ease;
+}
+
+.card-hero:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+}
+
+/* Tier 2: Analytical Cards - charts and analysis */
+.card-analytical {
+  @apply bg-white p-6 border border-slate-100;
+  border-radius: 1.5rem; /* 24px */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  transition: transform 500ms ease, box-shadow 500ms ease;
+}
+
+.card-analytical:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.03);
+}
+
+/* Tier 3: Utility Cards - tables, lists */
+.card-utility {
+  @apply bg-white p-5 border border-slate-100;
+  border-radius: 1.25rem; /* 20px */
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.015);
+}
+
+/* ========================================
+   INSIGHT CALLOUTS - Non-intrusive data insights
+   ======================================== */
+
+.insight-callout {
+  @apply mt-4 p-3 rounded-lg border flex items-start gap-2 text-sm;
+}
+
+.insight-callout-success {
+  @apply bg-primary-50 border-primary-100 text-primary-800;
+}
+
+.insight-callout-warning {
+  @apply bg-amber-50 border-amber-100 text-amber-800;
+}
+
+.insight-callout-info {
+  @apply bg-info-50 border-info-100 text-info-800;
+}
+
+/* ========================================
+   TYPOGRAPHY UTILITIES - Swiss Style
+   ======================================== */
+
+/* Tighter line-height for large KPI values */
+.leading-kpi {
+  line-height: 1.1;
+}
+
+/* Swiss-style label - uppercase with wide tracking */
+.label-swiss {
+  @apply text-xs font-black uppercase;
+  letter-spacing: 0.2em;
+}
+
+/* Hero metric value - large, bold, brand color */
+.metric-hero {
+  @apply text-5xl font-extrabold leading-none;
+  color: #50C878;
+}
+
+/* Metric subtitle - muted, smaller */
+.metric-subtitle {
+  @apply text-sm text-slate-500 mt-2;
+}
+
+/* ========================================
+   HEATMAP TILES - Premium Interactive
+   ======================================== */
+
+.heatmap-tile {
+  @apply rounded-xl transition-all duration-300 cursor-pointer;
+}
+
+.heatmap-tile:hover {
+  transform: scale(1.1);
+  z-index: 10;
 }

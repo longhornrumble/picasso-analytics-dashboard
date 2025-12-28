@@ -1,6 +1,6 @@
 /**
  * Picasso Analytics Dashboard
- * Main application entry point
+ * Premium Emerald Design System
  */
 
 import React, { useState } from 'react';
@@ -8,23 +8,72 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Dashboard } from './pages/Dashboard';
 import { ConversationsDashboard } from './pages/ConversationsDashboard';
 import { Login } from './pages/Login';
+import { PremiumLock } from './components/PremiumLock';
+import type { DashboardFeatures } from './types/analytics';
 
-type DashboardTab = 'forms' | 'conversations';
+type DashboardTab = 'conversations' | 'forms' | 'attribution';
+
+// Brand emerald color
+const EMERALD = '#50C878';
+
+// Lock icon for premium features
+const LockIcon = () => (
+  <svg className="w-3.5 h-3.5 ml-1.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+  </svg>
+);
+
+// MyRecruiter Logo Component
+const MyRecruiterLogo = () => (
+  <div className="flex items-center group">
+    <img
+      src="/myrecruiter-logo.png"
+      alt="MyRecruiter"
+      className="h-10 w-auto transition-all duration-300 group-hover:scale-105"
+    />
+  </div>
+);
+
+// Default features - secure defaults when API unavailable
+const DEFAULT_FEATURES: DashboardFeatures = {
+  dashboard_conversations: true,
+  dashboard_forms: true, // Unlocked for demo
+  dashboard_attribution: false,
+};
 
 /**
- * Dashboard navigation tabs
+ * Premium Navigation Bar - Liquid Header Design
  */
-function DashboardTabs({
+function NavigationBar({
   activeTab,
   onTabChange,
+  onLockedTabClick,
+  features = DEFAULT_FEATURES,
+  userEmail,
+  onSignOut,
 }: {
   activeTab: DashboardTab;
   onTabChange: (tab: DashboardTab) => void;
+  onLockedTabClick: (tab: DashboardTab) => void;
+  features?: DashboardFeatures;
+  userEmail?: string;
+  onSignOut: () => void;
 }) {
-  const tabs: { id: DashboardTab; label: string; icon: React.ReactNode }[] = [
+  const tabs: { id: DashboardTab; label: string; icon: React.ReactNode; locked: boolean }[] = [
+    {
+      id: 'conversations',
+      label: 'CONVERSATIONS',
+      locked: !features.dashboard_conversations,
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      ),
+    },
     {
       id: 'forms',
-      label: 'Forms',
+      label: 'FORMS',
+      locked: !features.dashboard_forms,
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -32,53 +81,113 @@ function DashboardTabs({
       ),
     },
     {
-      id: 'conversations',
-      label: 'Conversations',
+      id: 'attribution',
+      label: 'ATTRIBUTION',
+      locked: !features.dashboard_attribution,
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
         </svg>
       ),
     },
   ];
 
   return (
-    <div className="bg-white border-b border-gray-200">
+    <header
+      className="sticky top-0 z-50 border-b border-slate-100"
+      style={{
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+      }}
+    >
       <div className="max-w-7xl mx-auto px-6">
-        <nav className="flex gap-6" aria-label="Dashboard tabs">
-          {tabs.map((tab) => (
+        <div className="flex items-center justify-between h-16">
+          {/* Logo */}
+          <MyRecruiterLogo />
+
+          {/* Navigation Tabs */}
+          <nav className="flex items-center gap-1">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              const isLocked = tab.locked;
+
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => isLocked ? onLockedTabClick(tab.id) : onTabChange(tab.id)}
+                  className={`
+                    relative flex items-center gap-2 px-4 py-2 text-xs font-semibold tracking-wider
+                    transition-all duration-200 rounded-lg
+                    ${isLocked
+                      ? 'text-slate-300 cursor-not-allowed'
+                      : isActive
+                        ? 'text-slate-900'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    }
+                  `}
+                  style={isActive && !isLocked ? { backgroundColor: 'rgba(80, 200, 120, 0.1)' } : undefined}
+                >
+                  <span style={isActive && !isLocked ? { color: EMERALD } : undefined}>{tab.icon}</span>
+                  <span style={isActive && !isLocked ? { color: EMERALD } : undefined}>{tab.label}</span>
+                  {isLocked && <LockIcon />}
+
+                  {/* Precision Indicator - emerald underline */}
+                  {isActive && !isLocked && (
+                    <div
+                      className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full"
+                      style={{ backgroundColor: EMERALD, bottom: '-8px' }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Right side - Admin & Sign Out */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span className="font-medium tracking-wide text-xs uppercase">
+                {userEmail ? 'Enterprise Admin' : 'Admin Panel'}
+              </span>
+            </div>
             <button
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              className={`
-                flex items-center gap-2 py-4 px-1 border-b-2 text-sm font-medium transition-colors
-                ${activeTab === tab.id
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }
-              `}
+              onClick={onSignOut}
+              className="px-4 py-2 text-xs font-semibold text-white rounded-lg transition-all duration-200 hover:opacity-90"
+              style={{ backgroundColor: '#1e293b' }}
             >
-              {tab.icon}
-              {tab.label}
+              SIGN OUT
             </button>
-          ))}
-        </nav>
+          </div>
+        </div>
       </div>
-    </div>
+    </header>
   );
 }
 
 function AppContent() {
-  const { isAuthenticated, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState<DashboardTab>('forms');
+  const { isAuthenticated, loading, user, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState<DashboardTab>('conversations');
+  const [lockedTab, setLockedTab] = useState<DashboardTab | null>(null);
 
-  // Show loading state while checking authentication
+  const features = user?.features || DEFAULT_FEATURES;
+
+  // Show loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
+          <div
+            className="w-12 h-12 rounded-full animate-spin mx-auto mb-4"
+            style={{
+              border: '4px solid rgba(80, 200, 120, 0.2)',
+              borderTopColor: EMERALD,
+            }}
+          />
+          <p className="text-slate-500 font-medium">Loading...</p>
         </div>
       </div>
     );
@@ -89,11 +198,57 @@ function AppContent() {
     return <Login />;
   }
 
-  // Show dashboard with tabs
+  const handleLockedTabClick = (tab: DashboardTab) => {
+    setLockedTab(tab);
+  };
+
+  const handleReturnToDashboard = () => {
+    setLockedTab(null);
+  };
+
+  const renderDashboardContent = () => {
+    if (lockedTab) {
+      return (
+        <PremiumLock
+          feature={lockedTab}
+          onReturn={handleReturnToDashboard}
+        />
+      );
+    }
+
+    switch (activeTab) {
+      case 'forms':
+        return <Dashboard />;
+      case 'conversations':
+        return <ConversationsDashboard />;
+      case 'attribution':
+        return (
+          <PremiumLock
+            feature="attribution"
+            onReturn={() => setActiveTab('conversations')}
+          />
+        );
+      default:
+        return <ConversationsDashboard />;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <DashboardTabs activeTab={activeTab} onTabChange={setActiveTab} />
-      {activeTab === 'forms' ? <Dashboard /> : <ConversationsDashboard />}
+    <div className="min-h-screen bg-slate-50">
+      <NavigationBar
+        activeTab={lockedTab || activeTab}
+        onTabChange={(tab) => {
+          setLockedTab(null);
+          setActiveTab(tab);
+        }}
+        onLockedTabClick={handleLockedTabClick}
+        features={features}
+        userEmail={user?.email}
+        onSignOut={logout}
+      />
+      <main className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {renderDashboardContent()}
+      </main>
     </div>
   );
 }

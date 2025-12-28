@@ -1,13 +1,24 @@
 /**
  * PageHeader Component (Generic)
- * Reusable header with title, time range, filters, and export
+ * Premium Emerald Design System
+ *
+ * Features:
+ * - Section label with emerald accent line
+ * - Large bold title
+ * - Emerald-filled time range pills
+ * - Date range and export buttons
  *
  * Used by: Forms Dashboard, Conversations Dashboard, Attribution Dashboard
  */
 
 import type { ReactNode } from 'react';
+import { DateRangePicker, type DateRange } from './DateRangePicker';
+import { Dropdown } from './Dropdown';
 
-export type TimeRangeValue = '1d' | '7d' | '30d' | '90d';
+// Brand emerald color
+const EMERALD = '#50C878';
+
+export type TimeRangeValue = '1d' | '7d' | '30d' | '90d' | 'custom';
 
 export interface TimeRangeOption {
   value: TimeRangeValue;
@@ -15,13 +26,15 @@ export interface TimeRangeOption {
 }
 
 interface PageHeaderProps {
-  /** Page title */
+  /** Page title (large, bold) */
   title: string;
+  /** Section label (small, uppercase, appears above title) */
+  sectionLabel?: string;
   /** Currently selected time range */
   timeRange: TimeRangeValue;
   /** Time range change handler */
   onTimeRangeChange: (range: TimeRangeValue) => void;
-  /** Custom time range options (defaults to 1 day, 1 week, 1 month) */
+  /** Custom time range options (defaults to 1D, 7D, 30D) */
   timeRangeOptions?: TimeRangeOption[];
   /** Export button click handler */
   onExport?: () => void;
@@ -33,8 +46,10 @@ interface PageHeaderProps {
   showSignOut?: boolean;
   /** Show date range picker */
   showDatePicker?: boolean;
-  /** Date picker click handler */
-  onDatePickerClick?: () => void;
+  /** Custom date range (when timeRange is 'custom') */
+  dateRange?: DateRange | null;
+  /** Date range change handler */
+  onDateRangeChange?: (range: DateRange) => void;
   /** Show export button */
   showExport?: boolean;
   /** Slot for dashboard-specific filters (e.g., form dropdown) */
@@ -44,87 +59,101 @@ interface PageHeaderProps {
 }
 
 const defaultTimeRanges: TimeRangeOption[] = [
-  { value: '1d', label: '1 day' },
-  { value: '7d', label: '1 week' },
-  { value: '30d', label: '1 month' },
+  { value: '1d', label: '1D' },
+  { value: '7d', label: '7D' },
+  { value: '30d', label: '30D' },
 ];
 
 export function PageHeader({
   title,
+  sectionLabel,
   timeRange,
   onTimeRangeChange,
   timeRangeOptions = defaultTimeRanges,
   onExport,
   isExporting = false,
-  onSignOut,
-  showSignOut = true,
   showDatePicker = true,
-  onDatePickerClick,
+  dateRange = null,
+  onDateRangeChange,
   showExport = true,
   filters,
   actions,
 }: PageHeaderProps) {
+  // Handle date range selection - switches to custom mode
+  const handleDateRangeChange = (range: DateRange) => {
+    onTimeRangeChange('custom');
+    onDateRangeChange?.(range);
+  };
+
   return (
     <header className="mb-8">
-      {/* Top row: Title and Sign out */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-        <div className="flex items-center gap-3">
-          {actions}
-          {showSignOut && onSignOut && (
-            <button
-              onClick={onSignOut}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+      {/* Section Label and Title */}
+      <div className="mb-6">
+        {sectionLabel && (
+          <div className="flex items-center gap-2 mb-2">
+            <div
+              className="w-4 h-0.5 rounded-full"
+              style={{ backgroundColor: EMERALD }}
+            />
+            <span
+              className="text-[10px] font-black uppercase tracking-[0.2em]"
+              style={{ color: EMERALD }}
             >
-              Sign out
-            </button>
-          )}
-        </div>
+              {sectionLabel}
+            </span>
+          </div>
+        )}
+        <h1 className="text-3xl font-bold text-slate-900">{title}</h1>
       </div>
 
-      {/* Filter row */}
+      {/* Filter Row */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        {/* Left: Time range tabs */}
-        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-          {timeRangeOptions.map((range) => (
-            <button
-              key={range.value}
-              onClick={() => onTimeRangeChange(range.value)}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                timeRange === range.value
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              {range.label}
-            </button>
-          ))}
+        {/* Left: Time range pills */}
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100">
+          {timeRangeOptions.map((range) => {
+            const isActive = timeRange === range.value;
+            return (
+              <button
+                key={range.value}
+                onClick={() => onTimeRangeChange(range.value)}
+                className={`
+                  px-4 py-2 rounded-lg text-xs font-semibold tracking-wider
+                  transition-all duration-200
+                  ${isActive
+                    ? 'text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                  }
+                `}
+                style={isActive ? { backgroundColor: EMERALD } : undefined}
+              >
+                {range.label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Right: Filters, Date picker, and Export */}
+        {/* Right: Filters, Date picker, Actions */}
         <div className="flex items-center gap-3">
           {/* Dashboard-specific filters slot */}
           {filters}
 
           {/* Date range picker */}
-          {showDatePicker && (
-            <button
-              onClick={onDatePickerClick}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white hover:bg-gray-50"
-            >
-              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span className="text-gray-600">Select Date Range</span>
-            </button>
+          {showDatePicker && onDateRangeChange && (
+            <DateRangePicker
+              dateRange={timeRange === 'custom' ? dateRange : null}
+              onDateRangeChange={handleDateRangeChange}
+            />
           )}
 
-          {/* Export button */}
+          {/* Additional actions (e.g., export dropdown) */}
+          {actions}
+
+          {/* Export button (legacy - use actions prop with ExportDropdown instead) */}
           {showExport && onExport && (
             <button
               onClick={onExport}
               disabled={isExporting}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white hover:bg-gray-50 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 disabled:opacity-50 transition-all duration-200 uppercase tracking-wider"
             >
               {isExporting ? (
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -132,11 +161,11 @@ export function PageHeader({
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
               ) : (
-                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
               )}
-              <span className="text-gray-700 font-medium">Export Data</span>
+              <span className="text-slate-700">Export</span>
             </button>
           )}
         </div>
@@ -147,7 +176,7 @@ export function PageHeader({
 
 /**
  * Helper: Filter dropdown component
- * Reusable select dropdown for filters
+ * Reusable styled dropdown for filters (uses custom Dropdown component)
  */
 export function FilterDropdown({
   value,
@@ -162,18 +191,18 @@ export function FilterDropdown({
   placeholder?: string;
   className?: string;
 }) {
+  // Convert options format and add placeholder option
+  const dropdownOptions = [
+    { value: '', label: placeholder },
+    ...options.map(opt => ({ value: opt.id, label: opt.name })),
+  ];
+
   return (
-    <select
+    <Dropdown
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-transparent min-w-[140px] ${className}`}
-    >
-      <option value="">{placeholder}</option>
-      {options.map((option) => (
-        <option key={option.id} value={option.id}>
-          {option.name}
-        </option>
-      ))}
-    </select>
+      onChange={onChange}
+      options={dropdownOptions}
+      className={className}
+    />
   );
 }

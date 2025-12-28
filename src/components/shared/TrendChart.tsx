@@ -1,16 +1,15 @@
 /**
  * TrendChart Component (Generic)
- * Lightweight SVG-based line chart for time-series trends
+ * Clean SVG-based line chart for time-series trends
  *
  * Used by: All dashboards for session counts, event trends, etc.
- *
- * Note: For production, consider replacing with recharts/chart.js
- * This lightweight version avoids heavy dependencies for MVP.
+ * Designed to mirror the Bubble dashboard's clean line chart style.
  */
 
+import { useState } from 'react';
 
 export interface DataPoint {
-  /** X-axis label (e.g., "Dec 1", "Week 45") */
+  /** X-axis label (e.g., "12am", "3pm", "Dec 1") */
   label: string;
   /** Y-axis value */
   value: number;
@@ -30,7 +29,7 @@ export interface TrendLine {
 interface TrendChartProps {
   /** Title displayed in header */
   title: string;
-  /** Subtitle */
+  /** Subtitle (shown as badge, e.g., "Questions per hour") */
   subtitle?: string;
   /** Single line or multiple lines */
   lines: TrendLine[];
@@ -57,8 +56,19 @@ export function TrendChart({
   showGrid = true,
   showDots = true,
   showArea = false,
-  formatValue = (v) => v.toLocaleString(),
+  formatValue = (v: number) => v.toLocaleString(),
 }: TrendChartProps) {
+  // Tooltip state
+  const [hoveredPoint, setHoveredPoint] = useState<{
+    lineId: string;
+    index: number;
+    label: string;
+    value: number;
+    x: number;
+    y: number;
+    color: string;
+  } | null>(null);
+
   if (lines.length === 0 || lines[0].data.length === 0) {
     return (
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
@@ -72,38 +82,20 @@ export function TrendChart({
 
   // Calculate bounds across all lines
   const allValues = lines.flatMap(line => line.data.map(d => d.value));
-  const minValue = Math.min(...allValues);
   const maxValue = Math.max(...allValues);
-  const valueRange = maxValue - minValue || 1;
+  // Always start Y-axis at 0 for cleaner visualization
+  const minValue = 0;
 
-  // Chart dimensions
-  const padding = { top: 20, right: 20, bottom: 40, left: 60 };
-  const chartWidth = 100; // Percentage-based for responsiveness
-  const chartHeight = height;
+  // Round max to nice number for Y-axis
+  const niceMax = Math.ceil(maxValue / 10) * 10 || 10;
+
+  // Chart layout dimensions
+  const svgHeight = height;
+  const chartAreaHeight = svgHeight - 35; // Leave room for X-axis labels
 
   // Get labels from first line (assumes all lines have same labels)
   const labels = lines[0].data.map(d => d.label);
   const labelCount = labels.length;
-
-  // Generate path for a line
-  const generatePath = (data: DataPoint[]): string => {
-    const points = data.map((point, i) => {
-      const x = padding.left + (i / (labelCount - 1)) * (chartWidth - padding.left - padding.right);
-      const y = padding.top + (1 - (point.value - minValue) / valueRange) * (chartHeight - padding.top - padding.bottom);
-      return { x, y };
-    });
-
-    return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-  };
-
-  // Generate area path (same as line but closed at bottom)
-  const generateAreaPath = (data: DataPoint[]): string => {
-    const linePath = generatePath(data);
-    const bottomY = chartHeight - padding.bottom;
-    const startX = padding.left;
-    const endX = padding.left + ((labelCount - 1) / (labelCount - 1)) * (chartWidth - padding.left - padding.right);
-    return `${linePath} L ${endX} ${bottomY} L ${startX} ${bottomY} Z`;
-  };
 
   // Color mapping (convert Tailwind classes to actual colors for SVG)
   const colorMap: Record<string, string> = {
@@ -120,13 +112,28 @@ export function TrendChart({
     return colorMap[color] || colorMap.green;
   };
 
+  // Calculate Y-axis tick values (0, 10, 20, 30 style)
+  const yTicks = [];
+  const tickCount = 4;
+  for (let i = 0; i <= tickCount; i++) {
+    yTicks.push(Math.round(niceMax * (1 - i / tickCount)));
+  }
+
+  // Calculate which X labels to show (avoid overcrowding)
+  const maxLabels = 8;
+  const labelStep = Math.ceil(labelCount / maxLabels);
+
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+    <div className="card-analytical">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+          {subtitle && (
+            <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-full">
+              {subtitle}
+            </span>
+          )}
         </div>
         {/* Legend */}
         {showLegend && lines.length > 1 && (
@@ -144,93 +151,178 @@ export function TrendChart({
         )}
       </div>
 
-      {/* Chart */}
-      <div className="relative" style={{ height: chartHeight }}>
-        <svg
-          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-          preserveAspectRatio="none"
-          className="w-full h-full"
+      {/* Chart with HTML labels (won't distort) and SVG for lines */}
+      <div className="relative" style={{ height: svgHeight }}>
+        {/* Y-axis labels (HTML) */}
+        <div
+          className="absolute left-0 top-0 flex flex-col justify-between text-xs text-slate-400 font-medium"
+          style={{
+            height: chartAreaHeight,
+            width: '30px',
+            textAlign: 'right',
+            paddingRight: '8px'
+          }}
         >
-          {/* Grid lines */}
-          {showGrid && (
-            <g className="text-gray-200">
-              {[0, 0.25, 0.5, 0.75, 1].map(ratio => {
-                const y = padding.top + ratio * (chartHeight - padding.top - padding.bottom);
-                return (
-                  <line
-                    key={ratio}
-                    x1={padding.left}
-                    y1={y}
-                    x2={chartWidth - padding.right}
-                    y2={y}
-                    stroke="currentColor"
-                    strokeWidth="0.5"
-                    strokeDasharray="2,2"
-                  />
-                );
-              })}
-            </g>
-          )}
+          {yTicks.map((tick, i) => (
+            <span key={i} style={{ lineHeight: '1' }}>{tick}</span>
+          ))}
+        </div>
 
-          {/* Lines */}
-          {lines.map(line => {
-            const color = getColor(line.color);
-            return (
-              <g key={line.id}>
-                {/* Area fill */}
-                {showArea && (
-                  <path
-                    d={generateAreaPath(line.data)}
-                    fill={color}
-                    fillOpacity="0.1"
-                  />
-                )}
-                {/* Line */}
-                <path
-                  d={generatePath(line.data)}
-                  fill="none"
-                  stroke={color}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                {/* Dots */}
-                {showDots && line.data.map((point, i) => {
-                  const x = padding.left + (i / (labelCount - 1)) * (chartWidth - padding.left - padding.right);
-                  const y = padding.top + (1 - (point.value - minValue) / valueRange) * (chartHeight - padding.top - padding.bottom);
+        {/* Main chart area */}
+        <div
+          className="absolute"
+          style={{
+            left: '35px',
+            right: '5px',
+            top: 0,
+            height: chartAreaHeight
+          }}
+        >
+          <svg
+            viewBox={`0 0 100 100`}
+            preserveAspectRatio="none"
+            className="w-full h-full"
+          >
+            {/* Grid lines */}
+            {showGrid && (
+              <g>
+                {yTicks.map((_, i) => {
+                  const y = (i / tickCount) * 100;
                   return (
-                    <circle
+                    <line
                       key={i}
-                      cx={x}
-                      cy={y}
-                      r="3"
-                      fill="white"
-                      stroke={color}
-                      strokeWidth="2"
+                      x1="0"
+                      y1={y}
+                      x2="100"
+                      y2={y}
+                      stroke="var(--chart-grid-color)"
+                      strokeWidth="0.5"
+                      vectorEffect="non-scaling-stroke"
                     />
                   );
                 })}
               </g>
-            );
-          })}
-        </svg>
+            )}
 
-        {/* Y-axis labels */}
-        <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between py-5 text-xs text-gray-500 w-14 text-right pr-2">
-          <span>{formatValue(maxValue)}</span>
-          <span>{formatValue((maxValue + minValue) / 2)}</span>
-          <span>{formatValue(minValue)}</span>
+            {/* Lines and areas */}
+            {lines.map(line => {
+              const color = getColor(line.color);
+              // Generate path in 0-100 coordinate space
+              const pathPoints = line.data.map((point, i) => {
+                const x = (i / (labelCount - 1 || 1)) * 100;
+                const y = (1 - (point.value - minValue) / (niceMax - minValue)) * 100;
+                return { x, y };
+              });
+              const linePath = pathPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+              const areaPath = `${linePath} L 100 100 L 0 100 Z`;
+
+              return (
+                <g key={line.id}>
+                  {/* Area fill */}
+                  {showArea && (
+                    <path
+                      d={areaPath}
+                      fill={color}
+                      fillOpacity="0.15"
+                    />
+                  )}
+                  {/* Line */}
+                  <path
+                    d={linePath}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* Dots overlay (HTML for consistent sizing) - interactive with tooltips */}
+          {showDots && lines.map(line => {
+            const color = getColor(line.color);
+            return line.data.map((point, i) => {
+              const leftPercent = (i / (labelCount - 1 || 1)) * 100;
+              const topPercent = (1 - (point.value - minValue) / (niceMax - minValue)) * 100;
+              const isHovered = hoveredPoint?.lineId === line.id && hoveredPoint?.index === i;
+              return (
+                <div
+                  key={`${line.id}-${i}`}
+                  className={`absolute rounded-full bg-white border-2 cursor-pointer transition-all ${
+                    isHovered ? 'w-3 h-3 z-10' : 'w-2 h-2'
+                  }`}
+                  style={{
+                    left: `${leftPercent}%`,
+                    top: `${topPercent}%`,
+                    transform: 'translate(-50%, -50%)',
+                    borderColor: color,
+                  }}
+                  onMouseEnter={() => setHoveredPoint({
+                    lineId: line.id,
+                    index: i,
+                    label: point.label,
+                    value: point.value,
+                    x: leftPercent,
+                    y: topPercent,
+                    color,
+                  })}
+                  onMouseLeave={() => setHoveredPoint(null)}
+                />
+              );
+            });
+          })}
+
+          {/* Tooltip */}
+          {hoveredPoint && (
+            <div
+              className="absolute z-20 pointer-events-none"
+              style={{
+                left: `${hoveredPoint.x}%`,
+                top: `${hoveredPoint.y}%`,
+                transform: hoveredPoint.y > 50
+                  ? 'translate(-50%, calc(-100% - 12px))'
+                  : 'translate(-50%, 12px)',
+              }}
+            >
+              <div className="bg-slate-900 text-white text-sm rounded-2xl px-4 py-3 shadow-xl whitespace-nowrap">
+                <div className="font-bold">{formatValue(hoveredPoint.value)}</div>
+                <div className="text-slate-400 text-xs mt-0.5">{hoveredPoint.label}</div>
+              </div>
+              {/* Arrow */}
+              <div
+                className="absolute left-1/2 -translate-x-1/2"
+                style={{
+                  [hoveredPoint.y > 50 ? 'bottom' : 'top']: '-6px',
+                  width: 0,
+                  height: 0,
+                  borderLeft: '8px solid transparent',
+                  borderRight: '8px solid transparent',
+                  [hoveredPoint.y > 50 ? 'borderTop' : 'borderBottom']: '8px solid #0f172a',
+                }}
+              />
+            </div>
+          )}
         </div>
 
-        {/* X-axis labels */}
-        <div className="absolute bottom-0 left-14 right-5 flex justify-between text-xs text-gray-500">
-          {labels.filter((_, i) => {
-            // Show fewer labels on mobile
-            const step = Math.ceil(labelCount / 6);
-            return i % step === 0 || i === labelCount - 1;
-          }).map((label, i) => (
-            <span key={i}>{label}</span>
-          ))}
+        {/* X-axis labels (HTML) */}
+        <div
+          className="absolute bottom-0 flex justify-between text-xs text-slate-400 font-medium"
+          style={{
+            left: '35px',
+            right: '5px',
+            height: '20px'
+          }}
+        >
+          {labels.map((label, i) => {
+            // Only show some labels to avoid overcrowding
+            if (i % labelStep !== 0 && i !== labelCount - 1) return null;
+            return (
+              <span key={i} className="text-center" style={{ minWidth: '30px' }}>{label}</span>
+            );
+          })}
         </div>
       </div>
     </div>

@@ -4,7 +4,8 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { AuthState, User } from '../types/analytics';
+import type { AuthState, User, DashboardFeatures } from '../types/analytics';
+import { fetchFeatures } from '../services/analyticsApi';
 
 interface AuthContextType extends AuthState {
   login: (token: string) => void;
@@ -45,6 +46,26 @@ function isTokenExpired(token: string): boolean {
 }
 
 /**
+ * Extract dashboard features from JWT payload with secure defaults.
+ * API call will enrich with actual features - these are fallbacks only.
+ * - conversations: true (FREE tier, always available)
+ * - forms: false (PREMIUM only - API provides actual value)
+ * - attribution: false (PREMIUM only)
+ */
+function extractDashboardFeatures(payload: Record<string, unknown>): DashboardFeatures {
+  // Type-safe extraction with runtime check
+  const features = (typeof payload.features === 'object' && payload.features !== null)
+    ? (payload.features as Record<string, unknown>)
+    : {};
+
+  return {
+    dashboard_conversations: features.dashboard_conversations !== false, // default true (FREE tier)
+    dashboard_forms: features.dashboard_forms === true,                  // default false (PREMIUM only)
+    dashboard_attribution: features.dashboard_attribution === true,      // default false (PREMIUM only)
+  };
+}
+
+/**
  * Extract user from JWT token
  */
 function extractUserFromToken(token: string): User | null {
@@ -56,6 +77,7 @@ function extractUserFromToken(token: string): User | null {
     tenant_hash: (payload.tenant_hash as string) || '',
     email: payload.email as string | undefined,
     name: payload.name as string | undefined,
+    features: extractDashboardFeatures(payload),
   };
 }
 
@@ -123,6 +145,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth();
   }, []);
+
+  // Fetch features from API after authentication
+  useEffect(() => {
+    async function loadFeatures() {
+      if (!state.isAuthenticated || !state.token) return;
+
+      try {
+        const response = await fetchFeatures();
+        setState(prev => {
+          if (!prev.user) return prev;
+          const updatedUser = {
+            ...prev.user,
+            features: response.features,
+          };
+          // Update localStorage with enriched user
+          localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+          return {
+            ...prev,
+            user: updatedUser,
+          };
+        });
+      } catch (error) {
+        // Features fetch failed - use defaults from JWT extraction
+        console.warn('Failed to fetch features from API, using defaults:', error);
+      }
+    }
+
+    loadFeatures();
+  }, [state.isAuthenticated, state.token]);
 
   const login = useCallback((token: string) => {
     if (isTokenExpired(token)) {

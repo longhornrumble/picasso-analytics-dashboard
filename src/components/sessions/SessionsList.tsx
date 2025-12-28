@@ -8,6 +8,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { TimeRange, SessionSummary, SessionOutcome, SessionsListResponse } from '../../types/analytics';
 import { fetchSessionsList } from '../../services/analyticsApi';
 import { SessionCard, SessionCardSkeleton } from './SessionCard';
+import { Dropdown } from '../shared';
 
 interface SessionsListProps {
   timeRange: TimeRange;
@@ -145,8 +146,8 @@ export function SessionsList({ timeRange, onSessionClick, mockSessions }: Sessio
   /**
    * Handle outcome filter change
    */
-  const handleOutcomeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setOutcomeFilter(e.target.value as SessionOutcome | 'all');
+  const handleOutcomeChange = (value: string) => {
+    setOutcomeFilter(value as SessionOutcome | 'all');
   };
 
   // Render loading skeletons for initial load
@@ -170,15 +171,11 @@ export function SessionsList({ timeRange, onSessionClick, mockSessions }: Sessio
       <div className="space-y-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Sessions</h3>
-          <select
+          <Dropdown
             value={outcomeFilter}
             onChange={handleOutcomeChange}
-            className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          >
-            {OUTCOME_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+            options={OUTCOME_OPTIONS}
+          />
         </div>
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
           <p className="text-red-800 font-medium">Failed to load sessions</p>
@@ -200,15 +197,11 @@ export function SessionsList({ timeRange, onSessionClick, mockSessions }: Sessio
       <div className="space-y-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Sessions</h3>
-          <select
+          <Dropdown
             value={outcomeFilter}
             onChange={handleOutcomeChange}
-            className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          >
-            {OUTCOME_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+            options={OUTCOME_OPTIONS}
+          />
         </div>
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
           <svg className="w-12 h-12 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -243,15 +236,11 @@ export function SessionsList({ timeRange, onSessionClick, mockSessions }: Sessio
             ({sessions.length}{hasMore ? '+' : ''})
           </span>
         </h3>
-        <select
+        <Dropdown
           value={outcomeFilter}
           onChange={handleOutcomeChange}
-          className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-        >
-          {OUTCOME_OPTIONS.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+          options={OUTCOME_OPTIONS}
+        />
       </div>
 
       {/* Sessions grid */}

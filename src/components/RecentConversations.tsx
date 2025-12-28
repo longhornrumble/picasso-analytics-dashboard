@@ -131,7 +131,7 @@ export function RecentConversations({
 }: RecentConversationsProps) {
   if (loading && conversations.length === 0) {
     return (
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+      <div className="card-analytical">
         <div className="animate-pulse">
           <div className="h-6 bg-gray-200 rounded w-48 mb-4" />
           <div className="space-y-4">
@@ -146,7 +146,7 @@ export function RecentConversations({
 
   if (conversations.length === 0) {
     return (
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+      <div className="card-analytical">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Conversations</h3>
         <div className="flex items-center justify-center h-48 text-gray-400">
           No recent conversations
@@ -156,11 +156,11 @@ export function RecentConversations({
   }
 
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+    <div className="card-analytical">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900">Recent Conversations</h3>
-        <span className="text-sm text-primary-600 font-medium">
+        <span className="text-sm text-gray-600 font-medium">
           {totalCount.toLocaleString()} Q&A pairs
         </span>
       </div>

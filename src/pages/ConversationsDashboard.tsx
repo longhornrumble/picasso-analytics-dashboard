@@ -10,10 +10,14 @@ import { ConversationHeatMap } from '../components/ConversationHeatMap';
 import { TopQuestions } from '../components/TopQuestions';
 import { RecentConversations } from '../components/RecentConversations';
 import { SessionsList, SessionTimeline } from '../components/sessions';
+import { generateConversationsPDF } from '../components/export';
 import {
   PageHeader,
   SimpleTrendChart,
+  ExportDropdown,
   type TimeRangeValue,
+  type ExportFormat,
+  type DateRange,
 } from '../components/shared';
 import {
   fetchConversationSummary,
@@ -21,6 +25,7 @@ import {
   fetchTopQuestions,
   fetchRecentConversations,
   fetchConversationTrend,
+  exportConversationsData,
 } from '../services/analyticsApi';
 import type {
   ConversationSummaryMetrics,
@@ -259,12 +264,21 @@ const mockSessionDetails: Record<string, SessionDetailResponse> = {
 };
 
 export function ConversationsDashboard() {
-  const { logout } = useAuth();
+  useAuth(); // For authentication context
 
   // State
   const [timeRange, setTimeRange] = useState<TimeRangeValue>('30d');
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Handle time range change - clear custom date range when switching to preset
+  const handleTimeRangeChange = (range: TimeRangeValue) => {
+    setTimeRange(range);
+    if (range !== 'custom') {
+      setDateRange(null);
+    }
+  };
 
   // Session timeline state (for new Sessions API)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -282,19 +296,28 @@ export function ConversationsDashboard() {
   const [trend, setTrend] = useState<ConversationTrendPoint[]>([]);
   const [conversationsPage, setConversationsPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
+  const [exportToast, setExportToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Fetch data from DynamoDB (all endpoints now use fast DynamoDB queries)
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
+    // Build date range options for custom range
+    const dateRangeOptions = timeRange === 'custom' && dateRange ? {
+      startDate: dateRange.startDate.toISOString().split('T')[0],
+      endDate: dateRange.endDate.toISOString().split('T')[0],
+    } : undefined;
+
     try {
       const [summaryData, heatmapData, questionsData, conversationsData, trendData] = await Promise.all([
-        fetchConversationSummary(timeRange),
-        fetchConversationHeatmap(timeRange),
-        fetchTopQuestions(timeRange, 5),
-        fetchRecentConversations(timeRange, 1, 5),
-        fetchConversationTrend(timeRange, timeRange === '1d' ? 'hour' : 'day'),
+        fetchConversationSummary(timeRange, dateRangeOptions),
+        fetchConversationHeatmap(timeRange, dateRangeOptions),
+        fetchTopQuestions(timeRange, 5, dateRangeOptions),
+        fetchRecentConversations(timeRange, 1, 5, dateRangeOptions),
+        fetchConversationTrend(timeRange, timeRange === '1d' ? 'hour' : 'day', dateRangeOptions),
       ]);
 
       setSummary(summaryData.metrics);
@@ -314,7 +337,7 @@ export function ConversationsDashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [timeRange]);
+  }, [timeRange, dateRange]);
 
   useEffect(() => {
     loadData();
@@ -344,12 +367,73 @@ export function ConversationsDashboard() {
     return `${seconds.toFixed(1)} sec`;
   };
 
+  // Show toast notification
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setExportToast({ type, message });
+    setTimeout(() => setExportToast(null), 4000);
+  };
+
+  // Export handler
+  const handleExport = async (format: ExportFormat) => {
+    setIsExporting(true);
+    setExportingFormat(format);
+    try {
+      if (format === 'csv') {
+        // CSV export - sessions list
+        const blob = await exportConversationsData(timeRange);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `conversations-sessions-${timeRange}-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('success', 'Sessions exported as CSV');
+      } else if (format === 'pdf') {
+        // PDF export - summary report
+        const pdfSummary = USE_MOCK_DATA ? mockSummary : summary;
+        const pdfQuestions = USE_MOCK_DATA ? mockQuestions : questions;
+        const pdfHeatmap = USE_MOCK_DATA ? mockHeatmap : heatmap;
+        const pdfPeak = USE_MOCK_DATA ? mockPeak : peak;
+        const pdfTrend = USE_MOCK_DATA ? mockTrend : trend;
+
+        if (pdfSummary) {
+          await generateConversationsPDF({
+            summary: pdfSummary,
+            topQuestions: pdfQuestions,
+            heatmap: pdfHeatmap,
+            peak: pdfPeak,
+            trend: pdfTrend,
+            timeRange,
+            tenantName: 'MyRecruiter',
+          });
+          showToast('success', 'Summary report exported as PDF');
+        } else {
+          showToast('error', 'No data available to export');
+        }
+      }
+    } catch (err) {
+      console.error('Export error:', err);
+      showToast('error', 'Export failed. Please try again.');
+    } finally {
+      setIsExporting(false);
+      setExportingFormat(null);
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading conversations...</p>
+          <div
+            className="w-12 h-12 rounded-full animate-spin mx-auto mb-4"
+            style={{
+              border: '4px solid rgba(80, 200, 120, 0.2)',
+              borderTopColor: '#50C878',
+            }}
+          />
+          <p className="text-slate-500 font-medium">Loading conversations...</p>
         </div>
       </div>
     );
@@ -357,18 +441,19 @@ export function ConversationsDashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center bg-white p-8 rounded-xl shadow-sm max-w-md">
-          <div className="w-12 h-12 bg-danger-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-2xl shadow-sm max-w-md border border-slate-100">
+          <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Failed to load data</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <h2 className="text-lg font-bold text-slate-900 mb-2">Failed to load data</h2>
+          <p className="text-slate-500 mb-4">{error}</p>
           <button
             onClick={loadData}
-            className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600"
+            className="px-5 py-2.5 text-white rounded-xl font-semibold transition-all duration-200 hover:opacity-90"
+            style={{ backgroundColor: '#50C878' }}
           >
             Try Again
           </button>
@@ -378,40 +463,85 @@ export function ConversationsDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
+      {/* Export Toast Notification */}
+      {exportToast && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 ${
+            exportToast.type === 'success'
+              ? 'bg-green-50 border border-green-200 text-green-800'
+              : 'bg-red-50 border border-red-200 text-red-800'
+          }`}
+        >
+          {exportToast.type === 'success' ? (
+            <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          )}
+          <span className="text-sm font-medium">{exportToast.message}</span>
+          <button
+            onClick={() => setExportToast(null)}
+            className="ml-2 text-gray-400 hover:text-gray-600"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
         <PageHeader
-          title="Conversation Overview"
+          sectionLabel="UNIFIED INSIGHTS"
+          title="Conversation Flow"
           timeRange={timeRange}
-          onTimeRangeChange={setTimeRange}
-          onSignOut={logout}
+          onTimeRangeChange={handleTimeRangeChange}
+          showExport={false}
+          showDatePicker={true}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+          actions={
+            <ExportDropdown
+              onExport={handleExport}
+              isExporting={isExporting}
+              exportingFormat={exportingFormat}
+            />
+          }
         />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {/* Stats Cards - Hero Tier */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard
             title="Total Conversations"
             value={(USE_MOCK_DATA ? mockSummary.total_conversations : (summary?.total_conversations ?? 0)).toLocaleString()}
             subtitle="Unique chat sessions"
             variant="primary"
+            tier="hero"
           />
           <StatCard
             title="Total Messages"
             value={(USE_MOCK_DATA ? mockSummary.total_messages : (summary?.total_messages ?? 0)).toLocaleString()}
             subtitle="User + bot messages"
+            tier="hero"
           />
           <StatCard
             title="Response Time"
             value={formatResponseTime(USE_MOCK_DATA ? mockSummary.avg_response_time_seconds : (summary?.avg_response_time_seconds ?? 0))}
             subtitle="Average bot response"
             variant="success"
+            tier="hero"
           />
           <StatCard
             title="After Hours"
             value={`${(USE_MOCK_DATA ? mockSummary.after_hours_percentage : (summary?.after_hours_percentage ?? 0)).toFixed(1)}%`}
             subtitle="Outside 9am-5pm"
             variant="info"
+            tier="hero"
           />
         </div>
 
@@ -432,7 +562,7 @@ export function ConversationsDashboard() {
         <div className="mb-8">
           <SimpleTrendChart
             title="Conversations Trend"
-            subtitle={timeRange === '1d' ? 'Questions per hour' : 'Questions per day'}
+            subtitle="Questions per hour"
             data={(USE_MOCK_DATA ? mockTrend : trend).map(t => ({ label: t.period, value: t.value }))}
             color="green"
             height={200}
@@ -465,11 +595,9 @@ export function ConversationsDashboard() {
         )}
 
         {/* Footer */}
-        <footer className="mt-12 text-center py-6 border-t border-gray-200">
-          <p className="text-sm text-gray-500">
-            Mission Intelligence Platform powered by{' '}
-            <span className="font-semibold text-gray-700">MyRecruiter</span>
-          </p>
+        <footer className="mt-12 py-6 border-t border-slate-100 flex items-center justify-center gap-2">
+          <span className="text-sm text-slate-400">Mission Intelligence Platform powered by</span>
+          <img src="/myrecruiter-logo.png" alt="MyRecruiter" className="h-6 w-auto" />
         </footer>
       </div>
     </div>

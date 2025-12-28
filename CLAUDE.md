@@ -11,9 +11,10 @@ Standalone analytics dashboard for Picasso AI Chat Widget form submissions and u
 | React scaffold | ✅ Complete |
 | Shared styles integration | ✅ Complete |
 | Login page | ✅ Complete |
-| Forms Dashboard components | ✅ Complete (mock data) |
-| API integration | 🔶 In Progress |
-| Conversations Dashboard | ⏳ Not Started |
+| Forms Dashboard | ✅ Complete (live data) |
+| Conversations Dashboard | ✅ Complete (live data) |
+| API integration | ✅ Complete |
+| Master mock data switch | ✅ Complete |
 
 ## Quick Start
 
@@ -24,6 +25,168 @@ npm run build   # Production build
 npm run preview # Preview production build
 ```
 
+## Authentication
+
+### Generating a Valid JWT Token (Development)
+
+For local development and testing, generate a valid JWT token using this Python script:
+
+```bash
+AWS_PROFILE=chris-admin python3 << 'EOF'
+import json
+import hmac
+import hashlib
+import base64
+import time
+import boto3
+
+# Get signing key from Secrets Manager
+secrets_client = boto3.client('secretsmanager', region_name='us-east-1')
+secret = secrets_client.get_secret_value(SecretId='picasso/staging/jwt/signing-key')
+secret_data = json.loads(secret['SecretString'])
+signing_key = secret_data['signingKey']
+
+# Create JWT payload - UPDATE THESE VALUES AS NEEDED
+payload = {
+    "tenant_id": "MYR384719",           # Tenant ID (e.g., MYR384719, AUS123957)
+    "tenant_hash": "my87674d777bf9",    # Tenant hash for API queries
+    "email": "chris@myrecruiter.ai",    # User email
+    "exp": int(time.time()) + 3600      # Expires in 1 hour
+}
+
+# Create JWT manually with HMAC-SHA256
+header = {"alg": "HS256", "typ": "JWT"}
+header_b64 = base64.urlsafe_b64encode(json.dumps(header).encode()).rstrip(b'=').decode()
+payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b'=').decode()
+message = f"{header_b64}.{payload_b64}"
+signature = hmac.new(signing_key.encode(), message.encode(), hashlib.sha256).digest()
+signature_b64 = base64.urlsafe_b64encode(signature).rstrip(b'=').decode()
+token = f"{message}.{signature_b64}"
+
+print(token)
+EOF
+```
+
+### Available Tenants for Testing
+
+| Tenant ID | Tenant Hash | Description |
+|-----------|-------------|-------------|
+| MYR384719 | my87674d777bf9 | MyRecruiter (default dev tenant) |
+| AUS123957 | auc5b0ecb0adcb | Austin Angels |
+| FOS402334 | fo85e6a06dcdf4 | Foster Village |
+
+### Using the Token
+
+1. Start the dev server: `npm run dev`
+2. Navigate to `http://localhost:5173`
+3. Click "Enter Token Manually" on the login page
+4. Paste the generated JWT token
+5. Click "Sign In"
+
+### JWT Token Structure
+
+```json
+{
+  "tenant_id": "MYR384719",
+  "tenant_hash": "my87674d777bf9",
+  "email": "user@example.com",
+  "exp": 1735084800
+}
+```
+
+### Bubble SSO Integration (Production)
+
+In production, the dashboard integrates with Bubble for single sign-on:
+
+1. User clicks "Sign in with MyRecruiter"
+2. Redirect to Bubble auth URL (configured via `VITE_BUBBLE_AUTH_URL`)
+3. Bubble authenticates and redirects back with `?token=JWT`
+4. Dashboard extracts JWT and stores in localStorage
+5. All API calls include JWT in Authorization header
+
+## Environment Variables
+
+```env
+# Analytics API endpoint (Lambda Function URL)
+VITE_ANALYTICS_API_URL=https://uniywvlgstv2ymc46uyqs3z3du0vucst.lambda-url.us-east-1.on.aws
+
+# Bubble SSO authentication URL (leave empty for manual token entry)
+VITE_BUBBLE_AUTH_URL=
+
+# MASTER MOCK DATA SWITCH
+# Set to 'true' to show mock data as fallback when API returns empty
+# Set to 'false' (or omit) to only show live data from API
+VITE_USE_MOCK_DATA=false
+
+# Session Timeline Feature Flag
+VITE_USE_SESSIONS_API=true
+```
+
+### Master Mock Data Switch
+
+The `VITE_USE_MOCK_DATA` environment variable controls whether components show mock data as fallback:
+
+| Value | Behavior |
+|-------|----------|
+| `true` | Components fall back to mock data when API returns empty |
+| `false` | Components show empty states when no data available |
+
+This affects:
+- Recent Submissions table
+- Top Performing Forms cards
+- Field Bottlenecks display
+- Form filter dropdown
+
+## API Integration
+
+The dashboard connects to `Analytics_Dashboard_API` Lambda:
+
+### Forms API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /forms/summary` | Form metrics (views, completions, abandon rate) |
+| `GET /forms/bottlenecks` | Field drop-off analysis |
+| `GET /forms/top-performers` | Top forms by conversion rate |
+| `GET /forms/submissions` | Recent form submissions with pagination |
+
+### Conversations API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /conversations/summary` | Conversation metrics |
+| `GET /conversations/heatmap` | Activity by day/hour |
+| `GET /conversations/top-questions` | Most common first questions |
+| `GET /conversations/recent` | Recent conversations list |
+| `GET /conversations/trend` | Conversation volume over time |
+
+### Query Parameters
+
+- `range`: Time range (`1d`, `7d`, `30d`, `90d`)
+- `page`: Page number for pagination (default: 1)
+- `limit`: Items per page (default: 25, max: 100)
+- `form_id`: Filter by specific form
+- `search`: Search filter for submissions
+
+### Testing API Directly
+
+```bash
+# Generate token first (see above), then:
+TOKEN="your-jwt-token-here"
+
+# Test forms summary
+curl -s "https://uniywvlgstv2ymc46uyqs3z3du0vucst.lambda-url.us-east-1.on.aws/forms/summary?range=7d" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Test submissions
+curl -s "https://uniywvlgstv2ymc46uyqs3z3du0vucst.lambda-url.us-east-1.on.aws/forms/submissions?range=7d" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Test conversations
+curl -s "https://uniywvlgstv2ymc46uyqs3z3du0vucst.lambda-url.us-east-1.on.aws/conversations/summary?range=30d" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 ## Architecture
 
 ### Tech Stack
@@ -32,7 +195,7 @@ npm run preview # Preview production build
 - **Vite** - Build tool
 - **Tailwind CSS 3** - Styling (with shared preset)
 - **@picasso/shared-styles** - Centralized design tokens
-- **Analytics Dashboard API** - Backend (Lambda + Athena)
+- **Analytics Dashboard API** - Backend (Lambda + DynamoDB + Athena)
 
 ### Project Structure
 
@@ -40,16 +203,17 @@ npm run preview # Preview production build
 src/
 ├── components/           # Reusable UI components
 │   ├── StatCard.tsx         # Metric display card
-│   ├── ConversionFunnel.tsx # Funnel visualization
 │   ├── FieldBottlenecks.tsx # Drop-off analysis
-│   ├── TopPerformingForms.tsx # Form performance cards
-│   ├── RecentSubmissions.tsx  # Submissions table
-│   └── DashboardHeader.tsx    # Header with filters
+│   └── shared/              # Shared UI components
+│       ├── Funnel.tsx       # Conversion funnel
+│       ├── DataTable.tsx    # Paginated table
+│       ├── RankedCards.tsx  # Performance cards
+│       └── PageHeader.tsx   # Header with filters
 ├── context/
-│   └── AuthContext.tsx   # Authentication state & Bubble SSO
+│   └── AuthContext.tsx   # Authentication state & JWT handling
 ├── hooks/                # Custom React hooks
 ├── pages/
-│   ├── Dashboard.tsx     # Main dashboard view
+│   ├── Dashboard.tsx     # Main dashboard (Forms + Conversations tabs)
 │   └── Login.tsx         # Authentication page
 ├── services/
 │   └── analyticsApi.ts   # API client for Analytics Lambda
@@ -58,65 +222,61 @@ src/
 └── App.tsx               # Application entry point
 ```
 
-## Authentication
+### Data Flow
 
-### Bubble SSO Integration
+```
+User Browser
+    ↓
+Dashboard (React + Vite)
+    ↓
+JWT Authentication (localStorage)
+    ↓
+Analytics Dashboard API (Lambda)
+    ├─→ DynamoDB (hot path, <100ms)
+    │   ├── picasso-session-summaries
+    │   ├── picasso-session-events
+    │   └── picasso_form_submissions
+    └─→ Athena (fallback, 5-30s)
+        └── picasso_analytics.events
+```
 
-The dashboard integrates with Bubble for single sign-on:
+## DynamoDB Tables
 
-1. User clicks "Sign in with MyRecruiter"
-2. Redirect to Bubble auth URL (configured via `VITE_BUBBLE_AUTH_URL`)
-3. Bubble authenticates and redirects back with `?token=JWT`
-4. Dashboard extracts JWT and stores in localStorage
-5. All API calls include JWT in Authorization header
+| Table | Purpose | Key Schema |
+|-------|---------|------------|
+| `picasso-session-summaries` | Session metadata | pk: `TENANT#{hash}`, sk: `SESSION#{id}` |
+| `picasso-session-events` | Individual events | pk: `TENANT#{hash}`, sk: `{date}#{event_id}` |
+| `picasso_form_submissions` | Form data | pk: `submission_id`, GSI: `tenant_id + timestamp` |
 
-### JWT Token Structure
+### Form Submissions Schema
 
 ```json
 {
-  "tenant_id": "FOS402334",
-  "tenant_hash": "fo85e6a06dcdf4",
-  "email": "user@example.com",
-  "exp": 1735084800
+  "submission_id": "apply_dare2dream_1766797544456",
+  "tenant_id": "MYR384719",
+  "tenant_hash": "my87674d777bf9",
+  "form_id": "apply_dare2dream",
+  "form_title": "Dare to Dream Mentor Application",
+  "session_id": "session_1766797454267_amh6licae",
+  "form_data": { "field_123": "value" },
+  "form_data_labeled": {
+    "Name": { "label": "Name", "value": { "First Name": "Chris", "Last Name": "Miller" }, "type": "composite" },
+    "Email": { "label": "Email", "value": "chris@example.com", "type": "email" }
+  },
+  "submitted_at": "2025-12-27T01:05:44.456Z",
+  "timestamp": "2025-12-27T01:05:44.456Z",
+  "status": "pending_fulfillment"
 }
 ```
 
-### Manual Token Entry (Development)
-
-For testing, use the "Enter Token Manually" option on the login page.
-
-## API Integration
-
-The dashboard connects to `Analytics_Dashboard_API` Lambda:
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /analytics/summary` | Overview metrics |
-| `GET /analytics/sessions` | Session counts over time |
-| `GET /analytics/events` | Event breakdown by type |
-| `GET /analytics/funnel` | Conversion funnel data |
-
-### Query Parameters
-- `range`: Time range (`1d`, `7d`, `30d`, `90d`)
-- `granularity`: For sessions (`day`, `week`, `month`)
-- `type`: Filter events by type
-
-## Environment Variables
-
-Copy `.env.example` to `.env`:
-
-```env
-VITE_ANALYTICS_API_URL=https://your-lambda-url.lambda-url.us-east-1.on.aws
-VITE_BUBBLE_AUTH_URL=https://your-bubble-app.bubbleapps.io/auth
-VITE_DEV_MODE=false
-```
+**Important**: Records need both `submitted_at` AND `timestamp` attributes. The GSI uses `timestamp` as the sort key.
 
 ## Development
 
 ### Commands
 
 ```bash
-npm run dev        # Start dev server
+npm run dev        # Start dev server (localhost:5173)
 npm run build      # Build for production
 npm run preview    # Preview production build
 npm run lint       # Run ESLint
@@ -147,9 +307,44 @@ aws s3 sync dist/ s3://picasso-analytics-dashboard/ --profile chris-admin
 aws cloudfront create-invalidation --distribution-id XXXXX --paths "/*"
 ```
 
-## Design Reference
+## Known Issues & Fixes
 
-The dashboard UI is based on the Form Analytics Overview mockup:
+### Form Submissions Not Appearing
+
+**Symptom**: API returns 0 submissions but DynamoDB has data.
+
+**Cause**: New records have `submitted_at` but missing `timestamp` attribute (GSI key).
+
+**Fix**: Add `timestamp` attribute to records:
+```bash
+AWS_PROFILE=chris-admin python3 << 'EOF'
+import boto3
+dynamodb = boto3.client('dynamodb', region_name='us-east-1')
+response = dynamodb.scan(TableName='picasso_form_submissions')
+for item in response.get('Items', []):
+    if 'submitted_at' in item and 'timestamp' not in item:
+        sid = item['submission_id']['S']
+        ts = item['submitted_at']['S']
+        dynamodb.update_item(
+            TableName='picasso_form_submissions',
+            Key={'submission_id': {'S': sid}},
+            UpdateExpression='SET #ts = :ts',
+            ExpressionAttributeNames={'#ts': 'timestamp'},
+            ExpressionAttributeValues={':ts': {'S': ts}}
+        )
+        print(f"Updated {sid}")
+EOF
+```
+
+### Name/Email Showing as Anonymous
+
+**Symptom**: Recent Submissions shows "Anonymous" instead of actual name.
+
+**Cause**: API was reading from `form_data` (cryptic field IDs) instead of `form_data_labeled` (human-readable labels).
+
+**Fix**: Analytics Dashboard API now checks `form_data_labeled` first, falls back to `form_data` for old records.
+
+## Design Reference
 
 ### Key UI Elements
 - **Stats Cards**: Total Views, Completions, Avg Time, Abandon Rate
@@ -169,33 +364,19 @@ Colors are centralized in `/picasso-shared-styles/src/tokens.css`:
 - **Background**: `#f9fafb` (gray-50)
 - **Cards**: `#ffffff` with subtle shadow
 
-### Shared Styles Integration
-
-This project uses centralized design tokens:
-
-```css
-/* src/index.css */
-@import '@picasso/shared-styles/tokens';
-```
-
-```js
-/* tailwind.config.js */
-presets: [require('@picasso/shared-styles/tailwind-preset')]
-```
-
-To update brand colors across all dashboards, edit `/picasso-shared-styles/src/tokens.css`.
-
 ## Related Projects
 
 | Project | Path | Description |
 |---------|------|-------------|
 | **Picasso Widget** | `/Picasso` | Chat widget frontend |
 | **Shared Styles** | `/picasso-shared-styles` | Centralized design tokens |
-| **Analytics API** | `/Lambdas/lambda/Analytics_Dashboard_API` | Backend API (Athena) |
+| **Analytics API** | `/Lambdas/lambda/Analytics_Dashboard_API` | Backend API (DynamoDB + Athena) |
 | **Event Processor** | `/Lambdas/lambda/Analytics_Event_Processor` | SQS → S3 pipeline |
+| **Bedrock Handler** | `/Lambdas/lambda/Bedrock_Streaming_Handler_Staging` | Form submission processing |
 
 ## Documentation
 
 - [USER_JOURNEY_ANALYTICS_PLAN.md](/Picasso/docs/User_Journey/USER_JOURNEY_ANALYTICS_PLAN.md) - Full implementation plan
 - [USER_JOURNEY_ANALYTICS_PRD.md](/Picasso/docs/User_Journey/USER_JOURNEY_ANALYTICS_PRD.md) - Product requirements
 - [ANNEX_C_FORMS_DASHBOARD.md](/Picasso/docs/User_Journey/ANNEX_C_FORMS_DASHBOARD.md) - Forms dashboard spec
+- [ANNEX_B_CONVERSATIONS_DASHBOARD.md](/Picasso/docs/User_Journey/ANNEX_B_CONVERSATIONS_DASHBOARD.md) - Conversations dashboard spec

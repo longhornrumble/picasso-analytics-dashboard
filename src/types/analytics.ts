@@ -4,7 +4,13 @@
  */
 
 // Time range options
-export type TimeRange = '1d' | '7d' | '30d' | '90d';
+export type TimeRange = '1d' | '7d' | '30d' | '90d' | 'custom';
+
+// Custom date range for 'custom' time range
+export interface CustomDateRange {
+  startDate: string; // ISO date string
+  endDate: string;   // ISO date string
+}
 
 // API Response Types
 export interface SummaryMetrics {
@@ -109,6 +115,7 @@ export interface FormSubmissionAPI {
   duration_seconds: number;
   fields_completed: number;
   fields: Record<string, string>;
+  status?: string;  // Optional - e.g., 'pending_fulfillment', 'completed'
 }
 
 export interface SubmissionsResponse {
@@ -167,9 +174,23 @@ export interface FormSubmission {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   formType: string;
   comments: string;
   date: string;
+}
+
+// Dashboard feature flags
+export interface DashboardFeatures {
+  dashboard_conversations: boolean;
+  dashboard_forms: boolean;
+  dashboard_attribution: boolean;
+}
+
+// Features API response
+export interface FeaturesResponse {
+  tenant_id: string;
+  features: DashboardFeatures;
 }
 
 // Auth types
@@ -178,6 +199,7 @@ export interface User {
   tenant_hash: string;
   email?: string;
   name?: string;
+  features?: DashboardFeatures;
 }
 
 export interface AuthState {
