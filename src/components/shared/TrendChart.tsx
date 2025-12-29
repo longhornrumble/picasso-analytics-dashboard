@@ -71,9 +71,9 @@ export function TrendChart({
 
   if (lines.length === 0 || lines[0].data.length === 0) {
     return (
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
-        <div className="flex items-center justify-center h-48 text-gray-400">
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
+        <h3 className="text-lg font-semibold text-slate-900 mb-4">{title}</h3>
+        <div className="flex items-center justify-center h-48 text-slate-400">
           No data available
         </div>
       </div>
@@ -99,9 +99,11 @@ export function TrendChart({
 
   // Color mapping (convert Tailwind classes to actual colors for SVG)
   const colorMap: Record<string, string> = {
-    'green': '#50C878',
+    'green': 'var(--color-primary-500)',
+    'primary': 'var(--color-primary-500)',
     'blue': '#3b82f6',
-    'red': '#ef4444',
+    'red': 'var(--color-danger-500)',
+    'danger': 'var(--color-danger-500)',
     'purple': '#8b5cf6',
     'orange': '#f97316',
     'gray': '#6b7280',
@@ -109,7 +111,8 @@ export function TrendChart({
 
   const getColor = (color: string): string => {
     if (color.startsWith('#')) return color;
-    return colorMap[color] || colorMap.green;
+    if (color.startsWith('var(')) return color;
+    return colorMap[color] || colorMap.primary;
   };
 
   // Calculate Y-axis tick values (0, 10, 20, 30 style)
@@ -144,7 +147,7 @@ export function TrendChart({
                   className="w-3 h-3 rounded-full"
                   style={{ backgroundColor: getColor(line.color) }}
                 />
-                <span className="text-xs text-gray-600">{line.name}</span>
+                <span className="text-xs text-slate-600">{line.name}</span>
               </div>
             ))}
           </div>
@@ -337,7 +340,7 @@ export function SimpleTrendChart({
   title,
   subtitle,
   data,
-  color = 'green',
+  color = 'primary',
   ...props
 }: Omit<TrendChartProps, 'lines'> & {
   data: DataPoint[];

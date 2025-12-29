@@ -1,11 +1,11 @@
 /**
  * PageHeader Component (Generic)
- * Premium Emerald Design System
+ * Premium Design System
  *
  * Features:
- * - Section label with emerald accent line
+ * - Section label with primary color accent line
  * - Large bold title
- * - Emerald-filled time range pills
+ * - Primary color-filled time range pills
  * - Date range and export buttons
  *
  * Used by: Forms Dashboard, Conversations Dashboard, Attribution Dashboard
@@ -14,9 +14,6 @@
 import type { ReactNode } from 'react';
 import { DateRangePicker, type DateRange } from './DateRangePicker';
 import { Dropdown } from './Dropdown';
-
-// Brand emerald color
-const EMERALD = '#50C878';
 
 export type TimeRangeValue = '1d' | '7d' | '30d' | '90d' | 'custom';
 
@@ -92,12 +89,10 @@ export function PageHeader({
         {sectionLabel && (
           <div className="flex items-center gap-2 mb-2">
             <div
-              className="w-4 h-0.5 rounded-full"
-              style={{ backgroundColor: EMERALD }}
+              className="w-4 h-0.5 rounded-full bg-primary-500"
             />
             <span
-              className="text-[10px] font-black uppercase tracking-[0.2em]"
-              style={{ color: EMERALD }}
+              className="text-[10px] font-black uppercase tracking-[0.2em] text-primary-500"
             >
               {sectionLabel}
             </span>
@@ -120,11 +115,10 @@ export function PageHeader({
                   px-4 py-2 rounded-lg text-xs font-semibold tracking-wider
                   transition-all duration-200
                   ${isActive
-                    ? 'text-white shadow-sm'
+                    ? 'text-white shadow-sm bg-primary-500'
                     : 'text-slate-500 hover:text-slate-700'
                   }
                 `}
-                style={isActive ? { backgroundColor: EMERALD } : undefined}
               >
                 {range.label}
               </button>

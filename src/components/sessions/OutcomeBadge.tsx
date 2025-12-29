@@ -21,8 +21,8 @@ const OUTCOME_CONFIG: Record<SessionOutcome, {
 }> = {
   form_completed: {
     label: 'Form Completed',
-    bgClass: 'bg-green-100',
-    textClass: 'text-green-800',
+    bgClass: 'bg-primary-100',
+    textClass: 'text-primary-800',
     icon: '\u2705', // ✅
   },
   cta_clicked: {
@@ -45,8 +45,8 @@ const OUTCOME_CONFIG: Record<SessionOutcome, {
   },
   abandoned: {
     label: 'Abandoned',
-    bgClass: 'bg-red-100',
-    textClass: 'text-red-800',
+    bgClass: 'bg-danger-100',
+    textClass: 'text-danger-800',
     icon: '\u274C', // ❌
   },
 };

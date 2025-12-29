@@ -87,7 +87,7 @@ export function RankedCards<T extends RankedItem>({
     switch (trend) {
       case 'up':
         return (
-          <span className="text-green-500 flex items-center gap-1 text-xs">
+          <span className="text-primary-500 flex items-center gap-1 text-xs">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
             </svg>
@@ -96,7 +96,7 @@ export function RankedCards<T extends RankedItem>({
         );
       case 'stable':
         return (
-          <span className="text-gray-400 flex items-center gap-1 text-xs">
+          <span className="text-slate-400 flex items-center gap-1 text-xs">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
@@ -105,7 +105,7 @@ export function RankedCards<T extends RankedItem>({
         );
       case 'down':
         return (
-          <span className="text-red-400 flex items-center gap-1 text-xs">
+          <span className="text-danger-400 flex items-center gap-1 text-xs">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
             </svg>
@@ -120,23 +120,23 @@ export function RankedCards<T extends RankedItem>({
   const defaultCardRender = (item: T) => (
     <div
       key={item.id}
-      className={`border border-gray-200 rounded-lg p-4 hover:border-gray-300 hover:shadow-sm transition-all ${
+      className={`border border-slate-200 rounded-lg p-4 hover:border-slate-300 hover:shadow-sm transition-all ${
         onCardClick ? 'cursor-pointer' : ''
       }`}
       onClick={() => onCardClick?.(item)}
     >
       <div className="flex items-start justify-between mb-2">
-        <h4 className="font-medium text-gray-900 text-sm truncate flex-1">
+        <h4 className="font-medium text-slate-900 text-sm truncate flex-1">
           {item.name}
         </h4>
-        <span className="text-sm font-semibold text-gray-700 ml-2">
+        <span className="text-sm font-semibold text-slate-700 ml-2">
           {item.primaryValue}
           {item.primaryLabel && ` ${item.primaryLabel}`}
         </span>
       </div>
       <div className="flex items-center justify-between">
         {item.secondaryValue !== undefined && (
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-slate-500">
             {item.secondaryValue} {item.secondaryLabel}
           </span>
         )}
@@ -149,9 +149,9 @@ export function RankedCards<T extends RankedItem>({
     <div className="card-analytical">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
         {summaryValue !== undefined && (
-          <span className="text-sm text-gray-600 font-medium">
+          <span className="text-sm text-slate-600 font-medium">
             {typeof summaryValue === 'number' ? summaryValue.toLocaleString() : summaryValue}{' '}
             {summaryLabel}
           </span>
@@ -172,16 +172,16 @@ export function RankedCards<T extends RankedItem>({
         {showViewAll && onViewAll && (
           <button
             onClick={onViewAll}
-            className="border-2 border-dashed border-gray-200 rounded-lg p-4 hover:border-gray-400 hover:bg-gray-50 transition-all flex flex-col items-center justify-center min-h-[80px]"
+            className="border-2 border-dashed border-slate-200 rounded-lg p-4 hover:border-slate-400 hover:bg-slate-50 transition-all flex flex-col items-center justify-center min-h-[80px]"
           >
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-2">
-              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mb-2">
+              <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
             </div>
-            <span className="text-sm font-medium text-gray-700">{viewAllLabel}</span>
+            <span className="text-sm font-medium text-slate-700">{viewAllLabel}</span>
             {viewAllSublabel && (
-              <span className="text-xs text-gray-500">{viewAllSublabel}</span>
+              <span className="text-xs text-slate-500">{viewAllSublabel}</span>
             )}
           </button>
         )}

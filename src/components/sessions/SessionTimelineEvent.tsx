@@ -65,14 +65,14 @@ const EVENT_CONFIG: Record<string, {
   FORM_COMPLETED: {
     icon: '\u2705', // ✅
     label: 'Form Completed',
-    bgClass: 'bg-green-100',
-    borderClass: 'border-green-400',
+    bgClass: 'bg-primary-100',
+    borderClass: 'border-primary-400',
   },
   FORM_ABANDONED: {
     icon: '\u274C', // ❌
     label: 'Form Abandoned',
-    bgClass: 'bg-red-50',
-    borderClass: 'border-red-300',
+    bgClass: 'bg-danger-50',
+    borderClass: 'border-danger-300',
   },
 };
 
@@ -196,7 +196,7 @@ function PayloadDetails({ payload }: { payload: SessionEventPayload | null }) {
         <div className="mt-1 space-y-1">
           <div className="text-sm">
             <span className="font-medium text-gray-700">Form:</span>{' '}
-            <span className="text-green-700">{payload.form_label}</span>
+            <span className="text-primary-700">{payload.form_label}</span>
           </div>
           <div className="text-xs text-gray-500 flex items-center gap-3">
             <span>Duration: {formatDuration(payload.duration_seconds)}</span>
@@ -210,7 +210,7 @@ function PayloadDetails({ payload }: { payload: SessionEventPayload | null }) {
         <div className="mt-1 space-y-1">
           <div className="text-sm">
             <span className="font-medium text-gray-700">Form:</span>{' '}
-            <span className="text-red-700">{payload.form_label || payload.form_id}</span>
+            <span className="text-danger-700">{payload.form_label || payload.form_id}</span>
           </div>
           <div className="text-xs text-gray-500">
             {payload.last_field && (

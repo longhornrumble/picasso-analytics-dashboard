@@ -32,11 +32,11 @@ export function ConversionFunnel({
   };
 
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+    <div className="card-analytical">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">Conversion Funnel</h3>
-        <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+        <h3 className="text-lg font-semibold text-slate-900">Conversion Funnel</h3>
+        <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
           {conversionRate}% Conversion Rate
         </span>
       </div>
@@ -49,18 +49,18 @@ export function ConversionFunnel({
 
           return (
             <div key={stage.stage} className="flex items-center gap-4">
-              <div className="w-24 text-sm text-gray-600 text-right">
+              <div className="w-24 text-sm text-slate-600 text-right">
                 {displayName}
               </div>
               <div className="flex-1 relative">
-                <div className="h-10 bg-gray-100 rounded-lg overflow-hidden">
+                <div className="h-10 bg-slate-100 rounded-lg overflow-hidden">
                   <div
-                    className="h-full bg-green-400 rounded-lg transition-all duration-500"
+                    className="h-full bg-primary-400 rounded-lg transition-all duration-500"
                     style={{ width: `${widthPercent}%` }}
                   />
                 </div>
               </div>
-              <div className="w-16 text-right font-semibold text-gray-900">
+              <div className="w-16 text-right font-semibold text-slate-900">
                 {stage.count.toLocaleString()}
               </div>
             </div>
@@ -69,18 +69,18 @@ export function ConversionFunnel({
       </div>
 
       {/* Bottom stats */}
-      <div className="flex justify-between mt-6 pt-4 border-t border-gray-100">
+      <div className="flex justify-between mt-6 pt-4 border-t border-slate-100">
         <div className="text-center">
-          <p className="text-xs text-gray-500 uppercase font-medium">Total Views</p>
-          <p className="text-lg font-bold text-gray-900">{totalViews.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 uppercase font-medium">Total Views</p>
+          <p className="text-lg font-bold text-slate-900">{totalViews.toLocaleString()}</p>
         </div>
         <div className="text-center">
-          <p className="text-xs text-gray-500 uppercase font-medium">Abandoned</p>
-          <p className="text-lg font-bold text-red-500">{abandoned.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 uppercase font-medium">Abandoned</p>
+          <p className="text-lg font-bold text-danger-500">{abandoned.toLocaleString()}</p>
         </div>
         <div className="text-center">
-          <p className="text-xs text-gray-500 uppercase font-medium">Completed</p>
-          <p className="text-lg font-bold text-green-500">{completed.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 uppercase font-medium">Completed</p>
+          <p className="text-lg font-bold text-primary-500">{completed.toLocaleString()}</p>
         </div>
       </div>
     </div>

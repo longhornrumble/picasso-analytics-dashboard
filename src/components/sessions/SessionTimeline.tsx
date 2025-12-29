@@ -201,12 +201,12 @@ export function SessionTimeline({ sessionId, onClose, mockSessionDetail }: Sessi
           {isLoading && <TimelineSkeleton />}
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-              <p className="text-red-800 font-medium">Failed to load session</p>
-              <p className="text-red-600 text-sm mt-1">{error}</p>
+            <div className="bg-danger-50 border border-danger-200 rounded-lg p-4 text-center">
+              <p className="text-danger-800 font-medium">Failed to load session</p>
+              <p className="text-danger-600 text-sm mt-1">{error}</p>
               <button
                 onClick={() => sessionId && loadSession(sessionId)}
-                className="mt-3 text-sm text-red-700 underline hover:text-red-900"
+                className="mt-3 text-sm text-danger-700 underline hover:text-danger-900"
               >
                 Try again
               </button>

@@ -10,9 +10,6 @@
  * - Micro-shadow with hover lift effect
  */
 
-// Brand emerald color
-const EMERALD = '#50C878';
-
 interface StatCardProps {
   /** Aviation-style label (uppercase, wide tracking) */
   title: string;
@@ -47,10 +44,9 @@ export function StatCard({
       <p
         className={
           isHero
-            ? 'text-5xl font-extrabold leading-none'
+            ? 'text-5xl font-extrabold leading-none text-primary-500'
             : 'text-3xl font-bold text-slate-900'
         }
-        style={isHero ? { color: EMERALD } : undefined}
       >
         {value}
       </p>
@@ -78,7 +74,7 @@ export function StatCard({
       {trend && (
         <p
           className={`text-xs mt-2 font-semibold ${
-            trend.value >= 0 ? 'text-emerald-600' : 'text-rose-500'
+            trend.value >= 0 ? 'text-primary-600' : 'text-danger-500'
           }`}
         >
           {trend.value >= 0 ? '↑' : '↓'} {Math.abs(trend.value)}% {trend.label}

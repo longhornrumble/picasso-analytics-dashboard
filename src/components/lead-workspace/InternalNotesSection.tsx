@@ -105,7 +105,7 @@ function SaveIndicator({
   if (lastSaved) {
     return (
       <span className="flex items-center gap-1.5 text-xs text-slate-500">
-        <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-3.5 h-3.5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
         Saved {formatLastSaved(lastSaved)}
@@ -218,7 +218,7 @@ export function InternalNotesSection({
             w-full h-32 px-4 py-3 rounded-lg resize-none
             bg-white border border-gray-200
             text-sm text-slate-700 placeholder-gray-400
-            focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500
+            focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500
             disabled:opacity-50 disabled:cursor-not-allowed
             transition-colors duration-200
           `}

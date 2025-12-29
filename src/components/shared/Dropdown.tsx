@@ -60,11 +60,11 @@ export function Dropdown({ value, onChange, options, className = '' }: DropdownP
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between gap-2 text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:border-green-500 min-w-[140px] text-left"
+        className="flex items-center justify-between gap-2 text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white hover:bg-slate-50 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-w-[140px] text-left"
       >
-        <span className="text-gray-700">{currentLabel}</span>
+        <span className="text-slate-700">{currentLabel}</span>
         <svg
-          className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -75,20 +75,20 @@ export function Dropdown({ value, onChange, options, className = '' }: DropdownP
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-1 w-full min-w-[160px] bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 max-h-60 overflow-auto">
+        <div className="absolute right-0 mt-1 w-full min-w-[160px] bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1 max-h-60 overflow-auto">
           {options.map((option) => (
             <button
               key={option.value}
               type="button"
               onClick={() => handleSelect(option.value)}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 ${
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-100 flex items-center gap-2 ${
                 option.value === value
-                  ? 'text-green-700 bg-green-50 font-medium'
-                  : 'text-gray-700'
+                  ? 'text-primary-700 bg-primary-50 font-medium'
+                  : 'text-slate-700'
               }`}
             >
               {option.value === value && (
-                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               )}

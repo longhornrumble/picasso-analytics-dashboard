@@ -108,7 +108,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
       title={copied ? 'Copied!' : `Copy ${label}`}
     >
       {copied ? (
-        <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
       ) : (
@@ -175,8 +175,8 @@ export function CommunicationsCard({
         {/* Email Action */}
         {hasEmail && (
           <div className="flex items-center gap-3 p-3 rounded-lg bg-white border border-gray-200">
-            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center">
-              <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center">
+              <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                   d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
@@ -200,7 +200,7 @@ export function CommunicationsCard({
               ) : (
                 <a
                   href={generateMailtoLink(contactInfo.email!, contactInfo.name, tenantName)}
-                  className="p-1.5 rounded-md text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                  className="p-1.5 rounded-md text-primary-600 hover:text-primary-700 hover:bg-primary-50 transition-colors"
                   title="Compose email"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

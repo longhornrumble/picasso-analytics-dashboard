@@ -1,9 +1,9 @@
 /**
  * Funnel Component (Generic)
- * Premium Emerald Design System
+ * Premium Design System
  *
  * Features:
- * - Chromatic gradient bars (emerald to forest green)
+ * - Chromatic gradient bars (primary to darker shades)
  * - Super-ellipse bar corners (rounded-xl)
  * - Premium tooltip styling
  * - Aviation-style stat labels
@@ -12,9 +12,6 @@
  */
 
 import { useState } from 'react';
-
-// Brand emerald color
-const EMERALD = '#50C878';
 
 export interface FunnelStage {
   name: string;
@@ -63,11 +60,11 @@ export function Funnel({
   // Find max count for bar scaling
   const maxCount = Math.max(...stages.map(s => s.count), 1);
 
-  // Stat variant colors with emerald for success
+  // Stat variant colors with primary for success
   const statColors = {
     default: 'text-slate-900',
-    success: 'text-emerald-600',
-    danger: 'text-rose-500',
+    success: 'text-primary-600',
+    danger: 'text-danger-500',
   };
 
   return (
@@ -76,10 +73,7 @@ export function Funnel({
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-bold text-slate-900">{title}</h3>
         {rate !== undefined && (
-          <span
-            className="px-4 py-1.5 rounded-full text-sm font-semibold text-white"
-            style={{ backgroundColor: EMERALD }}
-          >
+          <span className="px-4 py-1.5 rounded-full text-sm font-semibold text-white bg-primary-500">
             {rate}% {rateLabel}
           </span>
         )}
@@ -96,11 +90,11 @@ export function Funnel({
             ? Math.round((stage.count / stages[0].count) * 100)
             : 0;
 
-          // Chromatic gradient: each bar gets slightly darker shade
+          // Chromatic gradient: each bar gets slightly darker shade using CSS variables
           const gradientShades = [
-            'linear-gradient(90deg, #6ee7b7 0%, #50C878 100%)',  // Lightest
-            'linear-gradient(90deg, #34d399 0%, #10b981 100%)',  // Medium
-            'linear-gradient(90deg, #10b981 0%, #059669 100%)',  // Forest green
+            'linear-gradient(90deg, var(--color-primary-300) 0%, var(--color-primary-500) 100%)',  // Lightest
+            'linear-gradient(90deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%)',  // Medium
+            'linear-gradient(90deg, var(--color-primary-600) 0%, var(--color-primary-700) 100%)',  // Darkest
           ];
           const barGradient = gradientShades[Math.min(index, gradientShades.length - 1)];
 
@@ -112,7 +106,7 @@ export function Funnel({
               <div className="flex-1 relative">
                 <div
                   className={`h-10 bg-slate-100 rounded-xl overflow-hidden cursor-pointer transition-all duration-300 ${
-                    isHovered ? 'ring-2 ring-emerald-400 ring-offset-2' : ''
+                    isHovered ? 'ring-2 ring-primary-400 ring-offset-2' : ''
                   }`}
                   onMouseEnter={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();

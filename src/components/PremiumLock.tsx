@@ -6,9 +6,6 @@
  * from active utility into a premium intelligence mindset.
  */
 
-// Brand emerald color
-const EMERALD = '#50C878';
-
 interface PremiumLockProps {
   feature: 'forms' | 'conversations' | 'attribution';
   onReturn: () => void;
@@ -52,11 +49,11 @@ export function PremiumLock({ feature, onReturn }: PremiumLockProps) {
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-6 py-16 relative overflow-hidden">
-      {/* Background "Vortex" - Atmospheric emerald glow */}
+      {/* Background "Vortex" - Atmospheric primary glow */}
       <div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full pointer-events-none"
         style={{
-          background: `radial-gradient(circle, ${EMERALD}15 0%, transparent 70%)`,
+          background: 'radial-gradient(circle, rgba(80, 200, 120, 0.08) 0%, transparent 70%)',
           filter: 'blur(120px)',
         }}
       />
@@ -151,12 +148,12 @@ export function PremiumLock({ feature, onReturn }: PremiumLockProps) {
             <ul className="space-y-4">
               {info.benefits.map((benefit, index) => (
                 <li key={index} className="flex items-center gap-4">
-                  {/* Checkmark in rounded-xl emerald box - Success Signifier */}
+                  {/* Checkmark in rounded-xl primary box - Success Signifier */}
                   <div
                     className="w-7 h-7 flex items-center justify-center flex-shrink-0"
                     style={{
                       borderRadius: '0.75rem',
-                      backgroundColor: `${EMERALD}15`,
+                      backgroundColor: 'rgba(80, 200, 120, 0.08)',
                     }}
                   >
                     <svg
@@ -164,7 +161,7 @@ export function PremiumLock({ feature, onReturn }: PremiumLockProps) {
                       height="16"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke={EMERALD}
+                      stroke="var(--color-primary-500)"
                       strokeWidth={3}
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -186,8 +183,8 @@ export function PremiumLock({ feature, onReturn }: PremiumLockProps) {
               className="inline-flex items-center justify-center px-10 py-4 text-white font-semibold transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"
               style={{
                 borderRadius: '2rem',
-                backgroundColor: EMERALD,
-                boxShadow: `0 20px 40px -10px rgba(80, 200, 120, 0.4), 0 8px 16px -8px rgba(80, 200, 120, 0.3)`,
+                backgroundColor: 'var(--color-primary-500)',
+                boxShadow: '0 20px 40px -10px rgba(80, 200, 120, 0.4), 0 8px 16px -8px rgba(80, 200, 120, 0.3)',
               }}
             >
               Contact Sales

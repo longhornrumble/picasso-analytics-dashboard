@@ -445,10 +445,9 @@ export function ConversationsDashboard() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <div
-            className="w-12 h-12 rounded-full animate-spin mx-auto mb-4"
+            className="w-12 h-12 rounded-full animate-spin mx-auto mb-4 border-4 border-primary-200"
             style={{
-              border: '4px solid rgba(80, 200, 120, 0.2)',
-              borderTopColor: '#50C878',
+              borderTopColor: 'var(--color-primary-500)',
             }}
           />
           <p className="text-slate-500 font-medium">Loading conversations...</p>
@@ -461,8 +460,8 @@ export function ConversationsDashboard() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center bg-white p-8 rounded-2xl shadow-sm max-w-md border border-slate-100">
-          <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-12 h-12 bg-danger-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
@@ -470,8 +469,7 @@ export function ConversationsDashboard() {
           <p className="text-slate-500 mb-4">{error}</p>
           <button
             onClick={loadData}
-            className="px-5 py-2.5 text-white rounded-xl font-semibold transition-all duration-200 hover:opacity-90"
-            style={{ backgroundColor: '#50C878' }}
+            className="px-5 py-2.5 bg-primary-500 text-white rounded-xl font-semibold transition-all duration-200 hover:opacity-90"
           >
             Try Again
           </button>
@@ -487,23 +485,23 @@ export function ConversationsDashboard() {
         <div
           className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 ${
             exportToast.type === 'success'
-              ? 'bg-green-50 border border-green-200 text-green-800'
-              : 'bg-red-50 border border-red-200 text-red-800'
+              ? 'bg-primary-50 border border-primary-200 text-primary-800'
+              : 'bg-danger-50 border border-danger-200 text-danger-800'
           }`}
         >
           {exportToast.type === 'success' ? (
-            <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           ) : (
-            <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           )}
           <span className="text-sm font-medium">{exportToast.message}</span>
           <button
             onClick={() => setExportToast(null)}
-            className="ml-2 text-gray-400 hover:text-gray-600"
+            className="ml-2 text-slate-400 hover:text-slate-600"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -582,7 +580,7 @@ export function ConversationsDashboard() {
             title="Conversations Trend"
             subtitle="Questions per hour"
             data={(useMockData ? mockTrend : trend).map(t => ({ label: t.period, value: t.value }))}
-            color="green"
+            color="primary"
             height={200}
             showArea
           />

@@ -60,8 +60,8 @@ function ArchiveConfirmModal({
       <div className="relative bg-white border border-gray-200 rounded-xl p-6 max-w-sm mx-4 shadow-2xl">
         <div className="text-center">
           {/* Icon */}
-          <div className="mx-auto w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-4">
-            <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="mx-auto w-12 h-12 rounded-full bg-danger-50 flex items-center justify-center mb-4">
+            <svg className="w-6 h-6 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                 d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
             </svg>
@@ -88,7 +88,7 @@ function ArchiveConfirmModal({
               type="button"
               onClick={onConfirm}
               disabled={isArchiving}
-              className="flex-1 px-4 py-2.5 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2.5 rounded-lg bg-danger-500 hover:bg-danger-600 text-white font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isArchiving ? (
                 <>
@@ -158,7 +158,7 @@ export function TerminalActions({
                 type="button"
                 onClick={handleArchiveClick}
                 disabled={disabled || isArchiving}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-50 text-red-500 text-sm font-semibold hover:bg-red-100 transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-danger-50 text-danger-500 text-sm font-semibold hover:bg-danger-100 transition-colors disabled:opacity-50"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -173,7 +173,7 @@ export function TerminalActions({
                 type="button"
                 onClick={handleReactivate}
                 disabled={disabled || isReactivating}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50 group"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50 group"
               >
                 <svg
                   className={`w-4 h-4 ${isReactivating ? 'animate-spin' : 'group-hover:animate-pulse'}`}

@@ -11,6 +11,26 @@ import {
   StyleSheet,
 } from '@react-pdf/renderer';
 
+// Design token colors (from @picasso/shared-styles)
+// Note: react-pdf doesn't support CSS variables, so we use hex values with token references
+const COLORS = {
+  primary500: '#50C878',    // var(--color-primary-500)
+  danger500: '#ef4444',     // var(--color-danger-500)
+  success600: '#16a34a',    // var(--color-success-600)
+  success700: '#166534',    // var(--color-success-700)
+  danger700: '#991b1b',     // var(--color-danger-700)
+  gray50: '#f9fafb',        // var(--color-gray-50)
+  gray100: '#f3f4f6',       // var(--color-gray-100)
+  gray200: '#e5e7eb',       // var(--color-gray-200)
+  gray400: '#9ca3af',       // var(--color-gray-400)
+  gray500: '#6b7280',       // var(--color-gray-500)
+  gray700: '#374151',       // var(--color-gray-700)
+  gray800: '#1f2937',       // var(--color-gray-800)
+  gray900: '#111827',       // var(--color-gray-900)
+  green50: '#f0fdf4',       // var(--color-green-50)
+  red50: '#fef2f2',         // var(--color-red-50)
+};
+
 // PDF Styles - A4 page is 595 x 842 points
 const styles = StyleSheet.create({
   page: {
@@ -18,7 +38,7 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
     fontFamily: 'Helvetica',
     fontSize: 10,
-    color: '#1f2937',
+    color: COLORS.gray800,
   },
   header: {
     marginBottom: 24,
@@ -26,12 +46,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#111827',
+    color: COLORS.gray900,
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 11,
-    color: '#6b7280',
+    color: COLORS.gray500,
   },
   section: {
     marginBottom: 20,
@@ -39,11 +59,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontWeight: 'bold',
-    color: '#111827',
+    color: COLORS.gray900,
     marginBottom: 10,
     paddingBottom: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: COLORS.gray200,
   },
   // KPI Cards - 4 cards across full width
   kpiRow: {
@@ -53,32 +73,32 @@ const styles = StyleSheet.create({
   kpiCard: {
     flex: 1,
     padding: 12,
-    backgroundColor: '#f9fafb',
+    backgroundColor: COLORS.gray50,
     borderRadius: 6,
   },
   kpiValue: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#50C878',
+    color: COLORS.primary500,
     marginBottom: 4,
   },
   kpiValueDanger: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#ef4444',
+    color: COLORS.danger500,
     marginBottom: 4,
   },
   kpiLabel: {
     fontSize: 8,
     fontWeight: 'bold',
-    color: '#374151',
+    color: COLORS.gray700,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 2,
   },
   kpiSubtitle: {
     fontSize: 8,
-    color: '#6b7280',
+    color: COLORS.gray500,
   },
   // Funnel visualization
   funnelContainer: {
@@ -92,25 +112,25 @@ const styles = StyleSheet.create({
   funnelLabel: {
     width: 80,
     fontSize: 9,
-    color: '#374151',
+    color: COLORS.gray700,
   },
   funnelBarContainer: {
     flex: 1,
     height: 24,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: COLORS.gray100,
     borderRadius: 4,
     overflow: 'hidden',
   },
   funnelBar: {
     height: '100%',
-    backgroundColor: '#50C878',
+    backgroundColor: COLORS.primary500,
     borderRadius: 4,
   },
   funnelValue: {
     width: 60,
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#111827',
+    color: COLORS.gray900,
     textAlign: 'right',
     marginLeft: 8,
   },
@@ -120,7 +140,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: COLORS.gray100,
   },
   funnelStat: {
     alignItems: 'center',
@@ -128,21 +148,21 @@ const styles = StyleSheet.create({
   funnelStatValue: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#111827',
+    color: COLORS.gray900,
   },
   funnelStatValueSuccess: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#50C878',
+    color: COLORS.primary500,
   },
   funnelStatValueDanger: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#ef4444',
+    color: COLORS.danger500,
   },
   funnelStatLabel: {
     fontSize: 7,
-    color: '#6b7280',
+    color: COLORS.gray500,
     marginTop: 2,
   },
   // Two-column layout with fixed height
@@ -164,23 +184,23 @@ const styles = StyleSheet.create({
   rowLabel: {
     width: 110,
     fontSize: 9,
-    color: '#374151',
+    color: COLORS.gray700,
   },
   rowBarContainer: {
     flex: 1,
     height: 18,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: COLORS.gray100,
     borderRadius: 4,
     overflow: 'hidden',
   },
   rowBarSuccess: {
     height: '100%',
-    backgroundColor: '#50C878',
+    backgroundColor: COLORS.primary500,
     borderRadius: 4,
   },
   rowBarDanger: {
     height: '100%',
-    backgroundColor: '#ef4444',
+    backgroundColor: COLORS.danger500,
     borderRadius: 4,
   },
   rowValue: {
@@ -191,10 +211,10 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   rowValueSuccess: {
-    color: '#16a34a',
+    color: COLORS.success600,
   },
   rowValueDanger: {
-    color: '#ef4444',
+    color: COLORS.danger500,
   },
   // Summary boxes
   summaryBox: {
@@ -203,19 +223,19 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   summaryBoxSuccess: {
-    backgroundColor: '#f0fdf4',
+    backgroundColor: COLORS.green50,
   },
   summaryBoxDanger: {
-    backgroundColor: '#fef2f2',
+    backgroundColor: COLORS.red50,
   },
   summaryText: {
     fontSize: 8,
   },
   summaryTextSuccess: {
-    color: '#166534',
+    color: COLORS.success700,
   },
   summaryTextDanger: {
-    color: '#991b1b',
+    color: COLORS.danger700,
   },
   // Footer
   footer: {
@@ -226,12 +246,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: COLORS.gray200,
     paddingTop: 8,
   },
   footerText: {
     fontSize: 8,
-    color: '#9ca3af',
+    color: COLORS.gray400,
   },
 });
 
@@ -393,7 +413,7 @@ export function FormsPDF({
                   </View>
                 ))
               ) : (
-                <Text style={{ fontSize: 9, color: '#6b7280' }}>No form data available</Text>
+                <Text style={{ fontSize: 9, color: COLORS.gray500 }}>No form data available</Text>
               )}
               <View style={[styles.summaryBox, styles.summaryBoxSuccess]}>
                 <Text style={[styles.summaryText, styles.summaryTextSuccess]}>
@@ -416,7 +436,7 @@ export function FormsPDF({
                   </View>
                 ))
               ) : (
-                <Text style={{ fontSize: 9, color: '#6b7280' }}>No bottleneck data available</Text>
+                <Text style={{ fontSize: 9, color: COLORS.gray500 }}>No bottleneck data available</Text>
               )}
               <View style={[styles.summaryBox, styles.summaryBoxDanger]}>
                 <Text style={[styles.summaryText, styles.summaryTextDanger]}>

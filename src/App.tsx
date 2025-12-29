@@ -13,9 +13,6 @@ import type { DashboardFeatures } from './types/analytics';
 
 type DashboardTab = 'conversations' | 'forms' | 'attribution';
 
-// Brand emerald color
-const EMERALD = '#50C878';
-
 // Lock icon for premium features
 const LockIcon = () => (
   <svg className="w-3.5 h-3.5 ml-1.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -122,22 +119,18 @@ function NavigationBar({
                     ${isLocked
                       ? 'text-slate-300 cursor-not-allowed'
                       : isActive
-                        ? 'text-slate-900'
+                        ? 'text-primary-500 bg-primary-50'
                         : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                     }
                   `}
-                  style={isActive && !isLocked ? { backgroundColor: 'rgba(80, 200, 120, 0.1)' } : undefined}
                 >
-                  <span style={isActive && !isLocked ? { color: EMERALD } : undefined}>{tab.icon}</span>
-                  <span style={isActive && !isLocked ? { color: EMERALD } : undefined}>{tab.label}</span>
+                  {tab.icon}
+                  {tab.label}
                   {isLocked && <LockIcon />}
 
                   {/* Precision Indicator - emerald underline */}
                   {isActive && !isLocked && (
-                    <div
-                      className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full"
-                      style={{ backgroundColor: EMERALD, bottom: '-8px' }}
-                    />
+                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-primary-500" style={{ bottom: '-8px' }} />
                   )}
                 </button>
               );
@@ -181,11 +174,7 @@ function AppContent() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <div
-            className="w-12 h-12 rounded-full animate-spin mx-auto mb-4"
-            style={{
-              border: '4px solid rgba(80, 200, 120, 0.2)',
-              borderTopColor: EMERALD,
-            }}
+            className="w-12 h-12 rounded-full animate-spin mx-auto mb-4 border-4 border-primary-200 border-t-primary-500"
           />
           <p className="text-slate-500 font-medium">Loading...</p>
         </div>

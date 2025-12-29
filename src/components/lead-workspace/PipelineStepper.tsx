@@ -122,12 +122,11 @@ export function PipelineStepper({
               className={`
                 px-4 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200
                 ${isActive
-                  ? 'text-white'
+                  ? 'bg-primary-500 text-white'
                   : 'text-slate-400 bg-slate-100 hover:text-slate-500 hover:bg-slate-200'
                 }
                 disabled:opacity-50 disabled:cursor-not-allowed
               `}
-              style={isActive ? { backgroundColor: '#50C878' } : undefined}
               aria-label={`${stage.label}: ${stage.description}`}
               aria-current={isActive ? 'step' : undefined}
             >

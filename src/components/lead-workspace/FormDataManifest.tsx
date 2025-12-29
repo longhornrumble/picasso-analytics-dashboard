@@ -125,21 +125,21 @@ function FieldRow({ field }: { field: ParsedFormField }) {
 
   return (
     <div className="py-3 flex items-center justify-between border-b border-gray-100 last:border-b-0">
-      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">
+      <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">
         {field.label}
       </p>
       <div className="text-right">
         {isEmailLink ? (
           <a
             href={`mailto:${field.value}`}
-            className="text-sm text-emerald-600 hover:text-emerald-700 transition-colors"
+            className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
           >
             {field.value}
           </a>
         ) : isPhoneLink ? (
           <a
             href={`tel:${field.value.replace(/\D/g, '')}`}
-            className="text-sm text-emerald-600 hover:text-emerald-700 transition-colors"
+            className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
           >
             {field.value}
           </a>
@@ -202,7 +202,7 @@ function CopyAllButton({ fields }: { fields: ParsedFormField[] }) {
     >
       {copied ? (
         <>
-          <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
           Copied!

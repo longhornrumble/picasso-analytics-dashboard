@@ -55,7 +55,7 @@ export function TopQuestions({
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-bold text-slate-900">Top Five Questions</h3>
         <div className="text-right">
-          <span className="text-2xl font-bold" style={{ color: '#50C878' }}>
+          <span className="text-2xl font-bold text-primary-500">
             {totalQuestions.toLocaleString()}
           </span>
           <span className="label-swiss text-slate-500 ml-2">Total</span>
@@ -76,18 +76,18 @@ export function TopQuestions({
               <span className="text-slate-500">
                 <span className="font-semibold text-slate-700">{question.count}</span> times
               </span>
-              <span className="font-semibold" style={{ color: '#50C878' }}>
+              <span className="font-semibold text-primary-500">
                 {question.percentage.toFixed(1)}% of all questions
               </span>
             </div>
 
-            {/* Progress bar - emerald gradient */}
+            {/* Progress bar - primary gradient */}
             <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-500 ease-out"
                 style={{
                   width: `${Math.min(question.percentage, 100)}%`,
-                  background: 'linear-gradient(90deg, #34d399 0%, #50C878 100%)',
+                  background: 'linear-gradient(90deg, #34d399 0%, var(--color-primary-500) 100%)',
                 }}
               />
             </div>

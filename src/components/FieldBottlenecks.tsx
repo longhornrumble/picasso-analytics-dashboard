@@ -53,9 +53,9 @@ export function FieldBottlenecks({ bottlenecks, totalAbandons }: FieldBottleneck
           </button>
         </div>
         <div className="text-right">
-          <p className="text-2xl font-bold text-rose-500">{totalAbandons.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-danger-500">{totalAbandons.toLocaleString()}</p>
           <p
-            className="text-[10px] font-black uppercase text-rose-400"
+            className="text-[10px] font-black uppercase text-danger-400"
             style={{ letterSpacing: '0.2em' }}
           >
             Abandons
@@ -76,7 +76,7 @@ export function FieldBottlenecks({ bottlenecks, totalAbandons }: FieldBottleneck
                 <div className="flex-1 relative">
                   <div
                     className={`h-6 bg-slate-100 rounded-xl overflow-hidden cursor-pointer transition-all duration-300 ${
-                      isHovered ? 'ring-2 ring-rose-400 ring-offset-2' : ''
+                      isHovered ? 'ring-2 ring-danger-400 ring-offset-2' : ''
                     }`}
                     onMouseEnter={(e) => {
                       const rect = e.currentTarget.getBoundingClientRect();
@@ -93,7 +93,7 @@ export function FieldBottlenecks({ bottlenecks, totalAbandons }: FieldBottleneck
                     />
                   </div>
                 </div>
-                <div className="w-12 text-right text-sm font-bold text-rose-500">
+                <div className="w-12 text-right text-sm font-bold text-danger-500">
                   {bottleneck.abandonRate}%
                 </div>
               </div>
@@ -101,7 +101,7 @@ export function FieldBottlenecks({ bottlenecks, totalAbandons }: FieldBottleneck
           })
         ) : (
           <div className="py-8 text-center text-slate-500">
-            <svg className="w-12 h-12 mx-auto mb-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-12 h-12 mx-auto mb-3 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <p className="font-semibold text-slate-700">No bottlenecks detected</p>
@@ -138,23 +138,23 @@ export function FieldBottlenecks({ bottlenecks, totalAbandons }: FieldBottleneck
         )}
       </div>
 
-      {/* Insight callout with rose accent */}
+      {/* Insight callout with danger accent */}
       {topBottleneck && (
-        <div className="mt-6 p-4 bg-rose-50 rounded-xl border border-rose-100">
+        <div className="mt-6 p-4 bg-danger-50 rounded-xl border border-danger-100">
           <div className="flex items-start gap-2">
-            <span className="text-rose-500 mt-0.5">
+            <span className="text-danger-500 mt-0.5">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </span>
             <div>
               <p
-                className="text-[10px] font-black uppercase text-rose-700 mb-1"
+                className="text-[10px] font-black uppercase text-danger-700 mb-1"
                 style={{ letterSpacing: '0.2em' }}
               >
                 Insight
               </p>
-              <p className="text-sm text-rose-600">
+              <p className="text-sm text-danger-600">
                 <span className="font-bold">{topBottleneck.fieldName}</span> causes {topBottleneck.abandonRate}% of drop-offs.
                 Add a trust badge to reduce anxiety.
               </p>

@@ -14,9 +14,6 @@
 import { useState } from 'react';
 import type { HeatmapRow, HeatmapPeak } from '../types/analytics';
 
-// Brand emerald color
-const EMERALD = '#50C878';
-
 interface ConversationHeatMapProps {
   /** Heatmap data rows (8 rows for 3-hour blocks) */
   data: HeatmapRow[];
@@ -31,28 +28,28 @@ interface ConversationHeatMapProps {
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /**
- * Emerald gradient ramp for heatmap
+ * Primary color gradient ramp for heatmap
  * From light tint to full brand color
  */
-const EMERALD_GRADIENT = {
+const PRIMARY_GRADIENT = {
   0: { bg: '#f8faf9', text: '#64748b' },      // slate-50 equivalent
-  1: { bg: '#d1fae5', text: '#065f46' },      // emerald-100
-  2: { bg: '#a7f3d0', text: '#047857' },      // emerald-200
-  3: { bg: '#6ee7b7', text: '#047857' },      // emerald-300
-  4: { bg: '#34d399', text: '#ffffff' },      // emerald-400
-  5: { bg: '#50C878', text: '#ffffff' },      // Brand emerald
+  1: { bg: '#d1fae5', text: '#065f46' },      // primary-100
+  2: { bg: '#a7f3d0', text: '#047857' },      // primary-200
+  3: { bg: '#6ee7b7', text: '#047857' },      // primary-300
+  4: { bg: '#34d399', text: '#ffffff' },      // primary-400
+  5: { bg: 'var(--color-primary-500)', text: '#ffffff' },      // Brand primary
 };
 
 function getHeatColor(value: number, maxValue: number): { bg: string; text: string; isPeak: boolean } {
-  if (value === 0 || maxValue === 0) return { ...EMERALD_GRADIENT[0], isPeak: false };
+  if (value === 0 || maxValue === 0) return { ...PRIMARY_GRADIENT[0], isPeak: false };
 
   const intensity = value / maxValue;
 
-  if (intensity >= 0.8) return { ...EMERALD_GRADIENT[5], isPeak: true };
-  if (intensity >= 0.6) return { ...EMERALD_GRADIENT[4], isPeak: false };
-  if (intensity >= 0.4) return { ...EMERALD_GRADIENT[3], isPeak: false };
-  if (intensity >= 0.2) return { ...EMERALD_GRADIENT[2], isPeak: false };
-  return { ...EMERALD_GRADIENT[1], isPeak: false };
+  if (intensity >= 0.8) return { ...PRIMARY_GRADIENT[5], isPeak: true };
+  if (intensity >= 0.6) return { ...PRIMARY_GRADIENT[4], isPeak: false };
+  if (intensity >= 0.4) return { ...PRIMARY_GRADIENT[3], isPeak: false };
+  if (intensity >= 0.2) return { ...PRIMARY_GRADIENT[2], isPeak: false };
+  return { ...PRIMARY_GRADIENT[1], isPeak: false };
 }
 
 export function ConversationHeatMap({
@@ -107,12 +104,12 @@ export function ConversationHeatMap({
           <h3 className="text-lg font-bold text-slate-900">Engagement Density</h3>
           {peak && (
             <p className="text-sm text-slate-500 mt-1">
-              Peak: <span className="font-semibold" style={{ color: EMERALD }}>{peak.day} at {peak.hour_block}</span>
+              Peak: <span className="font-semibold text-primary-500">{peak.day} at {peak.hour_block}</span>
             </p>
           )}
         </div>
         <div className="text-right">
-          <p className="text-3xl font-bold" style={{ color: EMERALD }}>{totalConversations.toLocaleString()}</p>
+          <p className="text-3xl font-bold text-primary-500">{totalConversations.toLocaleString()}</p>
           <p className="text-[10px] font-black uppercase text-slate-500 mt-1" style={{ letterSpacing: '0.2em' }}>Total</p>
         </div>
       </div>
@@ -158,7 +155,7 @@ export function ConversationHeatMap({
                           transform: isHovered ? 'scale(1.1)' : 'scale(1)',
                           // Glow effect on peak cells
                           boxShadow: isPeakCell || colors.isPeak
-                            ? `0 0 20px ${EMERALD}40`
+                            ? '0 0 20px rgba(80, 200, 120, 0.25)'
                             : undefined,
                         }}
                         onMouseEnter={(e) => {
@@ -209,7 +206,7 @@ export function ConversationHeatMap({
       <div className="flex items-center justify-end gap-3 mt-6">
         <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Less</span>
         <div className="flex gap-1">
-          {Object.values(EMERALD_GRADIENT).map((color, i) => (
+          {Object.values(PRIMARY_GRADIENT).map((color, i) => (
             <div
               key={i}
               className="w-5 h-5 rounded-lg"

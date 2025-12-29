@@ -57,7 +57,7 @@ export function DrawerHeader({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           {/* Lead Workspace Label */}
-          <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">
+          <span className="text-xs font-bold uppercase tracking-wider text-primary-600">
             LEAD WORKSPACE
           </span>
 
@@ -118,11 +118,9 @@ export function DrawerHeader({
             type="button"
             onClick={onNext}
             disabled={!hasNextLead}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-full transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              backgroundColor: hasNextLead ? '#50C878' : 'transparent',
-              border: hasNextLead ? 'none' : '1px solid rgba(148, 163, 184, 0.3)',
-            }}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-full transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+              hasNextLead ? 'bg-primary-500 text-white' : 'bg-transparent border border-slate-300/30 text-slate-400'
+            }`}
             title={hasNextLead ? `${queueCount} leads in queue` : 'No more leads'}
           >
             <span>Next</span>

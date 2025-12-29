@@ -18,6 +18,27 @@ import type {
   ConversationTrendPoint,
 } from '../../types/analytics';
 
+// Design token colors (from @picasso/shared-styles)
+// Note: react-pdf doesn't support CSS variables, so we use hex values with token references
+const COLORS = {
+  primary500: '#50C878',    // var(--color-primary-500)
+  success700: '#166534',    // var(--color-success-700)
+  gray50: '#f9fafb',        // var(--color-gray-50)
+  gray100: '#f3f4f6',       // var(--color-gray-100)
+  gray200: '#e5e7eb',       // var(--color-gray-200)
+  gray400: '#9ca3af',       // var(--color-gray-400)
+  gray500: '#6b7280',       // var(--color-gray-500)
+  gray700: '#374151',       // var(--color-gray-700)
+  gray800: '#1f2937',       // var(--color-gray-800)
+  gray900: '#111827',       // var(--color-gray-900)
+  green50: '#f0fdf4',       // var(--color-green-50)
+  green200: '#bbf7d0',      // var(--color-green-200)
+  green300: '#86efac',      // var(--color-green-300)
+  green400: '#4ade80',      // var(--color-green-400)
+  green500: '#22c55e',      // var(--color-green-500)
+  white: '#ffffff',         // var(--color-white)
+};
+
 // PDF Styles - A4 page is 595 x 842 points
 const styles = StyleSheet.create({
   page: {
@@ -25,7 +46,7 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
     fontFamily: 'Helvetica',
     fontSize: 10,
-    color: '#1f2937',
+    color: COLORS.gray800,
   },
   header: {
     marginBottom: 24,
@@ -33,12 +54,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#111827',
+    color: COLORS.gray900,
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 11,
-    color: '#6b7280',
+    color: COLORS.gray500,
   },
   section: {
     marginBottom: 20,
@@ -46,11 +67,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontWeight: 'bold',
-    color: '#111827',
+    color: COLORS.gray900,
     marginBottom: 10,
     paddingBottom: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: COLORS.gray200,
   },
   // KPI Cards - 4 cards across full width
   kpiRow: {
@@ -60,26 +81,26 @@ const styles = StyleSheet.create({
   kpiCard: {
     flex: 1,
     padding: 12,
-    backgroundColor: '#f9fafb',
+    backgroundColor: COLORS.gray50,
     borderRadius: 6,
   },
   kpiValue: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#50C878',
+    color: COLORS.primary500,
     marginBottom: 4,
   },
   kpiLabel: {
     fontSize: 8,
     fontWeight: 'bold',
-    color: '#374151',
+    color: COLORS.gray700,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 2,
   },
   kpiSubtitle: {
     fontSize: 8,
-    color: '#6b7280',
+    color: COLORS.gray500,
   },
   // Two-column layout for Questions and Heatmap
   twoColumnRow: {
@@ -95,18 +116,18 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: COLORS.gray100,
   },
   questionRank: {
     width: 20,
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#50C878',
+    color: COLORS.primary500,
   },
   questionText: {
     flex: 1,
     fontSize: 9,
-    color: '#374151',
+    color: COLORS.gray700,
     paddingRight: 8,
   },
   questionStats: {
@@ -116,11 +137,11 @@ const styles = StyleSheet.create({
   questionCount: {
     fontSize: 9,
     fontWeight: 'bold',
-    color: '#111827',
+    color: COLORS.gray900,
   },
   questionPercent: {
     fontSize: 7,
-    color: '#50C878',
+    color: COLORS.primary500,
   },
   // Heatmap - Compact version
   heatmapContainer: {
@@ -134,13 +155,13 @@ const styles = StyleSheet.create({
     width: 28,
     fontSize: 7,
     fontWeight: 'bold',
-    color: '#6b7280',
+    color: COLORS.gray500,
     textAlign: 'center',
   },
   heatmapHourLabel: {
     width: 32,
     fontSize: 7,
-    color: '#6b7280',
+    color: COLORS.gray500,
   },
   heatmapRow: {
     flexDirection: 'row',
@@ -156,24 +177,24 @@ const styles = StyleSheet.create({
   },
   heatmapCellText: {
     fontSize: 6,
-    color: '#ffffff',
+    color: COLORS.white,
   },
   peakInfo: {
     marginTop: 8,
     padding: 6,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: COLORS.green50,
     borderRadius: 4,
     flexDirection: 'row',
     alignItems: 'center',
   },
   peakLabel: {
     fontSize: 8,
-    color: '#166534',
+    color: COLORS.success700,
     fontWeight: 'bold',
   },
   peakValue: {
     fontSize: 8,
-    color: '#166534',
+    color: COLORS.success700,
     marginLeft: 4,
   },
   // Trend Chart
@@ -185,7 +206,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     height: 80,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: COLORS.gray200,
     paddingBottom: 4,
   },
   trendBarContainer: {
@@ -196,7 +217,7 @@ const styles = StyleSheet.create({
   },
   trendBar: {
     width: '70%',
-    backgroundColor: '#50C878',
+    backgroundColor: COLORS.primary500,
     borderTopLeftRadius: 2,
     borderTopRightRadius: 2,
     minHeight: 2,
@@ -208,7 +229,7 @@ const styles = StyleSheet.create({
   trendLabel: {
     flex: 1,
     fontSize: 6,
-    color: '#6b7280',
+    color: COLORS.gray500,
     textAlign: 'center',
   },
   trendSummary: {
@@ -217,7 +238,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: COLORS.gray100,
   },
   trendStat: {
     alignItems: 'center',
@@ -225,11 +246,11 @@ const styles = StyleSheet.create({
   trendStatValue: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#111827',
+    color: COLORS.gray900,
   },
   trendStatLabel: {
     fontSize: 7,
-    color: '#6b7280',
+    color: COLORS.gray500,
     marginTop: 2,
   },
   // Footer
@@ -241,23 +262,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: COLORS.gray200,
     paddingTop: 8,
   },
   footerText: {
     fontSize: 8,
-    color: '#9ca3af',
+    color: COLORS.gray400,
   },
 });
 
 // Helper to get heatmap cell color based on value
 function getHeatmapColor(value: number, maxValue: number): string {
-  if (value === 0) return '#f3f4f6';
+  if (value === 0) return COLORS.gray100;
   const intensity = Math.min(value / maxValue, 1);
-  if (intensity < 0.25) return '#bbf7d0';
-  if (intensity < 0.5) return '#86efac';
-  if (intensity < 0.75) return '#4ade80';
-  return '#22c55e';
+  if (intensity < 0.25) return COLORS.green200;
+  if (intensity < 0.5) return COLORS.green300;
+  if (intensity < 0.75) return COLORS.green400;
+  return COLORS.green500;
 }
 
 // Helper to format response time
@@ -425,7 +446,7 @@ export function ConversationsPDF({
                       {cell.value > 0 && (
                         <Text style={[
                           styles.heatmapCellText,
-                          { color: cell.value / maxHeatmapValue > 0.5 ? '#ffffff' : '#374151' }
+                          { color: cell.value / maxHeatmapValue > 0.5 ? COLORS.white : COLORS.gray700 }
                         ]}>
                           {cell.value}
                         </Text>

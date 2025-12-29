@@ -541,14 +541,14 @@ export function LeadWorkspaceDrawer({
           <div className="flex-1 p-6 space-y-6">
             {/* Error State */}
             {loadError && !isLoading && (
-              <div className="drawer-card border-red-200 bg-red-50">
+              <div className="drawer-card border-danger-200 bg-danger-50">
                 <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-red-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-danger-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div>
-                    <p className="font-medium text-red-800">Failed to load lead</p>
-                    <p className="text-sm text-red-600 mt-1">{loadError}</p>
+                    <p className="font-medium text-danger-800">Failed to load lead</p>
+                    <p className="text-sm text-danger-600 mt-1">{loadError}</p>
                   </div>
                 </div>
               </div>

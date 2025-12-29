@@ -9,9 +9,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-// Brand emerald color
-const EMERALD = '#50C878';
-
 const BUBBLE_AUTH_URL = import.meta.env.VITE_BUBBLE_AUTH_URL || '';
 
 export function Login() {
@@ -40,7 +37,7 @@ export function Login() {
       <div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full pointer-events-none"
         style={{
-          background: `radial-gradient(circle, ${EMERALD}12 0%, transparent 60%)`,
+          background: 'radial-gradient(circle, rgba(80, 200, 120, 0.07) 0%, transparent 60%)',
           filter: 'blur(120px)',
         }}
       />
@@ -66,13 +63,11 @@ export function Login() {
 
           {/* Meta Badge */}
           <span
-            className="inline-flex items-center px-4 py-1.5 mb-6 font-black uppercase"
+            className="inline-flex items-center px-4 py-1.5 mb-6 font-black uppercase bg-primary-50 text-primary-500"
             style={{
               fontSize: '10px',
               letterSpacing: '0.25em',
               borderRadius: '2rem',
-              backgroundColor: `${EMERALD}12`,
-              color: EMERALD,
             }}
           >
             Mission Intelligence
@@ -93,15 +88,8 @@ export function Login() {
 
           {/* Error message */}
           {error && (
-            <div
-              className="mb-8 p-4 text-left"
-              style={{
-                borderRadius: '1rem',
-                backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.15)',
-              }}
-            >
-              <p className="text-sm text-red-600 font-medium">{error}</p>
+            <div className="mb-8 p-4 text-left rounded-2xl bg-danger-50 border border-danger-100">
+              <p className="text-sm text-danger-600 font-medium">{error}</p>
             </div>
           )}
 
@@ -111,11 +99,9 @@ export function Login() {
               {/* Primary CTA - Bubble SSO */}
               <button
                 onClick={handleBubbleLogin}
-                className="w-full py-4 px-6 text-white font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
+                className="w-full py-4 px-6 text-white font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 bg-primary-500 rounded-[1.25rem]"
                 style={{
-                  borderRadius: '1.25rem',
-                  backgroundColor: EMERALD,
-                  boxShadow: `0 16px 32px -8px rgba(80, 200, 120, 0.4), 0 6px 12px -6px rgba(80, 200, 120, 0.3)`,
+                  boxShadow: '0 16px 32px -8px rgba(80, 200, 120, 0.4), 0 6px 12px -6px rgba(80, 200, 120, 0.3)',
                 }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -181,12 +167,10 @@ export function Login() {
               <button
                 type="submit"
                 disabled={!manualToken.trim()}
-                className="w-full py-4 px-6 text-white font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="w-full py-4 px-6 text-white font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 bg-primary-500 rounded-[1.25rem]"
                 style={{
-                  borderRadius: '1.25rem',
-                  backgroundColor: EMERALD,
                   boxShadow: manualToken.trim()
-                    ? `0 16px 32px -8px rgba(80, 200, 120, 0.4), 0 6px 12px -6px rgba(80, 200, 120, 0.3)`
+                    ? '0 16px 32px -8px rgba(80, 200, 120, 0.4), 0 6px 12px -6px rgba(80, 200, 120, 0.3)'
                     : 'none',
                 }}
               >
@@ -212,8 +196,7 @@ export function Login() {
             Having trouble signing in?{' '}
             <a
               href="mailto:support@myrecruiter.ai"
-              className="font-medium transition-colors duration-200 hover:underline"
-              style={{ color: EMERALD }}
+              className="font-medium transition-colors duration-200 hover:underline text-primary-500"
             >
               Contact support
             </a>
