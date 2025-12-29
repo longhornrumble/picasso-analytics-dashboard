@@ -43,6 +43,7 @@ import type {
   FieldBottleneckAPI,
   FormSubmissionAPI,
   FormPerformerAPI,
+  PipelineStatus,
 } from '../types/analytics';
 
 // Mock data for sections not yet supported by API
@@ -63,11 +64,11 @@ const mockBottlenecks: FieldBottleneck[] = [
 ];
 
 const mockSubmissions: FormSubmission[] = [
-  { id: '1', name: 'Sarah Jenkins', email: 'sarah.j@email.com', phone: '(555) 123-4567', formType: 'Volunteer App', comments: 'I have 5 years of experience working with youth programs and would love to contribute to your mentorship initiative.', date: 'Dec 01' },
-  { id: '2', name: 'Michael Chen', email: 'm.chen@email.com', phone: '(555) 234-5678', formType: 'Donation Req', comments: 'Looking to donate office supplies and furniture from our company that is relocating. Can arrange pickup or delivery.', date: 'Dec 01' },
-  { id: '3', name: 'Jessica Ford', email: 'jess.ford@email.com', phone: '(555) 345-6789', formType: 'Event Reg', comments: 'Dietary restriction: Please note I am vegetarian and allergic to nuts. Will need accommodation for the lunch portion.', date: 'Nov 30' },
-  { id: '4', name: 'Robert Smith', email: 'rob.smith@email.com', phone: '(555) 456-7890', formType: 'General Inquiry', comments: 'What are your opening hours on weekends? I work during the week and can only visit on Saturdays or Sundays.', date: 'Nov 30' },
-  { id: '5', name: 'Emily Davis', email: 'emily.d@email.com', phone: '(555) 567-8901', formType: 'Volunteer App', comments: 'Interested in the mentorship program. I am a retired teacher with 30 years of experience in elementary education.', date: 'Nov 29' },
+  { id: '1', name: 'Sarah Jenkins', email: 'sarah.j@email.com', phone: '(555) 123-4567', formType: 'Volunteer App', comments: 'I have 5 years of experience working with youth programs and would love to contribute to your mentorship initiative.', date: 'Dec 01', pipeline_status: 'new' },
+  { id: '2', name: 'Michael Chen', email: 'm.chen@email.com', phone: '(555) 234-5678', formType: 'Donation Req', comments: 'Looking to donate office supplies and furniture from our company that is relocating. Can arrange pickup or delivery.', date: 'Dec 01', pipeline_status: 'reviewing' },
+  { id: '3', name: 'Jessica Ford', email: 'jess.ford@email.com', phone: '(555) 345-6789', formType: 'Event Reg', comments: 'Dietary restriction: Please note I am vegetarian and allergic to nuts. Will need accommodation for the lunch portion.', date: 'Nov 30', pipeline_status: 'archived' },
+  { id: '4', name: 'Robert Smith', email: 'rob.smith@email.com', phone: '(555) 456-7890', formType: 'General Inquiry', comments: 'What are your opening hours on weekends? I work during the week and can only visit on Saturdays or Sundays.', date: 'Nov 30', pipeline_status: 'contacted' },
+  { id: '5', name: 'Emily Davis', email: 'emily.d@email.com', phone: '(555) 567-8901', formType: 'Volunteer App', comments: 'Interested in the mentorship program. I am a retired teacher with 30 years of experience in elementary education.', date: 'Nov 29', pipeline_status: 'archived' },
 ];
 
 // Form-specific mock metrics (keyed by form ID, empty string = all forms)
@@ -260,6 +261,17 @@ export function Dashboard() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
+  // Archive Vault view state (per PRD: Emerald Lead Reactivation Engine)
+  const [isArchiveView, setIsArchiveView] = useState(false);
+
+  // Mock submission status overrides (for archive/reactivate state sync)
+  const [mockStatusOverrides, setMockStatusOverrides] = useState<Record<string, PipelineStatus>>({});
+
+  // Handle status change from drawer (archive/reactivate)
+  const handleLeadStatusChange = useCallback((leadId: string, newStatus: PipelineStatus) => {
+    setMockStatusOverrides((prev) => ({ ...prev, [leadId]: newStatus }));
+  }, []);
+
   // Drawer handlers
   const openDrawer = useCallback((leadId: string) => {
     setSelectedLeadId(leadId);
@@ -271,6 +283,19 @@ export function Dashboard() {
     // Delay clearing the leadId to allow close animation
     setTimeout(() => setSelectedLeadId(null), 300);
   }, []);
+
+  // Navigate to next lead in queue (for mock data, cycle through IDs)
+  const goToNextLead = useCallback(() => {
+    if (!selectedLeadId) return;
+    // For mock IDs (1-5), cycle to next
+    const mockIds = ['1', '2', '3', '4', '5'];
+    const currentIndex = mockIds.indexOf(selectedLeadId);
+    if (currentIndex !== -1) {
+      const nextIndex = (currentIndex + 1) % mockIds.length;
+      setSelectedLeadId(mockIds[nextIndex]);
+    }
+    // For real IDs, the drawer handles navigation via API queue
+  }, [selectedLeadId]);
 
   // Fetch data (falls back to mock in dev mode)
   const loadData = useCallback(async () => {
@@ -616,12 +641,15 @@ export function Dashboard() {
           />
         </div>
 
-        {/* Recent Submissions */}
+        {/* Active Workspace / Archive Vault (per PRD: Emerald Lead Reactivation Engine) */}
         <DataTable<FormSubmission>
-          title="Recent Submissions"
+          title={isArchiveView ? "Archive Vault" : "Active Workspace"}
           subtitle={
-            <span>
-              Latest form entries - Search by name, email, phone, or form type
+            <span className={isArchiveView ? "text-slate-500" : ""}>
+              {isArchiveView
+                ? "Reviewing deactivated records"
+                : "Live interaction pipeline"
+              }
               {tableFormTypeFilter && (
                 <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
                   Type: {tableFormTypeFilter}
@@ -638,6 +666,39 @@ export function Dashboard() {
                 </span>
               )}
             </span>
+          }
+          headerAction={
+            <button
+              type="button"
+              onClick={() => {
+                setIsArchiveView(!isArchiveView);
+                setPage(1);
+              }}
+              className={`
+                inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
+                transition-all duration-200
+                ${isArchiveView
+                  ? "bg-slate-800 text-white hover:bg-slate-700"
+                  : "border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                }
+              `}
+            >
+              {isArchiveView ? (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Exit Vault
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                  </svg>
+                  View Archive
+                </>
+              )}
+            </button>
           }
           columns={getSubmissionColumns((formType) => {
             // Toggle filter: click same type to clear, different type to set
@@ -714,8 +775,20 @@ export function Dashboard() {
                   date: s.submitted_date,
                 }));
 
+            // Apply archive filter (per PRD: Emerald Lead Reactivation Engine)
+            // Archive Vault shows only archived leads; Active Workspace shows non-archived
+            // Apply status overrides for mock data (from archive/reactivate actions)
+            let filteredData = transformedData.filter(row => {
+              const effectiveStatus = mockStatusOverrides[row.id] ?? row.pipeline_status;
+              if (isArchiveView) {
+                return effectiveStatus === 'archived';
+              } else {
+                return effectiveStatus !== 'archived';
+              }
+            });
+
             // Apply date filter
-            let filteredData = transformedData.filter(row => matchesDateFilter(row.date));
+            filteredData = filteredData.filter(row => matchesDateFilter(row.date));
 
             // Apply type filter
             if (tableFormTypeFilter) {
@@ -823,6 +896,17 @@ export function Dashboard() {
 
             let data = mockSubmissions;
 
+            // Apply archive filter (per PRD: Emerald Lead Reactivation Engine)
+            // Apply status overrides for mock data (from archive/reactivate actions)
+            data = data.filter(row => {
+              const effectiveStatus = mockStatusOverrides[row.id] ?? row.pipeline_status;
+              if (isArchiveView) {
+                return effectiveStatus === 'archived';
+              } else {
+                return effectiveStatus !== 'archived';
+              }
+            });
+
             // Apply date filter
             data = data.filter(row => matchesDateFilter(row.date));
 
@@ -858,6 +942,7 @@ export function Dashboard() {
             setSortDirection(direction);
           }}
           reorderable
+          isArchiveView={isArchiveView}
           renderActions={(row) => (
             <button
               type="button"
@@ -887,6 +972,9 @@ export function Dashboard() {
         leadId={selectedLeadId}
         isOpen={isDrawerOpen}
         onClose={closeDrawer}
+        onNext={goToNextLead}
+        onStatusChange={handleLeadStatusChange}
+        effectivePipelineStatus={selectedLeadId ? mockStatusOverrides[selectedLeadId] : undefined}
       />
     </div>
   );

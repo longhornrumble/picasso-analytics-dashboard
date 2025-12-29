@@ -160,6 +160,28 @@ body {
   transform: translateX(0);
 }
 
+/* Vault Mode: Desaturated state for archived leads (per PRD: Emerald Lead Reactivation Engine) */
+.lead-workspace-drawer.vault-mode {
+  filter: saturate(0.7);
+}
+
+/* Reactivation Bloom: Saturation restoration animation (70% → 100% over 0.5s) */
+.lead-workspace-drawer.reactivation-bloom {
+  animation: saturation-bloom 0.5s ease-out forwards;
+}
+
+@keyframes saturation-bloom {
+  0% {
+    filter: saturate(0.7);
+  }
+  50% {
+    filter: saturate(1.15); /* Slight overshoot for visual pop */
+  }
+  100% {
+    filter: saturate(1);
+  }
+}
+
 @media (max-width: 640px) {
   .lead-workspace-drawer {
     width: 90vw;

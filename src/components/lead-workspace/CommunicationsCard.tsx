@@ -16,6 +16,8 @@ interface CommunicationsCardProps {
   isLoading?: boolean;
   /** Tenant name for email subject */
   tenantName?: string;
+  /** Disable actions when lead is archived (Vault Mode) */
+  isArchived?: boolean;
 }
 
 /**
@@ -138,6 +140,7 @@ export function CommunicationsCard({
   lead,
   isLoading = false,
   tenantName,
+  isArchived = false,
 }: CommunicationsCardProps) {
   const contactInfo = useMemo(() => extractContactInfo(lead), [lead]);
 
@@ -184,16 +187,28 @@ export function CommunicationsCard({
             </div>
             <div className="flex items-center gap-1">
               <CopyButton value={contactInfo.email!} label="email" />
-              <a
-                href={generateMailtoLink(contactInfo.email!, contactInfo.name, tenantName)}
-                className="p-1.5 rounded-md text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
-                title="Compose email"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </a>
+              {isArchived ? (
+                <span
+                  className="p-1.5 rounded-md text-gray-300 cursor-not-allowed"
+                  title="Reactivate lead to enable"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </span>
+              ) : (
+                <a
+                  href={generateMailtoLink(contactInfo.email!, contactInfo.name, tenantName)}
+                  className="p-1.5 rounded-md text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                  title="Compose email"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              )}
             </div>
           </div>
         )}
@@ -213,16 +228,28 @@ export function CommunicationsCard({
             </div>
             <div className="flex items-center gap-1">
               <CopyButton value={contactInfo.phone!} label="phone" />
-              <a
-                href={`tel:${contactInfo.phone!.replace(/\D/g, '')}`}
-                className="p-1.5 rounded-md text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors"
-                title="Call"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </a>
+              {isArchived ? (
+                <span
+                  className="p-1.5 rounded-md text-gray-300 cursor-not-allowed"
+                  title="Reactivate lead to enable"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </span>
+              ) : (
+                <a
+                  href={`tel:${contactInfo.phone!.replace(/\D/g, '')}`}
+                  className="p-1.5 rounded-md text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                  title="Call"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              )}
             </div>
           </div>
         )}

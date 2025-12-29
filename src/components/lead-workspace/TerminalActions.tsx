@@ -14,12 +14,16 @@ interface TerminalActionsProps {
   currentStatus: PipelineStatus;
   /** Handler to archive the lead */
   onArchive?: () => void;
+  /** Handler to reactivate an archived lead (per PRD: Emerald Lead Reactivation Engine) */
+  onReactivate?: () => void;
   /** Handler to navigate to next lead */
   onNextLead?: () => void;
   /** Handler to close the drawer */
   onClose?: () => void;
   /** Whether archive is in progress */
   isArchiving?: boolean;
+  /** Whether reactivation is in progress */
+  isReactivating?: boolean;
   /** Whether there's a next lead available */
   hasNextLead?: boolean;
   /** Count of leads remaining in queue */
@@ -109,9 +113,11 @@ function ArchiveConfirmModal({
 export function TerminalActions({
   currentStatus,
   onArchive,
+  onReactivate,
   onNextLead,
   onClose,
   isArchiving = false,
+  isReactivating = false,
   hasNextLead = false,
   queueCount = 0,
   disabled = false,
@@ -128,6 +134,10 @@ export function TerminalActions({
   const handleConfirmArchive = () => {
     onArchive?.();
     setShowConfirm(false);
+  };
+
+  const handleReactivate = () => {
+    onReactivate?.();
   };
 
   const handleNextLead = () => {
@@ -159,12 +169,23 @@ export function TerminalActions({
             )}
 
             {isArchived && (
-              <span className="px-5 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 text-sm font-semibold flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <button
+                type="button"
+                onClick={handleReactivate}
+                disabled={disabled || isReactivating}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50 group"
+              >
+                <svg
+                  className={`w-4 h-4 ${isReactivating ? 'animate-spin' : 'group-hover:animate-pulse'}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                ARCHIVED
-              </span>
+                {isReactivating ? 'REACTIVATING...' : 'REACTIVATE LEAD'}
+              </button>
             )}
           </div>
 

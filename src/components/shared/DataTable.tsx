@@ -77,6 +77,10 @@ interface DataTableProps<T extends object> {
   reorderable?: boolean;
   /** Callback when columns are reordered */
   onColumnReorder?: (columnKeys: string[]) => void;
+  /** Custom action element in header (e.g., View Archive toggle) */
+  headerAction?: React.ReactNode;
+  /** Apply grayscale styling to rows (for archive view) */
+  isArchiveView?: boolean;
 }
 
 export function DataTable<T extends object>({
@@ -103,6 +107,8 @@ export function DataTable<T extends object>({
   emptyMessage = 'No data available',
   reorderable = false,
   onColumnReorder,
+  headerAction,
+  isArchiveView = false,
 }: DataTableProps<T>) {
   const [searchQuery, setSearchQuery] = useState('');
   const totalPages = Math.ceil(totalCount / pageSize);
@@ -212,6 +218,8 @@ export function DataTable<T extends object>({
             {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
           </div>
           <div className="flex items-center gap-3">
+            {/* Header action (e.g., View Archive toggle) */}
+            {headerAction}
             {/* Search */}
             {showSearch && (
               <div className="relative">
@@ -354,6 +362,7 @@ export function DataTable<T extends object>({
                     ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-[var(--table-stripe-color)]'}
                     hover:bg-[var(--table-hover-color)] transition-colors duration-150
                     ${onRowClick ? 'cursor-pointer' : ''}
+                    ${isArchiveView ? 'grayscale opacity-80' : ''}
                   `}
                   onClick={() => onRowClick?.(row)}
                 >

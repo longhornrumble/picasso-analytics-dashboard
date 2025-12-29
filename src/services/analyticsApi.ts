@@ -23,6 +23,13 @@ import type {
   SessionDetailResponse,
   SessionOutcome,
   FeaturesResponse,
+  // Lead Workspace types
+  PipelineStatus,
+  LeadDetailResponse,
+  StatusUpdateResponse,
+  NotesUpdateResponse,
+  LeadQueueResponse,
+  ReactivateLeadResponse,
 } from '../types/analytics';
 
 // API endpoint - configurable via environment variable
@@ -58,6 +65,38 @@ async function apiRequest<T>(
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `API error: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Make authenticated PATCH request
+ */
+async function apiPatch<T>(
+  endpoint: string,
+  body: Record<string, unknown>
+): Promise<T> {
+  const token = getAuthToken();
+
+  if (!token) {
+    throw new Error('Not authenticated');
+  }
+
+  const url = `${API_BASE_URL}${endpoint}`;
+
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -561,4 +600,115 @@ export async function exportConversationsSummaryData(range: TimeRange = '30d'): 
  */
 export async function fetchFeatures(): Promise<FeaturesResponse> {
   return apiRequest<FeaturesResponse>('/features');
+}
+
+// =============================================================================
+// Lead Workspace API Functions (High-Velocity Lead Processing)
+// =============================================================================
+
+/**
+ * Fetch full lead details for the Lead Workspace drawer
+ * Returns all form fields, pipeline status, and internal notes
+ *
+ * @param submissionId - The submission ID (e.g., "volunteer_apply_1704067200000")
+ */
+export async function fetchLeadDetail(
+  submissionId: string
+): Promise<LeadDetailResponse> {
+  // Validate submission ID format
+  if (!submissionId || !/^[a-zA-Z0-9_-]+$/.test(submissionId)) {
+    throw new Error('Invalid submission ID format');
+  }
+
+  return apiRequest<LeadDetailResponse>(`/leads/${encodeURIComponent(submissionId)}`);
+}
+
+/**
+ * Update lead pipeline status
+ * Automatically sets contacted_at when status → 'contacted'
+ * Automatically sets archived_at when status → 'archived'
+ *
+ * @param submissionId - The submission ID to update
+ * @param pipelineStatus - New pipeline status
+ */
+export async function updateLeadStatus(
+  submissionId: string,
+  pipelineStatus: PipelineStatus
+): Promise<StatusUpdateResponse> {
+  if (!submissionId || !/^[a-zA-Z0-9_-]+$/.test(submissionId)) {
+    throw new Error('Invalid submission ID format');
+  }
+
+  return apiPatch<StatusUpdateResponse>(
+    `/leads/${encodeURIComponent(submissionId)}/status`,
+    { pipeline_status: pipelineStatus }
+  );
+}
+
+/**
+ * Update lead internal notes
+ * Supports incremental updates with debounced autosave
+ *
+ * @param submissionId - The submission ID to update
+ * @param internalNotes - New internal notes content
+ */
+export async function updateLeadNotes(
+  submissionId: string,
+  internalNotes: string
+): Promise<NotesUpdateResponse> {
+  if (!submissionId || !/^[a-zA-Z0-9_-]+$/.test(submissionId)) {
+    throw new Error('Invalid submission ID format');
+  }
+
+  return apiPatch<NotesUpdateResponse>(
+    `/leads/${encodeURIComponent(submissionId)}/notes`,
+    { internal_notes: internalNotes }
+  );
+}
+
+/**
+ * Reactivate an archived lead
+ * Restores lead from archive to 'new' status with system audit note
+ *
+ * Per PRD: Emerald Lead Reactivation Engine v4.2.1
+ * - Idempotency: Returns success with reactivated=false if already active
+ * - Audit Trail: Backend prepends [System] restoration note
+ *
+ * @param submissionId - The submission ID to reactivate
+ */
+export async function reactivateLead(
+  submissionId: string
+): Promise<ReactivateLeadResponse> {
+  if (!submissionId || !/^[a-zA-Z0-9_-]+$/.test(submissionId)) {
+    throw new Error('Invalid submission ID format');
+  }
+
+  return apiPatch<ReactivateLeadResponse>(
+    `/leads/${encodeURIComponent(submissionId)}/reactivate`,
+    {}
+  );
+}
+
+/**
+ * Fetch lead queue for navigation
+ * Returns the next lead ID for "Next Lead" button
+ *
+ * @param status - Optional filter by pipeline status (default: 'new')
+ * @param currentId - Current lead ID to find next after
+ */
+export async function fetchLeadQueue(
+  status?: PipelineStatus,
+  currentId?: string
+): Promise<LeadQueueResponse> {
+  const params: Record<string, string> = {};
+
+  if (status) {
+    params.status = status;
+  }
+
+  if (currentId) {
+    params.current_id = currentId;
+  }
+
+  return apiRequest<LeadQueueResponse>('/leads/queue', params);
 }

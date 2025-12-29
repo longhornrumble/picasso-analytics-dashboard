@@ -12,7 +12,7 @@
  * Follows Premium Emerald Design System (STYLE_GUIDE.md)
  */
 
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { DrawerHeader } from './DrawerHeader';
 import { MetadataGrid } from './MetadataGrid';
 import { PipelineStepper } from './PipelineStepper';
@@ -20,7 +20,14 @@ import { FormDataManifest } from './FormDataManifest';
 import { CommunicationsCard } from './CommunicationsCard';
 import { InternalNotesSection } from './InternalNotesSection';
 import { TerminalActions } from './TerminalActions';
-import type { LeadWorkspaceData, PipelineStatus } from '../../types/analytics';
+import {
+  fetchLeadDetail,
+  updateLeadStatus,
+  updateLeadNotes,
+  fetchLeadQueue,
+  reactivateLead,
+} from '../../services/analyticsApi';
+import type { LeadWorkspaceData, PipelineStatus, SubmissionType } from '../../types/analytics';
 
 interface LeadWorkspaceDrawerProps {
   /** Unique lead reference ID */
@@ -33,40 +40,148 @@ interface LeadWorkspaceDrawerProps {
   onNext?: () => void;
   /** Handler to archive the lead (Phase 7) */
   onArchive?: () => void;
+  /** Callback when lead pipeline status changes (archive/reactivate) - syncs table data */
+  onStatusChange?: (leadId: string, newStatus: PipelineStatus) => void;
+  /** Override pipeline status from parent (for mock data sync) */
+  effectivePipelineStatus?: PipelineStatus;
 }
 
 /**
- * Generate mock lead data for testing
- * Will be replaced with API call in Phase 3+
+ * Infer submission type from form_id for badge coloring
  */
-function getMockLeadData(leadId: string): LeadWorkspaceData {
-  // Create deterministic mock data based on leadId
-  const hash = leadId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const types = ['volunteer', 'donor', 'general'] as const;
-  const statuses = ['new', 'reviewing', 'contacted'] as const;
+function inferSubmissionType(formId: string): SubmissionType {
+  const id = formId.toLowerCase();
+  if (id.includes('volunteer') || id.includes('mentor') || id.includes('foster')) {
+    return 'volunteer';
+  }
+  if (id.includes('donor') || id.includes('donate') || id.includes('sponsor')) {
+    return 'donor';
+  }
+  return 'general';
+}
 
-  return {
-    submission_id: leadId,
-    session_id: `session_${leadId}`,
+/**
+ * Check if the leadId is a mock ID (simple number like '1', '2', etc.)
+ */
+function isMockId(leadId: string): boolean {
+  return /^\d+$/.test(leadId);
+}
+
+/**
+ * Mock lead data for demo/development when using mock submission IDs
+ */
+const MOCK_LEADS: Record<string, LeadWorkspaceData> = {
+  '1': {
+    submission_id: '1',
+    session_id: 'session_mock_1',
     form_id: 'volunteer_application',
     form_label: 'Volunteer Application',
-    submitted_at: new Date(Date.now() - (hash % 7) * 24 * 60 * 60 * 1000).toISOString(),
-    submitted_date: 'Dec 28',
-    duration_seconds: 120 + (hash % 180),
-    fields_completed: 8 + (hash % 5),
+    submitted_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    submitted_date: 'Dec 01',
+    duration_seconds: 245,
+    fields_completed: 12,
     fields: {
-      name: ['Sarah Jenkins', 'Michael Chen', 'Jessica Ford', 'Robert Smith'][hash % 4],
-      email: ['sarah.j@email.com', 'm.chen@email.com', 'jess.ford@email.com', 'rob.smith@email.com'][hash % 4],
+      name: 'Sarah Jenkins',
+      email: 'sarah.j@email.com',
       phone: '(555) 123-4567',
-      zip: ['78701', '90210', '10001', '60601'][hash % 4],
-      comments: 'I have experience working with youth programs and would love to contribute.',
+      zip: '78701',
+      comments: 'I have 5 years of experience working with youth programs and would love to contribute to your mentorship initiative.',
     },
-    pipeline_status: statuses[hash % statuses.length],
-    submission_type: types[hash % types.length],
-    program_id: ['mentorship', 'foster_care', 'youth_programs'][hash % 3],
-    zip_code: ['78701', '90210', '10001', '60601'][hash % 4],
-  };
-}
+    pipeline_status: 'new',
+    submission_type: 'volunteer',
+    program_id: 'mentorship',
+    zip_code: '78701',
+    internal_notes: '',
+  },
+  '2': {
+    submission_id: '2',
+    session_id: 'session_mock_2',
+    form_id: 'donation_request',
+    form_label: 'Donation Request',
+    submitted_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    submitted_date: 'Dec 01',
+    duration_seconds: 180,
+    fields_completed: 8,
+    fields: {
+      name: 'Michael Chen',
+      email: 'm.chen@email.com',
+      phone: '(555) 234-5678',
+      zip: '90210',
+      comments: 'Looking to donate office supplies and furniture from our company that is relocating. Can arrange pickup or delivery.',
+    },
+    pipeline_status: 'new',
+    submission_type: 'donor',
+    program_id: 'donations',
+    zip_code: '90210',
+    internal_notes: '',
+  },
+  '3': {
+    submission_id: '3',
+    session_id: 'session_mock_3',
+    form_id: 'event_registration',
+    form_label: 'Event Registration',
+    submitted_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    submitted_date: 'Nov 30',
+    duration_seconds: 120,
+    fields_completed: 6,
+    fields: {
+      name: 'Jessica Ford',
+      email: 'jess.ford@email.com',
+      phone: '(555) 345-6789',
+      zip: '10001',
+      comments: 'Dietary restriction: Please note I am vegetarian and allergic to nuts. Will need accommodation for the lunch portion.',
+    },
+    pipeline_status: 'archived',
+    submission_type: 'general',
+    program_id: 'events',
+    zip_code: '10001',
+    internal_notes: '[System] Archived by admin on Nov 30\nDuplicate submission - original processed under ID #42',
+  },
+  '4': {
+    submission_id: '4',
+    session_id: 'session_mock_4',
+    form_id: 'general_inquiry',
+    form_label: 'General Inquiry',
+    submitted_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    submitted_date: 'Nov 30',
+    duration_seconds: 90,
+    fields_completed: 5,
+    fields: {
+      name: 'Robert Smith',
+      email: 'rob.smith@email.com',
+      phone: '(555) 456-7890',
+      zip: '60601',
+      comments: 'What are your opening hours on weekends? I work during the week and can only visit on Saturdays or Sundays.',
+    },
+    pipeline_status: 'contacted',
+    submission_type: 'general',
+    program_id: 'general',
+    zip_code: '60601',
+    internal_notes: 'Sent hours info via email.',
+  },
+  '5': {
+    submission_id: '5',
+    session_id: 'session_mock_5',
+    form_id: 'volunteer_application',
+    form_label: 'Volunteer Application',
+    submitted_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    submitted_date: 'Nov 29',
+    duration_seconds: 310,
+    fields_completed: 14,
+    fields: {
+      name: 'Emily Davis',
+      email: 'emily.d@email.com',
+      phone: '(555) 567-8901',
+      zip: '33101',
+      comments: 'Interested in the mentorship program. I am a retired teacher with 30 years of experience in elementary education.',
+    },
+    pipeline_status: 'archived',
+    submission_type: 'volunteer',
+    program_id: 'mentorship',
+    zip_code: '33101',
+    internal_notes: '[System] Archived by admin on Nov 29\nApplicant withdrew interest',
+  },
+};
 
 /**
  * LeadWorkspaceDrawer - Main drawer container
@@ -85,56 +200,201 @@ export function LeadWorkspaceDrawer({
   onClose,
   onNext,
   onArchive,
+  onStatusChange,
+  effectivePipelineStatus,
 }: LeadWorkspaceDrawerProps) {
-  // Lead data state (will be fetched from API in later phases)
+  // Lead data state
   const [leadData, setLeadData] = useState<LeadWorkspaceData | null>(null);
+  const [tenantName, setTenantName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [notesLastSaved, setNotesLastSaved] = useState<string | null>(null);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [isReactivating, setIsReactivating] = useState(false);
+  const [showBloom, setShowBloom] = useState(false);
 
-  // Mock queue data (will be replaced with real data in later phases)
-  const hasNextLead = true; // Mock: always has next lead
-  const queueCount = 12; // Mock: 12 leads in queue
+  // Queue data for Next Lead navigation
+  const [nextLeadId, setNextLeadId] = useState<string | null>(null);
+  const [queueCount, setQueueCount] = useState(0);
+  const hasNextLead = nextLeadId !== null;
+
+  // Track mounted state to prevent state updates after unmount
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   // Handle pipeline status change
-  const handleStatusChange = useCallback((newStatus: PipelineStatus) => {
+  const handleStatusChange = useCallback(async (newStatus: PipelineStatus) => {
     if (!leadData) return;
 
     setIsSavingStatus(true);
-    // Simulate API call (will be replaced with real API in later phases)
-    setTimeout(() => {
-      setLeadData((prev) => prev ? { ...prev, pipeline_status: newStatus } : null);
-      setIsSavingStatus(false);
-    }, 500);
+
+    // For mock IDs, just update local state
+    if (isMockId(leadData.submission_id)) {
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setLeadData((prev) => prev ? { ...prev, pipeline_status: newStatus } : null);
+          setIsSavingStatus(false);
+        }
+      }, 300);
+      return;
+    }
+
+    try {
+      await updateLeadStatus(leadData.submission_id, newStatus);
+      if (isMountedRef.current) {
+        setLeadData((prev) => prev ? { ...prev, pipeline_status: newStatus } : null);
+        // Refresh queue data after status change
+        const queueData = await fetchLeadQueue(leadData.pipeline_status, leadData.submission_id);
+        if (isMountedRef.current) {
+          setNextLeadId(queueData.next_lead_id);
+          setQueueCount(queueData.queue_count);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update status:', error);
+    } finally {
+      if (isMountedRef.current) {
+        setIsSavingStatus(false);
+      }
+    }
   }, [leadData]);
 
-  // Handle notes change
-  const handleNotesChange = useCallback((newNotes: string) => {
+  // Handle notes change (with debounce for autosave)
+  const handleNotesChange = useCallback(async (newNotes: string) => {
     if (!leadData) return;
 
+    // Optimistically update local state
+    setLeadData((prev) => prev ? { ...prev, internal_notes: newNotes } : null);
     setIsSavingNotes(true);
-    // Simulate API call (will be replaced with real API in later phases)
-    setTimeout(() => {
-      setLeadData((prev) => prev ? { ...prev, internal_notes: newNotes } : null);
-      setIsSavingNotes(false);
-      setNotesLastSaved(new Date().toISOString());
-    }, 500);
+
+    // For mock IDs, just simulate save
+    if (isMockId(leadData.submission_id)) {
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setNotesLastSaved(new Date().toISOString());
+          setIsSavingNotes(false);
+        }
+      }, 300);
+      return;
+    }
+
+    try {
+      const response = await updateLeadNotes(leadData.submission_id, newNotes);
+      if (isMountedRef.current) {
+        setNotesLastSaved(response.updated_at);
+      }
+    } catch (error) {
+      console.error('Failed to save notes:', error);
+    } finally {
+      if (isMountedRef.current) {
+        setIsSavingNotes(false);
+      }
+    }
   }, [leadData]);
 
   // Handle archive action
-  const handleArchive = useCallback(() => {
+  const handleArchive = useCallback(async () => {
     if (!leadData) return;
 
     setIsArchiving(true);
-    // Simulate API call (will be replaced with real API in later phases)
-    setTimeout(() => {
-      setLeadData((prev) => prev ? { ...prev, pipeline_status: 'archived' } : null);
-      setIsArchiving(false);
-      onArchive?.();
-    }, 800);
-  }, [leadData, onArchive]);
+
+    // For mock IDs, just simulate archive
+    if (isMockId(leadData.submission_id)) {
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setLeadData((prev) => prev ? { ...prev, pipeline_status: 'archived' } : null);
+          setIsArchiving(false);
+          onArchive?.();
+          // Notify parent to sync table data
+          onStatusChange?.(leadData.submission_id, 'archived');
+        }
+      }, 500);
+      return;
+    }
+
+    try {
+      await updateLeadStatus(leadData.submission_id, 'archived');
+      if (isMountedRef.current) {
+        setLeadData((prev) => prev ? { ...prev, pipeline_status: 'archived' } : null);
+        onArchive?.();
+        // Notify parent to sync table data
+        onStatusChange?.(leadData.submission_id, 'archived');
+      }
+    } catch (error) {
+      console.error('Failed to archive lead:', error);
+    } finally {
+      if (isMountedRef.current) {
+        setIsArchiving(false);
+      }
+    }
+  }, [leadData, onArchive, onStatusChange]);
+
+  // Handle reactivation (per PRD: Emerald Lead Reactivation Engine)
+  const handleReactivate = useCallback(async () => {
+    if (!leadData || leadData.pipeline_status !== 'archived') return;
+
+    setIsReactivating(true);
+
+    // For mock IDs, simulate reactivation
+    if (isMockId(leadData.submission_id)) {
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setLeadData((prev) => prev ? { ...prev, pipeline_status: 'new' } : null);
+          setIsReactivating(false);
+          // Trigger saturation bloom animation (per PRD)
+          setShowBloom(true);
+          setTimeout(() => setShowBloom(false), 600);
+          // Notify parent to sync table data
+          onStatusChange?.(leadData.submission_id, 'new');
+        }
+      }, 800);
+      return;
+    }
+
+    try {
+      const response = await reactivateLead(leadData.submission_id);
+      if (isMountedRef.current) {
+        // Update local state with reactivated status
+        setLeadData((prev) => prev ? {
+          ...prev,
+          pipeline_status: response.pipeline_status,
+          // Prepend system note if present
+          internal_notes: response.reactivated_at
+            ? `[System] Restored from Archive at ${new Date(response.reactivated_at).toLocaleString()}\n${prev.internal_notes || ''}`
+            : prev.internal_notes,
+        } : null);
+
+        // Trigger saturation bloom animation (per PRD)
+        setShowBloom(true);
+        setTimeout(() => setShowBloom(false), 600);
+
+        // Notify parent to sync table data
+        onStatusChange?.(leadData.submission_id, response.pipeline_status);
+
+        // Refresh queue data after reactivation
+        try {
+          const queueData = await fetchLeadQueue('new', leadData.submission_id);
+          if (isMountedRef.current) {
+            setNextLeadId(queueData.next_lead_id);
+            setQueueCount(queueData.queue_count);
+          }
+        } catch (queueError) {
+          console.warn('Failed to refresh queue after reactivation:', queueError);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to reactivate lead:', error);
+    } finally {
+      if (isMountedRef.current) {
+        setIsReactivating(false);
+      }
+    }
+  }, [leadData, onStatusChange]);
 
   // Handle next lead navigation
   const handleNextLead = useCallback(() => {
@@ -170,18 +430,86 @@ export function LeadWorkspaceDrawer({
   useEffect(() => {
     if (isOpen && leadId) {
       setIsLoading(true);
-      // Simulate API call delay
-      const timer = setTimeout(() => {
-        setLeadData(getMockLeadData(leadId));
-        setIsLoading(false);
-      }, 300);
-      return () => clearTimeout(timer);
+      setLoadError(null);
+
+      const loadData = async () => {
+        // Check if this is a mock ID (simple number like '1', '2', etc.)
+        if (isMockId(leadId)) {
+          // Use mock data for demo/development
+          const mockLead = MOCK_LEADS[leadId];
+          if (mockLead && isMountedRef.current) {
+            // Apply effective pipeline status override from parent (for mock data sync)
+            const leadWithEffectiveStatus = effectivePipelineStatus
+              ? { ...mockLead, pipeline_status: effectivePipelineStatus }
+              : mockLead;
+            setLeadData(leadWithEffectiveStatus);
+            setTenantName('Demo Organization');
+            // Calculate next mock ID for queue navigation
+            const mockIds = Object.keys(MOCK_LEADS).sort();
+            const currentIndex = mockIds.indexOf(leadId);
+            const nextIndex = (currentIndex + 1) % mockIds.length;
+            setNextLeadId(mockIds[nextIndex]);
+            setQueueCount(mockIds.length);
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        try {
+          // Fetch lead detail from API
+          const response = await fetchLeadDetail(leadId);
+
+          if (isMountedRef.current) {
+            // Transform API response to include submission_type
+            const lead: LeadWorkspaceData = {
+              ...response.lead,
+              submission_type: inferSubmissionType(response.lead.form_id),
+            };
+            setLeadData(lead);
+            setTenantName(response.tenant_name);
+
+            // Fetch queue data for Next Lead navigation
+            try {
+              const queueData = await fetchLeadQueue(lead.pipeline_status, leadId);
+              if (isMountedRef.current) {
+                setNextLeadId(queueData.next_lead_id);
+                setQueueCount(queueData.queue_count);
+              }
+            } catch (queueError) {
+              console.warn('Failed to fetch queue data:', queueError);
+              // Non-fatal: just disable next lead button
+              setNextLeadId(null);
+              setQueueCount(0);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load lead:', error);
+          if (isMountedRef.current) {
+            setLoadError(error instanceof Error ? error.message : 'Failed to load lead');
+          }
+        } finally {
+          if (isMountedRef.current) {
+            setIsLoading(false);
+          }
+        }
+      };
+
+      loadData();
     } else if (!isOpen) {
       // Clear data when drawer closes (after animation)
-      const timer = setTimeout(() => setLeadData(null), 300);
+      const timer = setTimeout(() => {
+        setLeadData(null);
+        setTenantName('');
+        setLoadError(null);
+        setNextLeadId(null);
+        setQueueCount(0);
+      }, 300);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, leadId]);
+  }, [isOpen, leadId, effectivePipelineStatus]);
+
+  // Vault Mode: Check if lead is archived (per PRD: Emerald Lead Reactivation Engine)
+  const isArchived = leadData?.pipeline_status === 'archived';
 
   return (
     <>
@@ -192,9 +520,9 @@ export function LeadWorkspaceDrawer({
         aria-hidden="true"
       />
 
-      {/* Drawer */}
+      {/* Drawer - applies vault mode styling when archived, bloom on reactivation */}
       <aside
-        className={`lead-workspace-drawer ${isOpen ? 'open' : ''}`}
+        className={`lead-workspace-drawer ${isOpen ? 'open' : ''} ${isArchived ? 'vault-mode' : ''} ${showBloom ? 'reactivation-bloom' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="drawer-title"
@@ -211,6 +539,21 @@ export function LeadWorkspaceDrawer({
 
           {/* Main Content Area */}
           <div className="flex-1 p-6 space-y-6">
+            {/* Error State */}
+            {loadError && !isLoading && (
+              <div className="drawer-card border-red-200 bg-red-50">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-red-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <p className="font-medium text-red-800">Failed to load lead</p>
+                    <p className="text-sm text-red-600 mt-1">{loadError}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Phase 2: MetadataGrid Component */}
             <MetadataGrid
               lead={leadData}
@@ -218,7 +561,7 @@ export function LeadWorkspaceDrawer({
             />
 
             {/* Phase 3: PipelineStepper Component */}
-            {leadData && (
+            {leadData && !isArchived && (
               <PipelineStepper
                 currentStatus={leadData.pipeline_status}
                 onStatusChange={handleStatusChange}
@@ -238,6 +581,26 @@ export function LeadWorkspaceDrawer({
               </div>
             )}
 
+            {/* Vault Mode: Archived State Callout (per PRD: Emerald Lead Reactivation Engine) */}
+            {isArchived && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-amber-800 text-sm">ARCHIVED STATE</h4>
+                    <p className="text-sm text-amber-700 mt-1">
+                      This lead is currently read-only and removed from active queues.
+                      Reactivate to continue engagement.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Phase 4: FormDataManifest Component */}
             <FormDataManifest
               lead={leadData}
@@ -248,7 +611,8 @@ export function LeadWorkspaceDrawer({
             <CommunicationsCard
               lead={leadData}
               isLoading={isLoading}
-              tenantName={leadData?.tenant_name}
+              tenantName={tenantName || leadData?.tenant_name}
+              isArchived={isArchived}
             />
 
             {/* Phase 6: InternalNotesSection Component */}
@@ -266,9 +630,11 @@ export function LeadWorkspaceDrawer({
             <TerminalActions
               currentStatus={leadData.pipeline_status}
               onArchive={handleArchive}
+              onReactivate={handleReactivate}
               onNextLead={handleNextLead}
               onClose={onClose}
               isArchiving={isArchiving}
+              isReactivating={isReactivating}
               hasNextLead={hasNextLead}
               queueCount={queueCount}
             />

@@ -178,6 +178,8 @@ export interface FormSubmission {
   formType: string;
   comments: string;
   date: string;
+  /** Pipeline status for archive filtering (per PRD: Emerald Lead Reactivation Engine) */
+  pipeline_status?: PipelineStatus;
 }
 
 // Dashboard feature flags
@@ -457,6 +459,15 @@ export interface NotesUpdateResponse {
   ref_id: string;
   internal_notes: string;
   updated_at: string;
+}
+
+/** API response for lead reactivation */
+export interface ReactivateLeadResponse {
+  submission_id: string;
+  pipeline_status: PipelineStatus;
+  reactivated: boolean;
+  reactivated_at?: string;
+  message: string;
 }
 
 /** Lead queue for Next Lead navigation */
