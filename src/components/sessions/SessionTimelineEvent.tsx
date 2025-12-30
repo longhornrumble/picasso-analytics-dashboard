@@ -13,17 +13,16 @@ interface SessionTimelineEventProps {
 }
 
 /**
- * AI Badge icon with sparkles for bot responses
+ * AI Sparkles icon for bot responses (3 four-pointed stars)
  */
-const AIBadgeIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-    {/* Rounded rectangle background */}
-    <rect x="2" y="4" width="16" height="16" rx="3" stroke="#7c3aed" strokeWidth="2" fill="none" />
-    {/* AI text */}
-    <text x="10" y="15" textAnchor="middle" fill="#7c3aed" fontSize="8" fontWeight="bold" fontFamily="system-ui, sans-serif">AI</text>
-    {/* Sparkles */}
-    <path d="M20 3l-.5 1.5L18 5l1.5.5.5 1.5.5-1.5L22 5l-1.5-.5L20 3z" fill="#7c3aed" />
-    <path d="M21 11l-.3 1-.7.3.7.3.3 1 .3-1 .7-.3-.7-.3-.3-1z" fill="#a78bfa" />
+const AISparklesIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#7c3aed">
+    {/* Large center sparkle */}
+    <path d="M12 3L13.5 9.5L20 12L13.5 14.5L12 21L10.5 14.5L4 12L10.5 9.5L12 3Z" />
+    {/* Top-right small sparkle */}
+    <path d="M19 2L19.75 5L22 6L19.75 7L19 10L18.25 7L16 6L18.25 5L19 2Z" opacity="0.6" />
+    {/* Bottom-left small sparkle */}
+    <path d="M6 14L6.75 17L9 18L6.75 19L6 22L5.25 19L3 18L5.25 17L6 14Z" opacity="0.6" />
   </svg>
 );
 
@@ -49,7 +48,7 @@ const EVENT_CONFIG: Record<string, {
     borderClass: 'border-blue-300',
   },
   MESSAGE_RECEIVED: {
-    icon: <AIBadgeIcon />,
+    icon: <AISparklesIcon />,
     label: 'AI Response',
     bgClass: 'bg-purple-50',
     borderClass: 'border-purple-300',
