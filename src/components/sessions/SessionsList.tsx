@@ -155,7 +155,7 @@ export function SessionsList({ timeRange, onSessionClick, mockSessions }: Sessio
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Sessions</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Conversation Logs</h3>
           <div className="w-40 h-9 bg-gray-200 rounded animate-pulse" />
         </div>
         {Array.from({ length: 5 }).map((_, i) => (
@@ -170,7 +170,7 @@ export function SessionsList({ timeRange, onSessionClick, mockSessions }: Sessio
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Sessions</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Conversation Logs</h3>
           <Dropdown
             value={outcomeFilter}
             onChange={handleOutcomeChange}
@@ -196,7 +196,7 @@ export function SessionsList({ timeRange, onSessionClick, mockSessions }: Sessio
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Sessions</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Conversation Logs</h3>
           <Dropdown
             value={outcomeFilter}
             onChange={handleOutcomeChange}
@@ -231,7 +231,7 @@ export function SessionsList({ timeRange, onSessionClick, mockSessions }: Sessio
       {/* Header with filter */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900">
-          Sessions
+          Conversation Logs
           <span className="ml-2 text-sm font-normal text-gray-500">
             ({sessions.length}{hasMore ? '+' : ''})
           </span>
