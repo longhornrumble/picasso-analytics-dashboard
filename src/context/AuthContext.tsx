@@ -146,6 +146,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth();
   }, []);
 
+  // Auto-redirect to Bubble login when not authenticated
+  useEffect(() => {
+    if (!state.loading && !state.isAuthenticated && BUBBLE_AUTH_URL) {
+      // Not authenticated and Bubble URL is configured - redirect immediately
+      window.location.href = BUBBLE_AUTH_URL;
+    }
+  }, [state.loading, state.isAuthenticated]);
+
   // Fetch features from API after authentication
   useEffect(() => {
     async function loadFeatures() {

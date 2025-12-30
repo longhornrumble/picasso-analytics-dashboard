@@ -161,6 +161,9 @@ function NavigationBar({
   );
 }
 
+// Check if Bubble SSO is configured
+const BUBBLE_AUTH_URL = import.meta.env.VITE_BUBBLE_AUTH_URL || '';
+
 function AppContent() {
   const { isAuthenticated, loading, user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('conversations');
@@ -168,21 +171,23 @@ function AppContent() {
 
   const features = user?.features || DEFAULT_FEATURES;
 
-  // Show loading state
-  if (loading) {
+  // Show loading state while checking auth OR while redirecting to Bubble
+  if (loading || (!isAuthenticated && BUBBLE_AUTH_URL)) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <div
             className="w-12 h-12 rounded-full animate-spin mx-auto mb-4 border-4 border-primary-200 border-t-primary-500"
           />
-          <p className="text-slate-500 font-medium">Loading...</p>
+          <p className="text-slate-500 font-medium">
+            {loading ? 'Loading...' : 'Redirecting to login...'}
+          </p>
         </div>
       </div>
     );
   }
 
-  // Show login if not authenticated
+  // Show login only if not authenticated AND no Bubble URL (dev mode)
   if (!isAuthenticated) {
     return <Login />;
   }
