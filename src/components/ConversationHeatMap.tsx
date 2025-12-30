@@ -116,10 +116,16 @@ export function ConversationHeatMap({
 
       {/* Heatmap Grid */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[400px]">
+        <table className="w-full min-w-[400px] table-fixed">
+          <colgroup>
+            <col className="w-12" />
+            {DAYS.map(day => (
+              <col key={day} style={{ width: `${100 / 7}%` }} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
-              <th className="w-16 p-1 text-xs text-slate-400 font-medium text-left" />
+              <th className="p-1 text-xs text-slate-400 font-medium text-left" />
               {DAYS.map(day => (
                 <th key={day} className="p-1 text-xs text-slate-500 font-semibold text-center uppercase tracking-wider">
                   {day}

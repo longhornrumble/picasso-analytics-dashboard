@@ -525,7 +525,7 @@ export function Dashboard() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
         <PageHeader
-          sectionLabel="ENTERPRISE INTELLIGENCE"
+          sectionLabel="MISSION INTELLIGENCE"
           title="Form Performance"
           timeRange={timeRange}
           onTimeRangeChange={handleTimeRangeChange}

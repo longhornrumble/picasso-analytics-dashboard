@@ -513,7 +513,7 @@ export function ConversationsDashboard() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
         <PageHeader
-          sectionLabel="UNIFIED INSIGHTS"
+          sectionLabel="MISSION INTELLIGENCE"
           title="Conversation Flow"
           timeRange={timeRange}
           onTimeRangeChange={handleTimeRangeChange}

@@ -46,14 +46,12 @@ function NavigationBar({
   onTabChange,
   onLockedTabClick,
   features = DEFAULT_FEATURES,
-  userEmail,
   onSignOut,
 }: {
   activeTab: DashboardTab;
   onTabChange: (tab: DashboardTab) => void;
   onLockedTabClick: (tab: DashboardTab) => void;
   features?: DashboardFeatures;
-  userEmail?: string;
   onSignOut: () => void;
 }) {
   const tabs: { id: DashboardTab; label: string; icon: React.ReactNode; locked: boolean }[] = [
@@ -137,16 +135,8 @@ function NavigationBar({
             })}
           </nav>
 
-          {/* Right side - Admin & Sign Out */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              <span className="font-medium tracking-wide text-xs uppercase">
-                {userEmail ? 'Enterprise Admin' : 'Admin Panel'}
-              </span>
-            </div>
+          {/* Right side - Sign Out */}
+          <div className="flex items-center">
             <button
               onClick={onSignOut}
               className="px-4 py-2 text-xs font-semibold text-white rounded-lg transition-all duration-200 hover:opacity-90"
@@ -237,7 +227,6 @@ function AppContent() {
         }}
         onLockedTabClick={handleLockedTabClick}
         features={features}
-        userEmail={user?.email}
         onSignOut={logout}
       />
       <main className="animate-in fade-in slide-in-from-bottom-4 duration-500">
