@@ -15,6 +15,12 @@ Standalone analytics dashboard for Picasso AI Chat Widget form submissions and u
 | Conversations Dashboard | ✅ Complete (live data) |
 | API integration | ✅ Complete |
 | Master mock data switch | ✅ Complete |
+| Lead Workspace Drawer | ✅ Complete (Phase 8 polish) |
+| Marketing Style Guide alignment | ✅ Complete |
+
+## Production URL
+
+**Live Dashboard**: https://d3r39xkfb0snuq.cloudfront.net
 
 ## Quick Start
 
@@ -204,6 +210,11 @@ src/
 ├── components/           # Reusable UI components
 │   ├── StatCard.tsx         # Metric display card
 │   ├── FieldBottlenecks.tsx # Drop-off analysis
+│   ├── lead-workspace/      # Lead Workspace Drawer components
+│   │   ├── LeadWorkspaceDrawer.tsx  # Main drawer component
+│   │   ├── DrawerHeader.tsx         # Header with lead name/ref
+│   │   ├── TerminalActions.tsx      # Archive/Next Lead buttons
+│   │   └── ...                      # Pipeline, notes, communications
 │   └── shared/              # Shared UI components
 │       ├── Funnel.tsx       # Conversion funnel
 │       ├── DataTable.tsx    # Paginated table
@@ -212,6 +223,9 @@ src/
 ├── context/
 │   └── AuthContext.tsx   # Authentication state & JWT handling
 ├── hooks/                # Custom React hooks
+│   ├── useFocusTrap.ts      # Focus trap for modals/drawers (WCAG 2.4.3)
+│   ├── useAnnounce.ts       # Screen reader announcements
+│   └── useSwipeGesture.ts   # Touch gesture detection
 ├── pages/
 │   ├── Dashboard.tsx     # Main dashboard (Forms + Conversations tabs)
 │   └── Login.tsx         # Authentication page
@@ -303,9 +317,15 @@ Output is in `dist/` directory.
 ### S3/CloudFront Deployment
 
 ```bash
-aws s3 sync dist/ s3://picasso-analytics-dashboard/ --profile chris-admin
-aws cloudfront create-invalidation --distribution-id XXXXX --paths "/*"
+# Deploy to production
+aws s3 sync dist/ s3://app-myrecruiter-ai/ --delete --profile chris-admin
+aws cloudfront create-invalidation --distribution-id EJ0Y6ZUIUBSAT --paths "/*"
 ```
+
+**Infrastructure:**
+- **S3 Bucket**: `app-myrecruiter-ai`
+- **CloudFront Distribution**: `EJ0Y6ZUIUBSAT`
+- **Domain**: `d3r39xkfb0snuq.cloudfront.net`
 
 ## Known Issues & Fixes
 
@@ -355,14 +375,27 @@ EOF
 
 ### Color Palette (via @picasso/shared-styles)
 
-Colors are centralized in `/picasso-shared-styles/src/tokens.css`:
+Colors are centralized in `/picasso-shared-styles/src/tokens.css` and aligned with the **MyRecruiter Marketing Style Guide** (`/marketing_style_guide`).
 
-- **Primary Green**: `#50C878` (brand color, success metrics)
+**Primary Emerald Palette:**
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `--color-primary-500` | `#50C878` | Primary brand color, CTAs |
+| `--color-primary-400` | `#34d399` | Hover states, secondary accents |
+| `--color-primary-600` | `#059669` | Eyebrow text, icons on light |
+| `--color-primary-700` | `#047857` | Setup step numbers, icon strokes |
+| `--color-primary-800` | `#065f46` | Premium card backgrounds |
+
+**Semantic Colors:**
 - **Danger Red**: `#ef4444` (abandons, errors)
 - **Info Blue**: `#3b82f6` (links, informational)
-- **Warning Amber**: `#f59e0b` (warnings)
+- **Warning Amber**: `#f59e0b` (warnings, saving states)
 - **Background**: `#f9fafb` (gray-50)
-- **Cards**: `#ffffff` with subtle shadow
+- **Cards**: `#ffffff` with `--shadow-card-elevated`
+
+**Alpha Variants** (for shadows, overlays):
+- `--color-primary-alpha-10` through `--color-primary-alpha-50`
+- Used for button glows, focus rings, hover states
 
 ## Related Projects
 
@@ -370,6 +403,7 @@ Colors are centralized in `/picasso-shared-styles/src/tokens.css`:
 |---------|------|-------------|
 | **Picasso Widget** | `/Picasso` | Chat widget frontend |
 | **Shared Styles** | `/picasso-shared-styles` | Centralized design tokens |
+| **Marketing Style Guide** | `/marketing_style_guide` | Brand colors, typography, UI components |
 | **Analytics API** | `/Lambdas/lambda/Analytics_Dashboard_API` | Backend API (DynamoDB + Athena) |
 | **Event Processor** | `/Lambdas/lambda/Analytics_Event_Processor` | SQS → S3 pipeline |
 | **Bedrock Handler** | `/Lambdas/lambda/Bedrock_Streaming_Handler_Staging` | Form submission processing |
