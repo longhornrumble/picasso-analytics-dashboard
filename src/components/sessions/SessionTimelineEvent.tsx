@@ -128,7 +128,7 @@ function PayloadDetails({ eventType, payload }: { eventType: string; payload: Re
     case 'MESSAGE_SENT':
       return payload.content_preview ? (
         <div className="mt-1">
-          <p className="text-sm text-gray-700 bg-blue-50 rounded-lg px-3 py-2 border-l-2 border-blue-400">
+          <p className="text-sm text-gray-700 bg-blue-50 rounded-lg px-3 py-2 border-l-2 border-blue-400 max-h-32 overflow-y-auto">
             "{String(payload.content_preview)}"
           </p>
           {typeof payload.content_length === 'number' && payload.content_length > 100 && (
@@ -142,7 +142,7 @@ function PayloadDetails({ eventType, payload }: { eventType: string; payload: Re
     case 'MESSAGE_RECEIVED':
       return payload.content_preview ? (
         <div className="mt-1">
-          <p className="text-sm text-gray-700 bg-purple-50 rounded-lg px-3 py-2 border-l-2 border-purple-400 line-clamp-4">
+          <p className="text-sm text-gray-700 bg-purple-50 rounded-lg px-3 py-2 border-l-2 border-purple-400 max-h-32 overflow-y-auto">
             "{String(payload.content_preview)}"
           </p>
           {typeof payload.response_time_ms === 'number' && (
