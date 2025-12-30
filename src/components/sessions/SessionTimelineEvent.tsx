@@ -13,13 +13,17 @@ interface SessionTimelineEventProps {
 }
 
 /**
- * AI Sparkle SVG icon for bot responses
+ * AI Badge icon with sparkles for bot responses
  */
-const AISparkleIcon = () => (
-  <svg className="w-4 h-4 text-purple-600" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 2L9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5L12 2z" />
-    <path d="M5 5l1.5 3L5 11l3-1.5L11 11 9.5 8 11 5 8 6.5 5 5z" opacity="0.6" />
-    <path d="M19 13l-1.5 3 1.5 3-3-1.5-3 1.5 1.5-3-1.5-3 3 1.5 3-1.5z" opacity="0.6" />
+const AIBadgeIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+    {/* Rounded rectangle background */}
+    <rect x="2" y="4" width="16" height="16" rx="3" stroke="#7c3aed" strokeWidth="2" fill="none" />
+    {/* AI text */}
+    <text x="10" y="15" textAnchor="middle" fill="#7c3aed" fontSize="8" fontWeight="bold" fontFamily="system-ui, sans-serif">AI</text>
+    {/* Sparkles */}
+    <path d="M20 3l-.5 1.5L18 5l1.5.5.5 1.5.5-1.5L22 5l-1.5-.5L20 3z" fill="#7c3aed" />
+    <path d="M21 11l-.3 1-.7.3.7.3.3 1 .3-1 .7-.3-.7-.3-.3-1z" fill="#a78bfa" />
   </svg>
 );
 
@@ -45,7 +49,7 @@ const EVENT_CONFIG: Record<string, {
     borderClass: 'border-blue-300',
   },
   MESSAGE_RECEIVED: {
-    icon: <AISparkleIcon />,
+    icon: <AIBadgeIcon />,
     label: 'AI Response',
     bgClass: 'bg-purple-50',
     borderClass: 'border-purple-300',
