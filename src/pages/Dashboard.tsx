@@ -639,14 +639,14 @@ export function Dashboard() {
           />
         </div>
 
-        {/* Active Workspace / Archive Vault (per PRD: Emerald Lead Reactivation Engine) */}
+        {/* Form Submissions / Archive Vault (per PRD: Emerald Lead Reactivation Engine) */}
         <DataTable<FormSubmission>
-          title={isArchiveView ? "Archive Vault" : "Active Workspace"}
+          title={isArchiveView ? "Archive Vault" : "Form Submissions"}
           subtitle={
             <span className={isArchiveView ? "text-slate-500" : ""}>
               {isArchiveView
                 ? "Reviewing deactivated records"
-                : "Live interaction pipeline"
+                : "Active pipeline"
               }
               {tableFormTypeFilter && (
                 <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
@@ -774,7 +774,7 @@ export function Dashboard() {
                 }));
 
             // Apply archive filter (per PRD: Emerald Lead Reactivation Engine)
-            // Archive Vault shows only archived leads; Active Workspace shows non-archived
+            // Archive Vault shows only archived leads; Form Submissions shows non-archived
             // Apply status overrides for mock data (from archive/reactivate actions)
             let filteredData = transformedData.filter(row => {
               const effectiveStatus = mockStatusOverrides[row.id] ?? row.pipeline_status;
