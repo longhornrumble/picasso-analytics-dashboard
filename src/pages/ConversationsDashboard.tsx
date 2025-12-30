@@ -183,7 +183,7 @@ const mockSessions: SessionSummary[] = [
     started_at: '2025-12-01T12:15:00Z',
     ended_at: '2025-12-01T12:18:00Z',
     duration_seconds: 180,
-    outcome: 'browsing',
+    outcome: 'conversation',
     message_count: 3,
     user_message_count: 1,
     bot_message_count: 2,

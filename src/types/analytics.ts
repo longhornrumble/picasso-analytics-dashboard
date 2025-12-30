@@ -322,7 +322,7 @@ export type SessionOutcome =
   | 'form_completed'
   | 'cta_clicked'
   | 'link_clicked'
-  | 'browsing'
+  | 'conversation'
   | 'abandoned';
 
 /**

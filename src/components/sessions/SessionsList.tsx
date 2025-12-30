@@ -23,7 +23,7 @@ const OUTCOME_OPTIONS: { value: SessionOutcome | 'all'; label: string }[] = [
   { value: 'form_completed', label: 'Form Completed' },
   { value: 'cta_clicked', label: 'CTA Clicked' },
   { value: 'link_clicked', label: 'Link Clicked' },
-  { value: 'browsing', label: 'Browsing' },
+  { value: 'conversation', label: 'Conversation' },
   { value: 'abandoned', label: 'Abandoned' },
 ];
 

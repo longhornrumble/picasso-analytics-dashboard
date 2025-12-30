@@ -37,8 +37,8 @@ const OUTCOME_CONFIG: Record<SessionOutcome, {
     textClass: 'text-purple-800',
     icon: '\uD83D\uDD17', // 🔗
   },
-  browsing: {
-    label: 'Browsing',
+  conversation: {
+    label: 'Conversation',
     bgClass: 'bg-gray-100',
     textClass: 'text-gray-800',
     icon: '\uD83D\uDCAC', // 💬
@@ -61,7 +61,7 @@ const SIZE_CLASSES = {
 };
 
 export function OutcomeBadge({ outcome, size = 'md' }: OutcomeBadgeProps) {
-  const config = OUTCOME_CONFIG[outcome] || OUTCOME_CONFIG.browsing;
+  const config = OUTCOME_CONFIG[outcome] || OUTCOME_CONFIG.conversation;
   const sizeClass = SIZE_CLASSES[size];
 
   return (
@@ -79,7 +79,7 @@ export function OutcomeBadge({ outcome, size = 'md' }: OutcomeBadgeProps) {
  * Compact version showing only the icon (for tight spaces)
  */
 export function OutcomeBadgeIcon({ outcome }: { outcome: SessionOutcome }) {
-  const config = OUTCOME_CONFIG[outcome] || OUTCOME_CONFIG.browsing;
+  const config = OUTCOME_CONFIG[outcome] || OUTCOME_CONFIG.conversation;
 
   return (
     <span
