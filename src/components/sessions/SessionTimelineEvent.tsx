@@ -3,7 +3,8 @@
  * Displays a single event in the session timeline with icon, timestamp, and payload details
  */
 
-import type { SessionEvent, SessionEventPayload } from '../../types/analytics';
+import type { ReactNode } from 'react';
+import type { SessionEvent } from '../../types/analytics';
 
 interface SessionTimelineEventProps {
   event: SessionEvent;
@@ -12,10 +13,21 @@ interface SessionTimelineEventProps {
 }
 
 /**
+ * AI Sparkle SVG icon for bot responses
+ */
+const AISparkleIcon = () => (
+  <svg className="w-4 h-4 text-purple-600" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2L9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5L12 2z" />
+    <path d="M5 5l1.5 3L5 11l3-1.5L11 11 9.5 8 11 5 8 6.5 5 5z" opacity="0.6" />
+    <path d="M19 13l-1.5 3 1.5 3-3-1.5-3 1.5 1.5-3-1.5-3 3 1.5 3-1.5z" opacity="0.6" />
+  </svg>
+);
+
+/**
  * Event type configuration with icons and colors
  */
 const EVENT_CONFIG: Record<string, {
-  icon: string;
+  icon: string | ReactNode;
   label: string;
   bgClass: string;
   borderClass: string;
@@ -33,8 +45,8 @@ const EVENT_CONFIG: Record<string, {
     borderClass: 'border-blue-300',
   },
   MESSAGE_RECEIVED: {
-    icon: '\uD83E\uDD16', // 🤖
-    label: 'Bot Response',
+    icon: <AISparkleIcon />,
+    label: 'AI Response',
     bgClass: 'bg-purple-50',
     borderClass: 'border-purple-300',
   },
@@ -102,37 +114,42 @@ function formatDuration(seconds: number): string {
 /**
  * Render payload details based on event type
  */
-function PayloadDetails({ payload }: { payload: SessionEventPayload | null }) {
+function PayloadDetails({ eventType, payload }: { eventType: string; payload: Record<string, unknown> | null }) {
   if (!payload) return null;
 
-  switch (payload.type) {
+  switch (eventType) {
     case 'WIDGET_OPENED':
       return payload.trigger ? (
         <div className="text-xs text-gray-500">
-          Trigger: <span className="font-medium">{payload.trigger}</span>
+          Trigger: <span className="font-medium">{String(payload.trigger)}</span>
         </div>
       ) : null;
 
     case 'MESSAGE_SENT':
-      return (
+      return payload.content_preview ? (
         <div className="mt-1">
           <p className="text-sm text-gray-700 bg-blue-50 rounded-lg px-3 py-2 border-l-2 border-blue-400">
-            "{payload.content_preview}"
+            "{String(payload.content_preview)}"
           </p>
-          {payload.content_length && payload.content_length > 100 && (
+          {typeof payload.content_length === 'number' && payload.content_length > 100 && (
             <span className="text-xs text-gray-400 mt-1">
               ({payload.content_length} chars)
             </span>
           )}
         </div>
-      );
+      ) : null;
 
     case 'MESSAGE_RECEIVED':
       return payload.content_preview ? (
         <div className="mt-1">
-          <p className="text-sm text-gray-700 bg-purple-50 rounded-lg px-3 py-2 border-l-2 border-purple-400">
-            "{payload.content_preview}"
+          <p className="text-sm text-gray-700 bg-purple-50 rounded-lg px-3 py-2 border-l-2 border-purple-400 line-clamp-4">
+            "{String(payload.content_preview)}"
           </p>
+          {typeof payload.response_time_ms === 'number' && (
+            <span className="text-xs text-gray-400 mt-1 block">
+              Response time: {payload.response_time_ms}ms
+            </span>
+          )}
         </div>
       ) : null;
 
@@ -141,11 +158,11 @@ function PayloadDetails({ payload }: { payload: SessionEventPayload | null }) {
         <div className="mt-1 space-y-1">
           <div className="text-sm">
             <span className="font-medium text-gray-700">Button:</span>{' '}
-            <span className="text-blue-600">"{payload.cta_label}"</span>
+            <span className="text-blue-600">"{String(payload.cta_label || '')}"</span>
           </div>
           <div className="text-xs text-gray-500">
-            Action: {payload.cta_action}
-            {payload.triggers_form && (
+            <span>Action: {String(payload.cta_action || '')}</span>
+            {!!payload.triggers_form && (
               <span className="ml-2 text-yellow-600">→ Opens form</span>
             )}
           </div>
@@ -157,19 +174,21 @@ function PayloadDetails({ payload }: { payload: SessionEventPayload | null }) {
         <div className="mt-1 space-y-1">
           <div className="text-sm">
             <span className="font-medium text-gray-700">Link:</span>{' '}
-            <span className="text-purple-600">"{payload.link_text}"</span>
+            <span className="text-purple-600">"{String(payload.link_text || '')}"</span>
           </div>
           <div className="text-xs text-gray-500 break-all">
-            URL: {payload.url}
+            <span>URL: {String(payload.url || '')}</span>
           </div>
-          <div className="text-xs">
-            <span className="inline-flex items-center gap-1">
-              {payload.category === 'email' && '📧'}
-              {payload.category === 'phone' && '📞'}
-              {payload.category === 'web' && '🌐'}
-              <span className="text-gray-500">{payload.category}</span>
-            </span>
-          </div>
+          {!!payload.category && (
+            <div className="text-xs">
+              <span className="inline-flex items-center gap-1">
+                {payload.category === 'email' && <span>📧</span>}
+                {payload.category === 'phone' && <span>📞</span>}
+                {payload.category === 'web' && <span>🌐</span>}
+                <span className="text-gray-500">{String(payload.category)}</span>
+              </span>
+            </div>
+          )}
         </div>
       );
 
@@ -177,7 +196,7 @@ function PayloadDetails({ payload }: { payload: SessionEventPayload | null }) {
       return (
         <div className="mt-1">
           <span className="inline-flex items-center px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm">
-            {payload.chip_label}
+            {String(payload.chip_label || '')}
           </span>
         </div>
       );
@@ -186,8 +205,12 @@ function PayloadDetails({ payload }: { payload: SessionEventPayload | null }) {
       return (
         <div className="mt-1 text-sm">
           <span className="font-medium text-gray-700">Form:</span>{' '}
-          <span className="text-yellow-700">{payload.form_label}</span>
-          <span className="text-xs text-gray-400 ml-2">({payload.form_id})</span>
+          <span className="text-yellow-700">{String(payload.form_label || payload.form_id || '')}</span>
+          {!!payload.form_id && (
+            <span className="text-xs text-gray-400 ml-2">
+              ({String(payload.form_id)})
+            </span>
+          )}
         </div>
       );
 
@@ -196,11 +219,15 @@ function PayloadDetails({ payload }: { payload: SessionEventPayload | null }) {
         <div className="mt-1 space-y-1">
           <div className="text-sm">
             <span className="font-medium text-gray-700">Form:</span>{' '}
-            <span className="text-primary-700">{payload.form_label}</span>
+            <span className="text-primary-700">{String(payload.form_label || '')}</span>
           </div>
           <div className="text-xs text-gray-500 flex items-center gap-3">
-            <span>Duration: {formatDuration(payload.duration_seconds)}</span>
-            <span>Fields: {payload.fields_completed}</span>
+            {typeof payload.duration_seconds === 'number' && (
+              <span>Duration: {formatDuration(payload.duration_seconds)}</span>
+            )}
+            {typeof payload.fields_completed === 'number' && (
+              <span>Fields: {payload.fields_completed}</span>
+            )}
           </div>
         </div>
       );
@@ -210,14 +237,16 @@ function PayloadDetails({ payload }: { payload: SessionEventPayload | null }) {
         <div className="mt-1 space-y-1">
           <div className="text-sm">
             <span className="font-medium text-gray-700">Form:</span>{' '}
-            <span className="text-danger-700">{payload.form_label || payload.form_id}</span>
+            <span className="text-danger-700">{String(payload.form_label || payload.form_id || '')}</span>
           </div>
           <div className="text-xs text-gray-500">
-            {payload.last_field && (
-              <span>Last field: {payload.last_field} | </span>
+            {!!payload.last_field && (
+              <span>Last field: {String(payload.last_field)} | </span>
             )}
-            <span>Reason: {payload.reason}</span>
-            <span className="ml-2">({payload.fields_completed} fields completed)</span>
+            {!!payload.reason && <span>Reason: {String(payload.reason)} </span>}
+            {typeof payload.fields_completed === 'number' && (
+              <span>({payload.fields_completed} fields completed)</span>
+            )}
           </div>
         </div>
       );
@@ -281,7 +310,7 @@ export function SessionTimelineEvent({
         </div>
 
         {/* Payload details */}
-        <PayloadDetails payload={event.payload} />
+        <PayloadDetails eventType={event.event_type} payload={event.payload as Record<string, unknown> | null} />
       </div>
     </div>
   );

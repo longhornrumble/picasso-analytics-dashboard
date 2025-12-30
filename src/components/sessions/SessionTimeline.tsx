@@ -219,8 +219,9 @@ export function SessionTimeline({ sessionId, onClose, mockSessionDetail }: Sessi
               <div className="mb-6 pb-4 border-b border-gray-200">
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <p className="text-sm text-gray-500 font-mono mb-1">
-                      {session.session_id}
+                    <p className="text-sm text-gray-500 mb-1">
+                      <span className="font-medium text-gray-600">Session ID:</span>{' '}
+                      <span className="font-mono">{session.session_id}</span>
                     </p>
                     <p className="text-sm text-gray-600">
                       Started: {formatDateTime(session.started_at)}
