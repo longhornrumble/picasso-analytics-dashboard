@@ -11,7 +11,6 @@ import { LeadWorkspaceDrawer } from '../components/lead-workspace';
 import {
   Funnel,
   DataTable,
-  BadgeCell,
   TruncatedCell,
   RankedCards,
   mapTrend,
@@ -151,40 +150,31 @@ function shouldUseMockData(tenantId: string | undefined): boolean {
   return MOCK_DATA_ENV_ENABLED && tenantId === DEMO_TENANT_ID;
 }
 
-// Form type badge colors
-const formTypeBadgeColors: Record<string, string> = {
-  'Volunteer App': 'bg-blue-100 text-blue-700',
-  'Donation Req': 'bg-primary-100 text-primary-700',
-  'Event Reg': 'bg-purple-100 text-purple-700',
-  'General Inquiry': 'bg-slate-100 text-slate-700',
-  'Supply Request': 'bg-orange-100 text-orange-700',
-};
-
 // Column definitions for submissions table (function to allow filter callback)
 const getSubmissionColumns = (onTypeClick?: (formType: string) => void): Column<FormSubmission>[] => [
   {
     key: 'date',
     header: 'Date',
-    render: (row) => <span className="text-sm text-slate-700">{row.date}</span>,
+    render: (row) => <span className="block text-left text-sm text-slate-700">{row.date}</span>,
     sortable: true,
     sortKey: 'date',
   },
   {
     key: 'name',
     header: 'Name',
-    render: (row) => <span className="text-sm font-medium text-slate-700">{row.name}</span>,
+    render: (row) => <span className="block text-left text-sm font-medium text-slate-700">{row.name}</span>,
     sortable: true,
     sortKey: 'name',
   },
   {
     key: 'email',
     header: 'Email',
-    render: (row) => <span className="text-sm text-slate-700">{row.email}</span>,
+    render: (row) => <span className="block text-left text-sm text-slate-700">{row.email}</span>,
   },
   {
     key: 'phone',
     header: 'Phone',
-    render: (row) => <span className="text-sm text-slate-700">{row.phone || '—'}</span>,
+    render: (row) => <span className="block text-left text-sm text-slate-700">{row.phone || '—'}</span>,
   },
   {
     key: 'type',
@@ -196,10 +186,12 @@ const getSubmissionColumns = (onTypeClick?: (formType: string) => void): Column<
           e.stopPropagation();
           onTypeClick?.(row.formType);
         }}
-        className="cursor-pointer hover:opacity-80 transition-opacity"
+        className="block text-left cursor-pointer hover:opacity-80 transition-opacity"
         title={`Filter by ${row.formType}`}
       >
-        <BadgeCell value={row.formType} colorMap={formTypeBadgeColors} />
+        <span className="inline-block text-left px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
+          {row.formType}
+        </span>
       </button>
     ),
     sortable: true,
@@ -208,7 +200,7 @@ const getSubmissionColumns = (onTypeClick?: (formType: string) => void): Column<
   {
     key: 'comments',
     header: 'Comments',
-    render: (row) => <TruncatedCell text={row.comments} maxWidth="150px" />,
+    render: (row) => <span className="block text-left"><TruncatedCell text={row.comments} maxWidth="150px" /></span>,
   },
 ];
 
