@@ -30,18 +30,18 @@ body {
 
 ::-webkit-scrollbar-thumb {
   @apply rounded-full;
-  background-color: rgba(80, 200, 120, 0.3);
+  background-color: var(--color-primary-alpha-30);
   transition: background-color 200ms ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(80, 200, 120, 0.5);
+  background-color: var(--color-primary-alpha-50);
 }
 
 /* Firefox scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(80, 200, 120, 0.3) transparent;
+  scrollbar-color: var(--color-primary-alpha-30) transparent;
 }
 
 /* ========================================
@@ -81,13 +81,13 @@ body {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.015);
 }
 
-/* Feature Card - Marketing style with subtle green tint */
+/* Feature Card - Marketing style with subtle green tint (Marketing Style Guide) */
 .card-feature {
   @apply p-6;
-  background-color: #F9FBFA;
-  border: 1px solid rgba(80, 200, 120, 0.25);
-  box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.08);
-  border-radius: 1rem; /* 16px */
+  background-color: var(--color-slate-50);
+  border: 1px solid var(--color-primary-alpha-25);
+  box-shadow: var(--shadow-card-elevated);
+  border-radius: var(--radius-2xl);
   transition: transform 300ms ease, box-shadow 300ms ease;
 }
 
@@ -100,17 +100,17 @@ body {
    MARKETING BUTTONS - Pill Style CTAs
    ======================================== */
 
-/* Primary pill button - emerald with glow shadow */
+/* Primary pill button - emerald with glow shadow (Marketing Style Guide) */
 .btn-pill-primary {
   @apply rounded-full px-7 py-3.5 font-semibold text-white;
   background-color: var(--color-primary-500);
-  box-shadow: 0 4px 14px rgba(80, 200, 120, 0.25);
+  box-shadow: var(--shadow-btn-primary);
   transition: all 200ms ease;
 }
 
 .btn-pill-primary:hover {
   background-color: var(--color-primary-400);
-  box-shadow: 0 6px 20px rgba(80, 200, 120, 0.35);
+  box-shadow: var(--shadow-btn-primary-hover);
   transform: translateY(-1px);
 }
 
@@ -145,26 +145,28 @@ body {
 }
 
 /* ========================================
-   MARKETING CALLOUTS - Dark theme info boxes
+   MARKETING CALLOUTS - Per Marketing Style Guide
    ======================================== */
 
+/* Info callout (on dark) - Marketing Style Guide */
 .callout-dark {
   @apply rounded-xl p-4;
   background-color: var(--color-slate-800);
-  border-left: 4px solid var(--color-warning-400);
+  border-left: 4px solid var(--color-warning-500);
   color: var(--color-slate-300);
 }
 
 .callout-dark-title {
   @apply font-semibold mb-1;
-  color: white;
+  color: var(--text-inverse);
 }
 
-/* Comparison callout - light background */
+/* Comparison callout (on light) - Marketing Style Guide */
+/* bg-emerald-50/30 rounded-xl p-5 border border-emerald-200/40 */
 .callout-comparison {
   @apply rounded-xl p-5 border;
-  background-color: rgba(80, 200, 120, 0.03);
-  border-color: rgba(80, 200, 120, 0.15);
+  background-color: var(--color-primary-50-alpha-30);
+  border-color: var(--color-primary-200-alpha-40);
 }
 
 /* ========================================
@@ -228,18 +230,17 @@ body {
 
 /* ========================================
    LEAD WORKSPACE DRAWER - Light Theme Design
-   Matches brand mockup specifications
+   Uses centralized tokens from @picasso/shared-styles
+   See: /picasso-shared-styles/README.md
    ======================================== */
 
 .lead-workspace-drawer {
   @apply fixed top-0 right-0 h-full z-50 overflow-hidden;
-  width: 576px; /* max-w-xl */
-  background: #ffffff; /* white */
-  /* Premium elevation */
-  box-shadow: -16px 0 48px rgba(0, 0, 0, 0.1),
-              -8px 0 24px rgba(0, 0, 0, 0.06);
+  width: var(--drawer-width);
+  background: var(--bg-primary);
+  box-shadow: var(--drawer-shadow);
   transform: translateX(100%);
-  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--drawer-transition);
 }
 
 .lead-workspace-drawer.open {
@@ -253,7 +254,7 @@ body {
 
 /* Reactivation Bloom: Saturation restoration animation (70% → 100% over 0.5s) */
 .lead-workspace-drawer.reactivation-bloom {
-  animation: saturation-bloom 0.5s ease-out forwards;
+  animation: saturation-bloom var(--duration-slower) ease-out forwards;
 }
 
 @keyframes saturation-bloom {
@@ -270,19 +271,19 @@ body {
 
 @media (max-width: 640px) {
   .lead-workspace-drawer {
-    width: 90vw;
+    width: var(--drawer-width-mobile);
   }
 }
 
-/* Drawer backdrop - Subtle blur */
+/* Drawer backdrop - Uses centralized tokens */
 .drawer-backdrop {
   @apply fixed inset-0 z-40;
-  background: rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, var(--drawer-backdrop-opacity));
+  backdrop-filter: blur(var(--drawer-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--drawer-backdrop-blur));
   opacity: 0;
   pointer-events: none;
-  transition: opacity 300ms ease;
+  transition: opacity var(--drawer-transition);
 }
 
 .drawer-backdrop.open {
@@ -291,13 +292,47 @@ body {
 }
 
 /* ========================================
+   FOCUS RING SYSTEM - WCAG 2.1 AA Compliant
+   Uses centralized tokens from @picasso/shared-styles
+   ======================================== */
+
+/* Default focus ring for interactive elements */
+.lead-workspace-drawer button:focus-visible,
+.lead-workspace-drawer a:focus-visible,
+.lead-workspace-drawer [role="button"]:focus-visible,
+.lead-workspace-drawer input:focus-visible,
+.lead-workspace-drawer textarea:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring-shadow);
+}
+
+/* Danger focus ring for destructive actions */
+.lead-workspace-drawer .btn-archive:focus-visible {
+  box-shadow: 0 0 0 var(--focus-ring-offset) var(--bg-primary),
+              0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--focus-ring-color-danger);
+}
+
+/* ========================================
+   TOUCH TARGET SIZING - WCAG 2.5.5 Compliant
+   Minimum 44x44px for mobile interactions
+   ======================================== */
+
+@media (max-width: 640px) {
+  .lead-workspace-drawer button,
+  .lead-workspace-drawer [role="button"] {
+    min-height: var(--touch-target-min);
+    min-width: var(--touch-target-min);
+  }
+}
+
+/* ========================================
    DRAWER CARDS - Light theme cards
    ======================================== */
 
 .drawer-card {
   @apply p-5 border border-gray-200;
-  border-radius: 1rem; /* 16px */
-  background: #f8fafc; /* slate-50 */
+  border-radius: var(--radius-2xl);
+  background: var(--color-slate-50);
 }
 
 /* ========================================
@@ -307,31 +342,32 @@ body {
 .pipeline-stepper-btn {
   @apply px-5 py-2.5 font-semibold text-sm border-2 cursor-pointer;
   border-radius: 9999px; /* pill shape */
-  border-color: #e2e8f0; /* slate-200 */
-  color: #64748b; /* slate-500 */
-  background: white;
-  transition: all 200ms ease;
+  border-color: var(--border-default);
+  color: var(--color-slate-500);
+  background: var(--bg-primary);
+  transition: all var(--transition-normal);
 }
 
 .pipeline-stepper-btn:hover {
   border-color: var(--color-primary-500);
   color: var(--color-primary-500);
+  transform: scale(var(--scale-hover));
 }
 
 .pipeline-stepper-btn:active {
-  transform: scale(0.97);
+  transform: scale(var(--scale-active));
 }
 
 .pipeline-stepper-btn.completed {
   background: var(--color-primary-500);
   border-color: var(--color-primary-500);
-  color: white;
+  color: var(--text-inverse);
 }
 
 .pipeline-stepper-btn.current {
   border-color: var(--color-primary-500);
   background: var(--color-primary-500);
-  color: white;
+  color: var(--text-inverse);
 }
 
 /* ========================================
@@ -341,7 +377,7 @@ body {
 .lead-voice-block {
   @apply p-4;
   border-radius: 0.75rem; /* 12px */
-  background: #f8fafc; /* slate-50 */
+  background: var(--color-slate-50);
   border-left: 3px solid var(--color-primary-500);
 }
 
@@ -352,33 +388,35 @@ body {
 .communications-card {
   @apply border border-gray-200 p-5;
   border-radius: 1rem; /* 16px */
-  background: #f8fafc; /* slate-50 */
+  background: var(--color-slate-50);
   transition: all 200ms ease;
 }
 
 .communications-card:hover {
   border-color: var(--color-primary-500);
-  box-shadow: 0 4px 12px rgba(80, 200, 120, 0.1);
+  box-shadow: 0 4px 12px var(--color-primary-alpha-10);
 }
 
 /* ========================================
    TERMINAL ACTIONS - Light theme buttons
+   Uses centralized tokens from @picasso/shared-styles
    ======================================== */
 
 /* Primary CTA - "Next Record" - dark charcoal filled */
 .btn-next-lead {
   @apply px-6 py-3.5 text-white font-semibold flex items-center gap-2;
-  border-radius: 0.75rem; /* 12px */
-  background-color: #1e293b; /* slate-800 */
-  transition: all 200ms ease;
+  border-radius: var(--radius-xl);
+  background-color: var(--color-slate-800);
+  transition: all var(--transition-normal);
 }
 
-.btn-next-lead:hover {
-  background-color: #334155; /* slate-700 */
+.btn-next-lead:hover:not(:disabled) {
+  background-color: var(--color-slate-700);
+  transform: scale(var(--scale-hover));
 }
 
-.btn-next-lead:active {
-  transform: scale(0.98);
+.btn-next-lead:active:not(:disabled) {
+  transform: scale(var(--scale-active));
 }
 
 .btn-next-lead:disabled {
@@ -389,33 +427,41 @@ body {
 /* Archive button - coral/red outline */
 .btn-archive {
   @apply px-5 py-3 font-semibold border-2 flex items-center gap-2;
-  border-radius: 0.75rem; /* 12px */
-  border-color: #fca5a5; /* red-300 */
-  color: #ef4444; /* red-500 */
-  background: white;
-  transition: all 200ms ease;
+  border-radius: var(--radius-xl);
+  border-color: var(--color-danger-300);
+  color: var(--color-danger-500);
+  background: var(--bg-primary);
+  transition: all var(--transition-normal);
 }
 
-.btn-archive:hover {
-  background: #fef2f2; /* red-50 */
-  border-color: #f87171; /* red-400 */
+.btn-archive:hover:not(:disabled) {
+  background: var(--color-danger-50);
+  border-color: var(--color-danger-400);
+  transform: scale(var(--scale-hover));
 }
 
-.btn-archive:active {
-  transform: scale(0.98);
+.btn-archive:active:not(:disabled) {
+  transform: scale(var(--scale-active));
 }
 
 /* Ghost Button - "Save & Exit Workspace" */
 .btn-ghost {
-  @apply px-5 py-3 font-semibold border-2 border-gray-300 flex items-center gap-2 justify-center;
-  border-radius: 0.75rem; /* 12px */
-  color: #64748b; /* slate-500 */
-  background: white;
-  transition: all 200ms ease;
+  @apply px-5 py-3 font-semibold border-2 flex items-center gap-2 justify-center;
+  border-radius: var(--radius-xl);
+  border-color: var(--border-dark);
+  color: var(--color-slate-500);
+  background: var(--bg-primary);
+  transition: all var(--transition-normal);
 }
 
-.btn-ghost:hover {
-  @apply bg-gray-50 border-gray-400;
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  border-color: var(--color-gray-400);
+  transform: scale(var(--scale-hover-subtle));
+}
+
+.btn-ghost:active:not(:disabled) {
+  transform: scale(var(--scale-active));
 }
 
 /* ========================================
@@ -432,7 +478,7 @@ body {
 .label-aviation-muted {
   @apply text-[10px] font-black uppercase;
   letter-spacing: 0.2em;
-  color: #64748b; /* slate-500 */
+  color: var(--color-slate-500);
 }
 
 /* ========================================
@@ -445,18 +491,18 @@ body {
 }
 
 .metadata-badge-emerald {
-  background: rgba(80, 200, 120, 0.12);
+  background: var(--color-primary-alpha-12);
   color: var(--color-primary-500);
 }
 
 .metadata-badge-blue {
-  background: rgba(59, 130, 246, 0.12);
-  color: #3b82f6;
+  background: var(--color-info-alpha-12);
+  color: var(--color-info-500);
 }
 
 .metadata-badge-slate {
-  background: rgba(148, 163, 184, 0.12);
-  color: #94a3b8;
+  background: var(--color-slate-alpha-12);
+  color: var(--color-slate-400);
 }
 
 /* ========================================
@@ -469,23 +515,23 @@ body {
 }
 
 .lead-workspace-drawer ::-webkit-scrollbar-track {
-  background: #f1f5f9; /* slate-100 */
+  background: var(--color-slate-100);
 }
 
 .lead-workspace-drawer ::-webkit-scrollbar-thumb {
   border-radius: 9999px;
-  background-color: #cbd5e1; /* slate-300 */
+  background-color: var(--color-slate-300);
   transition: background-color 200ms ease;
 }
 
 .lead-workspace-drawer ::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8; /* slate-400 */
+  background-color: var(--color-slate-400);
 }
 
 /* Firefox scrollbar */
 .lead-workspace-drawer * {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 #f1f5f9;
+  scrollbar-color: var(--color-slate-300) var(--color-slate-100);
 }
 
 /* ========================================
@@ -496,18 +542,18 @@ body {
   @apply w-full px-4 py-3 border border-gray-200 text-sm text-slate-700;
   @apply focus:outline-none resize-none;
   border-radius: 0.75rem; /* 12px */
-  background: #f8fafc; /* slate-50 */
+  background: var(--color-slate-50);
   transition: border-color 200ms ease, box-shadow 200ms ease;
   min-height: 100px;
 }
 
 .notes-textarea:focus {
   border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 3px rgba(80, 200, 120, 0.1);
+  box-shadow: 0 0 0 3px var(--color-primary-alpha-10);
 }
 
 .notes-textarea::placeholder {
-  color: #94a3b8; /* slate-400 */
+  color: var(--color-slate-400);
 }
 
 /* Save indicator */
@@ -517,7 +563,7 @@ body {
 }
 
 .save-indicator.saving {
-  color: #f59e0b; /* amber-500 */
+  color: var(--color-warning-500);
 }
 
 .save-indicator.saved {
@@ -526,19 +572,27 @@ body {
 
 /* ========================================
    DRAWER CLOSE BUTTON
+   Uses centralized tokens from @picasso/shared-styles
+   Focus ring ensures WCAG 2.4.7 compliance
    ======================================== */
 
 .drawer-close-btn {
-  @apply p-2 rounded-full transition-all duration-200;
+  @apply p-2 rounded-full;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
   background: transparent;
-  color: #64748b; /* slate-500 */
+  color: var(--color-slate-500);
+  transition: all var(--transition-normal);
 }
 
 .drawer-close-btn:hover {
-  background: #f1f5f9; /* slate-100 */
-  color: #334155; /* slate-700 */
+  background: var(--bg-tertiary);
+  color: var(--color-slate-700);
+  transform: scale(var(--scale-hover));
 }
 
 .drawer-close-btn:active {
-  transform: scale(0.95);
+  transform: scale(var(--scale-active));
 }
+
+/* Focus ring handled by global drawer focus styles */

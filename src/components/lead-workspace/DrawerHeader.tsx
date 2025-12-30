@@ -3,9 +3,12 @@
  * Sticky header for Lead Workspace Drawer
  *
  * Phase 2: Header & Metadata
+ * Phase 8: Accessibility polish - auto-focus close button (WCAG 2.4.3)
  * Follows Premium Emerald Design System (STYLE_GUIDE.md)
+ * Uses centralized tokens from @picasso/shared-styles (see /picasso-shared-styles/README.md)
  */
 
+import type { RefObject } from 'react';
 import type { LeadWorkspaceData } from '../../types/analytics';
 
 interface DrawerHeaderProps {
@@ -21,6 +24,8 @@ interface DrawerHeaderProps {
   hasNextLead?: boolean;
   /** Queue count for badge */
   queueCount?: number;
+  /** Ref for close button (auto-focus target for accessibility) */
+  closeButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
 /**
@@ -48,6 +53,7 @@ export function DrawerHeader({
   onNext,
   hasNextLead = false,
   queueCount = 0,
+  closeButtonRef,
 }: DrawerHeaderProps) {
   const leadName = getLeadName(lead);
 
@@ -69,12 +75,13 @@ export function DrawerHeader({
           )}
         </div>
 
-        {/* Close Button */}
+        {/* Close Button - receives focus when drawer opens (WCAG 2.4.3) */}
         <button
+          ref={closeButtonRef}
           type="button"
           onClick={onClose}
           className="drawer-close-btn"
-          aria-label="Close drawer"
+          aria-label="Close drawer (Escape)"
         >
           <svg
             className="w-5 h-5"

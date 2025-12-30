@@ -3,10 +3,12 @@
  * Footer actions for lead processing: Archive and Next Lead
  *
  * Phase 7: Terminal Actions
+ * Phase 8: Accessibility polish - focus trap in modal, ESC handling, tooltips
  * Follows Premium Emerald Design System (STYLE_GUIDE.md)
+ * Uses centralized tokens from @picasso/shared-styles (see /picasso-shared-styles/README.md)
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { PipelineStatus } from '../../types/analytics';
 
 interface TerminalActionsProps {
@@ -34,6 +36,7 @@ interface TerminalActionsProps {
 
 /**
  * Confirmation modal for archive action (light theme)
+ * Phase 8: Focus trap and ESC handling for accessibility (WCAG 2.4.3)
  */
 function ArchiveConfirmModal({
   isOpen,
@@ -46,28 +49,84 @@ function ArchiveConfirmModal({
   onCancel: () => void;
   isArchiving: boolean;
 }) {
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap: Focus cancel button when modal opens
+  useEffect(() => {
+    if (isOpen && cancelButtonRef.current) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => cancelButtonRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  // ESC key handler for modal
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape' && isOpen && !isArchiving) {
+      e.preventDefault();
+      e.stopPropagation();
+      onCancel();
+    }
+
+    // Tab trap within modal
+    if (e.key === 'Tab' && modalRef.current) {
+      const focusable = modalRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled])'
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }, [isOpen, isArchiving, onCancel]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown, true);
+      return () => document.removeEventListener('keydown', handleKeyDown, true);
+    }
+  }, [isOpen, handleKeyDown]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="archive-modal-title"
+    >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/30 backdrop-blur-sm"
         onClick={onCancel}
+        aria-hidden="true"
       />
 
       {/* Modal */}
-      <div className="relative bg-white border border-gray-200 rounded-xl p-6 max-w-sm mx-4 shadow-2xl">
+      <div
+        ref={modalRef}
+        className="relative bg-white border border-gray-200 rounded-xl p-6 max-w-sm mx-4 shadow-2xl"
+      >
         <div className="text-center">
           {/* Icon */}
           <div className="mx-auto w-12 h-12 rounded-full bg-danger-50 flex items-center justify-center mb-4">
-            <svg className="w-6 h-6 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                 d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
             </svg>
           </div>
 
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">
+          <h3 id="archive-modal-title" className="text-lg font-semibold text-slate-900 mb-2">
             Archive this lead?
           </h3>
           <p className="text-sm text-gray-500 mb-6">
@@ -77,6 +136,7 @@ function ArchiveConfirmModal({
           {/* Actions */}
           <div className="flex gap-3">
             <button
+              ref={cancelButtonRef}
               type="button"
               onClick={onCancel}
               disabled={isArchiving}
@@ -92,7 +152,7 @@ function ArchiveConfirmModal({
             >
               {isArchiving ? (
                 <>
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor"
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -189,15 +249,17 @@ export function TerminalActions({
             )}
           </div>
 
-          {/* Right side: Next Record */}
+          {/* Right side: Next Record - with tooltip for disabled state */}
           <button
             type="button"
             onClick={handleNextLead}
             disabled={disabled || !hasNextLead}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-800 text-white text-sm font-semibold hover:bg-slate-700 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-800 text-white text-sm font-semibold hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={hasNextLead ? `${queueCount} leads remaining (→ key)` : 'No more leads in queue'}
+            aria-label={hasNextLead ? `Next record, ${queueCount} leads remaining` : 'No more leads in queue'}
           >
             <span>NEXT RECORD</span>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
           </button>

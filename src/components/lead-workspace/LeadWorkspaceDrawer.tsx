@@ -20,6 +20,7 @@ import { FormDataManifest } from './FormDataManifest';
 import { CommunicationsCard } from './CommunicationsCard';
 import { InternalNotesSection } from './InternalNotesSection';
 import { TerminalActions } from './TerminalActions';
+import { useFocusTrap, useAnnounce, announcements, useSwipeGesture } from '../../hooks';
 import {
   fetchLeadDetail,
   updateLeadStatus,
@@ -227,6 +228,27 @@ export function LeadWorkspaceDrawer({
     return () => { isMountedRef.current = false; };
   }, []);
 
+  // Ref for close button (initial focus target)
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Screen reader announcements (WCAG 4.1.3)
+  const announce = useAnnounce();
+
+  // Focus trap (WCAG 2.4.3) - traps Tab focus within drawer when open
+  const focusTrapRef = useFocusTrap({
+    isActive: isOpen,
+    initialFocusRef: closeButtonRef,
+    onEscape: onClose,
+  });
+
+  // Swipe-to-close gesture for mobile (PRD: Mobile UX)
+  const swipeRef = useSwipeGesture({
+    isActive: isOpen,
+    direction: 'right',
+    threshold: 80,
+    onSwipe: onClose,
+  });
+
   // Handle pipeline status change
   const handleStatusChange = useCallback(async (newStatus: PipelineStatus) => {
     if (!leadData) return;
@@ -239,6 +261,8 @@ export function LeadWorkspaceDrawer({
         if (isMountedRef.current) {
           setLeadData((prev) => prev ? { ...prev, pipeline_status: newStatus } : null);
           setIsSavingStatus(false);
+          // Announce status change for screen readers (WCAG 4.1.3)
+          announce(announcements.statusChanged(newStatus));
         }
       }, 300);
       return;
@@ -248,6 +272,8 @@ export function LeadWorkspaceDrawer({
       await updateLeadStatus(leadData.submission_id, newStatus);
       if (isMountedRef.current) {
         setLeadData((prev) => prev ? { ...prev, pipeline_status: newStatus } : null);
+        // Announce status change for screen readers (WCAG 4.1.3)
+        announce(announcements.statusChanged(newStatus));
         // Refresh queue data after status change
         const queueData = await fetchLeadQueue(leadData.pipeline_status, leadData.submission_id);
         if (isMountedRef.current) {
@@ -262,7 +288,7 @@ export function LeadWorkspaceDrawer({
         setIsSavingStatus(false);
       }
     }
-  }, [leadData]);
+  }, [leadData, announce]);
 
   // Handle notes change (with debounce for autosave)
   const handleNotesChange = useCallback(async (newNotes: string) => {
@@ -271,6 +297,8 @@ export function LeadWorkspaceDrawer({
     // Optimistically update local state
     setLeadData((prev) => prev ? { ...prev, internal_notes: newNotes } : null);
     setIsSavingNotes(true);
+    // Announce saving for screen readers (WCAG 4.1.3)
+    announce(announcements.notesSaving(), { politeness: 'polite' });
 
     // For mock IDs, just simulate save
     if (isMockId(leadData.submission_id)) {
@@ -278,6 +306,7 @@ export function LeadWorkspaceDrawer({
         if (isMountedRef.current) {
           setNotesLastSaved(new Date().toISOString());
           setIsSavingNotes(false);
+          announce(announcements.notesSaved(), { politeness: 'polite' });
         }
       }, 300);
       return;
@@ -287,6 +316,7 @@ export function LeadWorkspaceDrawer({
       const response = await updateLeadNotes(leadData.submission_id, newNotes);
       if (isMountedRef.current) {
         setNotesLastSaved(response.updated_at);
+        announce(announcements.notesSaved(), { politeness: 'polite' });
       }
     } catch (error) {
       console.error('Failed to save notes:', error);
@@ -295,7 +325,7 @@ export function LeadWorkspaceDrawer({
         setIsSavingNotes(false);
       }
     }
-  }, [leadData]);
+  }, [leadData, announce]);
 
   // Handle archive action
   const handleArchive = useCallback(async () => {
@@ -309,6 +339,8 @@ export function LeadWorkspaceDrawer({
         if (isMountedRef.current) {
           setLeadData((prev) => prev ? { ...prev, pipeline_status: 'archived' } : null);
           setIsArchiving(false);
+          // Announce for screen readers (WCAG 4.1.3)
+          announce(announcements.leadArchived());
           onArchive?.();
           // Notify parent to sync table data
           onStatusChange?.(leadData.submission_id, 'archived');
@@ -321,6 +353,8 @@ export function LeadWorkspaceDrawer({
       await updateLeadStatus(leadData.submission_id, 'archived');
       if (isMountedRef.current) {
         setLeadData((prev) => prev ? { ...prev, pipeline_status: 'archived' } : null);
+        // Announce for screen readers (WCAG 4.1.3)
+        announce(announcements.leadArchived());
         onArchive?.();
         // Notify parent to sync table data
         onStatusChange?.(leadData.submission_id, 'archived');
@@ -332,7 +366,7 @@ export function LeadWorkspaceDrawer({
         setIsArchiving(false);
       }
     }
-  }, [leadData, onArchive, onStatusChange]);
+  }, [leadData, onArchive, onStatusChange, announce]);
 
   // Handle reactivation (per PRD: Emerald Lead Reactivation Engine)
   const handleReactivate = useCallback(async () => {
@@ -349,6 +383,8 @@ export function LeadWorkspaceDrawer({
           // Trigger saturation bloom animation (per PRD)
           setShowBloom(true);
           setTimeout(() => setShowBloom(false), 600);
+          // Announce for screen readers (WCAG 4.1.3)
+          announce(announcements.leadReactivated());
           // Notify parent to sync table data
           onStatusChange?.(leadData.submission_id, 'new');
         }
@@ -373,6 +409,9 @@ export function LeadWorkspaceDrawer({
         setShowBloom(true);
         setTimeout(() => setShowBloom(false), 600);
 
+        // Announce for screen readers (WCAG 4.1.3)
+        announce(announcements.leadReactivated());
+
         // Notify parent to sync table data
         onStatusChange?.(leadData.submission_id, response.pipeline_status);
 
@@ -394,26 +433,42 @@ export function LeadWorkspaceDrawer({
         setIsReactivating(false);
       }
     }
-  }, [leadData, onStatusChange]);
+  }, [leadData, onStatusChange, announce]);
 
   // Handle next lead navigation
   const handleNextLead = useCallback(() => {
-    onNext?.();
-  }, [onNext]);
-
-  // ESC key handler
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape' && isOpen) {
-      onClose();
+    if (hasNextLead) {
+      onNext?.();
+    } else {
+      // Announce when no more leads (WCAG 4.1.3)
+      announce(announcements.noMoreLeads());
     }
-  }, [isOpen, onClose]);
+  }, [onNext, hasNextLead, announce]);
 
-  // Body scroll lock and ESC key listener
+  // Keyboard shortcut handler (Arrow keys for navigation)
+  // Note: ESC is handled by useFocusTrap hook
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Don't trigger when typing in input/textarea
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      return;
+    }
+
+    // → = Next Lead
+    if (e.key === 'ArrowRight' && isOpen && hasNextLead) {
+      e.preventDefault();
+      handleNextLead();
+    }
+    // ← = Could be used for Previous Lead in future
+  }, [isOpen, hasNextLead, handleNextLead]);
+
+  // Body scroll lock and keyboard shortcuts
+  // Note: ESC key is handled by useFocusTrap hook
   useEffect(() => {
     if (isOpen) {
       // Lock body scroll
       document.body.style.overflow = 'hidden';
-      // Add ESC key listener
+      // Add keyboard shortcut listener (Cmd/Ctrl + →)
       document.addEventListener('keydown', handleKeyDown);
     } else {
       // Restore body scroll
@@ -511,6 +566,15 @@ export function LeadWorkspaceDrawer({
   // Vault Mode: Check if lead is archived (per PRD: Emerald Lead Reactivation Engine)
   const isArchived = leadData?.pipeline_status === 'archived';
 
+  // Combine refs for focus trap and swipe gesture
+  const setDrawerRefs = useCallback((node: HTMLDivElement | null) => {
+    // Assign to both refs using type assertion for mutable assignment
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (focusTrapRef as any).current = node;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (swipeRef as any).current = node;
+  }, [focusTrapRef, swipeRef]);
+
   return (
     <>
       {/* Backdrop with blur */}
@@ -521,7 +585,9 @@ export function LeadWorkspaceDrawer({
       />
 
       {/* Drawer - applies vault mode styling when archived, bloom on reactivation */}
+      {/* Focus trap and swipe gesture applied via combined ref */}
       <aside
+        ref={setDrawerRefs}
         className={`lead-workspace-drawer ${isOpen ? 'open' : ''} ${isArchived ? 'vault-mode' : ''} ${showBloom ? 'reactivation-bloom' : ''}`}
         role="dialog"
         aria-modal="true"
@@ -535,6 +601,7 @@ export function LeadWorkspaceDrawer({
             lead={leadData}
             isLoading={isLoading}
             onClose={onClose}
+            closeButtonRef={closeButtonRef}
           />
 
           {/* Main Content Area */}
