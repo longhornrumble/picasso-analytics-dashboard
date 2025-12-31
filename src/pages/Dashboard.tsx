@@ -276,18 +276,110 @@ export function Dashboard() {
     setTimeout(() => setSelectedLeadId(null), 300);
   }, []);
 
-  // Navigate to next lead in queue (for mock data, cycle through IDs)
-  const goToNextLead = useCallback(() => {
-    if (!selectedLeadId) return;
-    // For mock IDs (1-5), cycle to next
-    const mockIds = ['1', '2', '3', '4', '5'];
-    const currentIndex = mockIds.indexOf(selectedLeadId);
-    if (currentIndex !== -1) {
-      const nextIndex = (currentIndex + 1) % mockIds.length;
-      setSelectedLeadId(mockIds[nextIndex]);
+  // Compute visible submission IDs from filtered table data
+  // This is the single source of truth for queue navigation (works for both mock and real data)
+  const visibleSubmissionIds = (() => {
+    // Helper to check if date matches filter
+    const matchesDateFilter = (dateStr: string): boolean => {
+      if (tableDateFilter.value === 'all') return true;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      let rowDate: Date;
+      if (dateStr.includes('-')) {
+        rowDate = new Date(dateStr);
+      } else {
+        const [month, day] = dateStr.split(' ');
+        const monthIndex = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].indexOf(month);
+        rowDate = new Date(today.getFullYear(), monthIndex, parseInt(day));
+      }
+      rowDate.setHours(0, 0, 0, 0);
+
+      switch (tableDateFilter.value) {
+        case 'today':
+          return rowDate.getTime() === today.getTime();
+        case '7d': {
+          const sevenDaysAgo = new Date(today);
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          return rowDate >= sevenDaysAgo && rowDate <= today;
+        }
+        case '30d': {
+          const thirtyDaysAgo = new Date(today);
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          return rowDate >= thirtyDaysAgo && rowDate <= today;
+        }
+        case 'custom':
+          if (tableDateFilter.startDate && tableDateFilter.endDate) {
+            const start = new Date(tableDateFilter.startDate);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(tableDateFilter.endDate);
+            end.setHours(23, 59, 59, 999);
+            return rowDate >= start && rowDate <= end;
+          }
+          return true;
+        default:
+          return true;
+      }
+    };
+
+    // Transform data (same as table)
+    // For mock data, use mockSubmissions which has pipeline_status
+    // For real data from API, treat all as active (non-archived) since API doesn't filter by pipeline status yet
+    const transformedData: FormSubmission[] = useMockData
+      ? mockSubmissions
+      : submissions.map(s => ({
+          id: s.submission_id,
+          name: s.fields?.name || s.fields?.full_name || 'Anonymous',
+          email: s.fields?.email || '',
+          phone: s.fields?.phone || s.fields?.phone_number || '',
+          formType: s.form_label || s.form_id,
+          comments: s.fields?.comments || s.fields?.message || '',
+          date: s.submitted_date,
+          // API doesn't return pipeline_status yet - treat as 'new' (active)
+          pipeline_status: 'new' as PipelineStatus,
+        }));
+
+    // Apply same filters as table
+    let filteredData = transformedData.filter(row => {
+      const effectiveStatus = mockStatusOverrides[row.id] ?? row.pipeline_status;
+      if (isArchiveView) {
+        return effectiveStatus === 'archived';
+      } else {
+        return effectiveStatus !== 'archived';
+      }
+    });
+
+    filteredData = filteredData.filter(row => matchesDateFilter(row.date));
+
+    if (tableFormTypeFilter) {
+      filteredData = filteredData.filter(row => row.formType === tableFormTypeFilter);
     }
-    // For real IDs, the drawer handles navigation via API queue
-  }, [selectedLeadId]);
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filteredData = filteredData.filter(row =>
+        row.name.toLowerCase().includes(query) ||
+        row.email.toLowerCase().includes(query) ||
+        (row.phone && row.phone.toLowerCase().includes(query)) ||
+        row.formType.toLowerCase().includes(query)
+      );
+    }
+
+    return filteredData.map(row => row.id);
+  })();
+
+  // Navigate to next lead in queue (unified for both mock and real data)
+  const goToNextLead = useCallback(() => {
+    if (!selectedLeadId || visibleSubmissionIds.length <= 1) return;
+
+    const currentIndex = visibleSubmissionIds.indexOf(selectedLeadId);
+    if (currentIndex !== -1) {
+      // Move to next ID in the visible queue (wrap around)
+      const nextIndex = (currentIndex + 1) % visibleSubmissionIds.length;
+      setSelectedLeadId(visibleSubmissionIds[nextIndex]);
+    }
+  }, [selectedLeadId, visibleSubmissionIds]);
 
   // Fetch data (falls back to mock in dev mode)
   const loadData = useCallback(async () => {
@@ -965,6 +1057,7 @@ export function Dashboard() {
         onNext={goToNextLead}
         onStatusChange={handleLeadStatusChange}
         effectivePipelineStatus={selectedLeadId ? mockStatusOverrides[selectedLeadId] : undefined}
+        visibleSubmissionIds={visibleSubmissionIds}
       />
     </div>
   );

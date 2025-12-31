@@ -29,16 +29,34 @@ interface DrawerHeaderProps {
 }
 
 /**
+ * Get field value case-insensitively from fields object
+ */
+function getField(fields: Record<string, string>, ...keys: string[]): string {
+  for (const key of keys) {
+    // Check exact key first
+    if (fields[key]) return fields[key];
+    // Check lowercase
+    const lower = key.toLowerCase();
+    if (fields[lower]) return fields[lower];
+    // Check Title Case
+    const title = key.charAt(0).toUpperCase() + key.slice(1).toLowerCase();
+    if (fields[title]) return fields[title];
+  }
+  return '';
+}
+
+/**
  * Format lead name from fields
  */
 function getLeadName(lead: LeadWorkspaceData | null): string {
   if (!lead?.fields) return 'Unknown Lead';
 
-  const name = lead.fields.name || lead.fields.full_name;
+  // Check for name fields (case-insensitive)
+  const name = getField(lead.fields, 'name', 'Name', 'full_name', 'Full Name', 'fullName');
   if (name) return name;
 
-  const firstName = lead.fields.first_name || '';
-  const lastName = lead.fields.last_name || '';
+  const firstName = getField(lead.fields, 'first_name', 'First Name', 'firstName');
+  const lastName = getField(lead.fields, 'last_name', 'Last Name', 'lastName');
   if (firstName || lastName) {
     return `${firstName} ${lastName}`.trim();
   }
@@ -66,13 +84,6 @@ export function DrawerHeader({
           <span className="text-xs font-bold uppercase tracking-wider text-primary-600">
             LEAD WORKSPACE
           </span>
-
-          {/* Ref ID Badge */}
-          {lead && (
-            <span className="px-2 py-1 text-xs font-mono font-semibold bg-slate-800 text-white rounded">
-              REF: SUB_{lead.submission_id.slice(0, 5).toUpperCase()}
-            </span>
-          )}
         </div>
 
         {/* Close Button - receives focus when drawer opens (WCAG 2.4.3) */}

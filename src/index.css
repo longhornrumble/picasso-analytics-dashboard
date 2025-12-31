@@ -577,7 +577,7 @@ body {
    ======================================== */
 
 .drawer-close-btn {
-  @apply p-2 rounded-full;
+  @apply p-2 rounded-full flex items-center justify-center;
   min-width: var(--touch-target-min);
   min-height: var(--touch-target-min);
   background: transparent;

@@ -25,7 +25,6 @@ import {
   fetchLeadDetail,
   updateLeadStatus,
   updateLeadNotes,
-  fetchLeadQueue,
   reactivateLead,
 } from '../../services/analyticsApi';
 import type { LeadWorkspaceData, PipelineStatus, SubmissionType } from '../../types/analytics';
@@ -45,6 +44,8 @@ interface LeadWorkspaceDrawerProps {
   onStatusChange?: (leadId: string, newStatus: PipelineStatus) => void;
   /** Override pipeline status from parent (for mock data sync) */
   effectivePipelineStatus?: PipelineStatus;
+  /** Visible submission IDs from the table (single source of truth for queue navigation) */
+  visibleSubmissionIds?: string[];
 }
 
 /**
@@ -110,7 +111,7 @@ const MOCK_LEADS: Record<string, LeadWorkspaceData> = {
       zip: '90210',
       comments: 'Looking to donate office supplies and furniture from our company that is relocating. Can arrange pickup or delivery.',
     },
-    pipeline_status: 'new',
+    pipeline_status: 'reviewing',
     submission_type: 'donor',
     program_id: 'donations',
     zip_code: '90210',
@@ -203,6 +204,7 @@ export function LeadWorkspaceDrawer({
   onArchive,
   onStatusChange,
   effectivePipelineStatus,
+  visibleSubmissionIds = [],
 }: LeadWorkspaceDrawerProps) {
   // Lead data state
   const [leadData, setLeadData] = useState<LeadWorkspaceData | null>(null);
@@ -274,12 +276,7 @@ export function LeadWorkspaceDrawer({
         setLeadData((prev) => prev ? { ...prev, pipeline_status: newStatus } : null);
         // Announce status change for screen readers (WCAG 4.1.3)
         announce(announcements.statusChanged(newStatus));
-        // Refresh queue data after status change
-        const queueData = await fetchLeadQueue(leadData.pipeline_status, leadData.submission_id);
-        if (isMountedRef.current) {
-          setNextLeadId(queueData.next_lead_id);
-          setQueueCount(queueData.queue_count);
-        }
+        // Queue will auto-update via visibleSubmissionIds from parent
       }
     } catch (error) {
       console.error('Failed to update status:', error);
@@ -412,19 +409,8 @@ export function LeadWorkspaceDrawer({
         // Announce for screen readers (WCAG 4.1.3)
         announce(announcements.leadReactivated());
 
-        // Notify parent to sync table data
+        // Notify parent to sync table data (queue auto-updates via visibleSubmissionIds)
         onStatusChange?.(leadData.submission_id, response.pipeline_status);
-
-        // Refresh queue data after reactivation
-        try {
-          const queueData = await fetchLeadQueue('new', leadData.submission_id);
-          if (isMountedRef.current) {
-            setNextLeadId(queueData.next_lead_id);
-            setQueueCount(queueData.queue_count);
-          }
-        } catch (queueError) {
-          console.warn('Failed to refresh queue after reactivation:', queueError);
-        }
       }
     } catch (error) {
       console.error('Failed to reactivate lead:', error);
@@ -489,6 +475,25 @@ export function LeadWorkspaceDrawer({
 
       const loadData = async () => {
         // Check if this is a mock ID (simple number like '1', '2', etc.)
+        // Unified queue calculation from visibleSubmissionIds (passed from Dashboard)
+        // This works the same for both mock and real data
+        const calculateQueueFromVisibleIds = () => {
+          if (visibleSubmissionIds.length > 1) {
+            const currentIndex = visibleSubmissionIds.indexOf(leadId);
+            if (currentIndex !== -1) {
+              const nextIndex = (currentIndex + 1) % visibleSubmissionIds.length;
+              setNextLeadId(visibleSubmissionIds[nextIndex]);
+              setQueueCount(visibleSubmissionIds.length - 1); // Exclude current lead from count
+            } else {
+              setNextLeadId(null);
+              setQueueCount(0);
+            }
+          } else {
+            setNextLeadId(null);
+            setQueueCount(0);
+          }
+        };
+
         if (isMockId(leadId)) {
           // Use mock data for demo/development
           const mockLead = MOCK_LEADS[leadId];
@@ -499,12 +504,9 @@ export function LeadWorkspaceDrawer({
               : mockLead;
             setLeadData(leadWithEffectiveStatus);
             setTenantName('Demo Organization');
-            // Calculate next mock ID for queue navigation
-            const mockIds = Object.keys(MOCK_LEADS).sort();
-            const currentIndex = mockIds.indexOf(leadId);
-            const nextIndex = (currentIndex + 1) % mockIds.length;
-            setNextLeadId(mockIds[nextIndex]);
-            setQueueCount(mockIds.length);
+
+            // Calculate queue from visible IDs (same as real data)
+            calculateQueueFromVisibleIds();
             setIsLoading(false);
             return;
           }
@@ -523,19 +525,8 @@ export function LeadWorkspaceDrawer({
             setLeadData(lead);
             setTenantName(response.tenant_name);
 
-            // Fetch queue data for Next Lead navigation
-            try {
-              const queueData = await fetchLeadQueue(lead.pipeline_status, leadId);
-              if (isMountedRef.current) {
-                setNextLeadId(queueData.next_lead_id);
-                setQueueCount(queueData.queue_count);
-              }
-            } catch (queueError) {
-              console.warn('Failed to fetch queue data:', queueError);
-              // Non-fatal: just disable next lead button
-              setNextLeadId(null);
-              setQueueCount(0);
-            }
+            // Calculate queue from visible IDs (same as mock data - unified behavior)
+            calculateQueueFromVisibleIds();
           }
         } catch (error) {
           console.error('Failed to load lead:', error);
@@ -561,7 +552,7 @@ export function LeadWorkspaceDrawer({
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, leadId, effectivePipelineStatus]);
+  }, [isOpen, leadId, effectivePipelineStatus, visibleSubmissionIds]);
 
   // Vault Mode: Check if lead is archived (per PRD: Emerald Lead Reactivation Engine)
   const isArchived = leadData?.pipeline_status === 'archived';

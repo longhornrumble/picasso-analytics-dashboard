@@ -21,6 +21,26 @@ interface CommunicationsCardProps {
 }
 
 /**
+ * Get field value case-insensitively from fields object
+ */
+function getField(fields: Record<string, string>, ...keys: string[]): string | null {
+  for (const key of keys) {
+    // Check exact key
+    if (fields[key]) return fields[key];
+    // Check lowercase
+    const lower = key.toLowerCase();
+    if (fields[lower]) return fields[lower];
+    // Check Title Case
+    const title = key.charAt(0).toUpperCase() + key.slice(1).toLowerCase();
+    if (fields[title]) return fields[title];
+    // Check UPPERCASE
+    const upper = key.toUpperCase();
+    if (fields[upper]) return fields[upper];
+  }
+  return null;
+}
+
+/**
  * Extract contact information from lead fields
  */
 function extractContactInfo(lead: LeadWorkspaceData | null): {
@@ -34,21 +54,24 @@ function extractContactInfo(lead: LeadWorkspaceData | null): {
 
   const fields = lead.fields;
 
-  // Extract name
+  // Extract name (case-insensitive)
   let name = 'Unknown';
-  if (fields.name) {
-    name = fields.name;
-  } else if (fields.full_name) {
-    name = fields.full_name;
-  } else if (fields.first_name || fields.last_name) {
-    name = `${fields.first_name || ''} ${fields.last_name || ''}`.trim();
+  const nameValue = getField(fields, 'name', 'Name', 'full_name', 'Full Name');
+  if (nameValue) {
+    name = nameValue;
+  } else {
+    const firstName = getField(fields, 'first_name', 'First Name') || '';
+    const lastName = getField(fields, 'last_name', 'Last Name') || '';
+    if (firstName || lastName) {
+      name = `${firstName} ${lastName}`.trim();
+    }
   }
 
-  // Extract email
-  const email = fields.email || fields.email_address || null;
+  // Extract email (case-insensitive)
+  const email = getField(fields, 'email', 'Email', 'email_address', 'Email Address');
 
-  // Extract phone
-  const phone = fields.phone || fields.mobile || fields.phone_number || fields.tel || null;
+  // Extract phone (case-insensitive)
+  const phone = getField(fields, 'phone', 'Phone', 'mobile', 'Mobile', 'phone_number', 'Phone Number', 'tel');
 
   return { name, email, phone };
 }

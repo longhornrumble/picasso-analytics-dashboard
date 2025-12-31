@@ -111,6 +111,7 @@ function parseFormFields(lead: LeadWorkspaceData | null): ParsedFormField[] {
 
 /**
  * Single field row component (light theme)
+ * Uses stacked layout for long values (like comments)
  */
 function FieldRow({ field }: { field: ParsedFormField }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -123,6 +124,33 @@ function FieldRow({ field }: { field: ParsedFormField }) {
   const isEmailLink = field.type === 'email' && field.value !== '—';
   const isPhoneLink = field.type === 'tel' && field.value !== '—';
 
+  // Use stacked layout for long text (comments, about, etc.)
+  const isLongText = field.value.length > 50 || field.isExpandable;
+
+  // Stacked layout for long text
+  if (isLongText) {
+    return (
+      <div className="py-3 border-b border-gray-100 last:border-b-0">
+        <p className="text-xs font-semibold uppercase tracking-wide text-primary-600 mb-2">
+          {field.label}
+        </p>
+        <p className="text-sm text-slate-800 font-medium">
+          {displayValue}
+        </p>
+        {field.isExpandable && (
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="mt-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            {isExpanded ? 'Show less' : 'Show more'}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Inline layout for short values
   return (
     <div className="py-3 flex items-center justify-between border-b border-gray-100 last:border-b-0">
       <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">
@@ -147,15 +175,6 @@ function FieldRow({ field }: { field: ParsedFormField }) {
           <p className="text-sm text-slate-800 font-medium">
             {displayValue}
           </p>
-        )}
-        {field.isExpandable && (
-          <button
-            type="button"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="mt-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            {isExpanded ? 'Show less' : 'Show more'}
-          </button>
         )}
       </div>
     </div>
