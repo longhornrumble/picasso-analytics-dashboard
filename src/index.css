@@ -52,33 +52,33 @@ body {
 .card-hero {
   @apply bg-white p-8 border border-slate-100 text-center;
   border-radius: 2.5rem; /* 40px super-ellipse */
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
   transition: transform 500ms ease, box-shadow 500ms ease;
 }
 
 .card-hero:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
 
 /* Tier 2: Analytical Cards - charts and analysis */
 .card-analytical {
   @apply bg-white p-6 border border-slate-100;
   border-radius: 1.5rem; /* 24px */
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
   transition: transform 500ms ease, box-shadow 500ms ease;
 }
 
 .card-analytical:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
 }
 
 /* Tier 3: Utility Cards - tables, lists */
 .card-utility {
   @apply bg-white p-5 border border-slate-100;
   border-radius: 1.25rem; /* 20px */
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.015);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
 }
 
 /* Feature Card - Marketing style with subtle green tint (Marketing Style Guide) */

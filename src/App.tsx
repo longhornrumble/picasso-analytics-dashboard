@@ -113,11 +113,11 @@ function NavigationBar({
                   onClick={() => isLocked ? onLockedTabClick(tab.id) : onTabChange(tab.id)}
                   className={`
                     relative flex items-center gap-2 px-4 py-2 text-xs font-semibold tracking-wider
-                    transition-all duration-200 rounded-lg
+                    transition-all duration-200 rounded-full
                     ${isLocked
                       ? 'text-slate-300 cursor-not-allowed'
                       : isActive
-                        ? 'text-primary-500 bg-primary-50'
+                        ? 'text-primary-600 bg-primary-50'
                         : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                     }
                   `}

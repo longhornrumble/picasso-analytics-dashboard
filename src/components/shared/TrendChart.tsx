@@ -207,6 +207,26 @@ export function TrendChart({
               </g>
             )}
 
+            {/* Gradient definitions for area fills */}
+            <defs>
+              {lines.map(line => {
+                const color = getColor(line.color);
+                return (
+                  <linearGradient
+                    key={`gradient-${line.id}`}
+                    id={`area-gradient-${line.id}`}
+                    x1="0%"
+                    y1="0%"
+                    x2="0%"
+                    y2="100%"
+                  >
+                    <stop offset="0%" stopColor={color} stopOpacity="0.30" />
+                    <stop offset="100%" stopColor={color} stopOpacity="0" />
+                  </linearGradient>
+                );
+              })}
+            </defs>
+
             {/* Lines and areas */}
             {lines.map(line => {
               const color = getColor(line.color);
@@ -221,20 +241,19 @@ export function TrendChart({
 
               return (
                 <g key={line.id}>
-                  {/* Area fill */}
+                  {/* Area fill - vertical gradient per style guide (30% → 0%) */}
                   {showArea && (
                     <path
                       d={areaPath}
-                      fill={color}
-                      fillOpacity="0.15"
+                      fill={`url(#area-gradient-${line.id})`}
                     />
                   )}
-                  {/* Line */}
+                  {/* Line - 3px stroke per style guide */}
                   <path
                     d={linePath}
                     fill="none"
                     stroke={color}
-                    strokeWidth="2.5"
+                    strokeWidth="3"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     vectorEffect="non-scaling-stroke"

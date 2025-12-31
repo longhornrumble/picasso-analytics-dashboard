@@ -39,14 +39,16 @@ export function StatCard({
   const isHero = tier === 'hero';
 
   return (
-    <div className={isHero ? 'card-hero' : 'card-analytical'}>
-      {/* Hero Value - Large Emerald Number */}
+    <div className={`group ${isHero ? 'card-hero' : 'card-analytical'}`}>
+      {/* Hero Value - Large Emerald Number with hover scale */}
       <p
-        className={
-          isHero
+        className={`
+          transition-transform duration-300 ease-out group-hover:scale-105
+          ${isHero
             ? 'text-5xl font-extrabold leading-none text-primary-500'
             : 'text-3xl font-bold text-slate-900'
-        }
+          }
+        `}
       >
         {value}
       </p>
