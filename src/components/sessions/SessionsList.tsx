@@ -10,8 +10,16 @@ import { fetchSessionsList } from '../../services/analyticsApi';
 import { SessionCard, SessionCardSkeleton } from './SessionCard';
 import { Dropdown } from '../shared';
 
+/** Date range for custom filtering */
+interface DateRange {
+  startDate: Date;
+  endDate: Date;
+}
+
 interface SessionsListProps {
   timeRange: TimeRange;
+  /** Custom date range for filtering (when timeRange is 'custom') */
+  dateRange?: DateRange | null;
   onSessionClick: (sessionId: string) => void;
   /** Optional mock data - when provided, API calls are skipped */
   mockSessions?: SessionSummary[];
@@ -30,7 +38,7 @@ const OUTCOME_OPTIONS: { value: SessionOutcome | 'all'; label: string }[] = [
 /** Number of sessions to fetch per page */
 const PAGE_SIZE = 25;
 
-export function SessionsList({ timeRange, onSessionClick, mockSessions }: SessionsListProps) {
+export function SessionsList({ timeRange, dateRange, onSessionClick, mockSessions }: SessionsListProps) {
   // Check if using mock data
   const useMockData = !!mockSessions;
 
@@ -62,11 +70,19 @@ export function SessionsList({ timeRange, onSessionClick, mockSessions }: Sessio
 
     try {
       const outcome = outcomeFilter === 'all' ? undefined : outcomeFilter;
+
+      // Build date range options for custom range
+      const dateRangeOptions = timeRange === 'custom' && dateRange ? {
+        startDate: dateRange.startDate.toISOString().split('T')[0],
+        endDate: dateRange.endDate.toISOString().split('T')[0],
+      } : undefined;
+
       const response: SessionsListResponse = await fetchSessionsList(
         timeRange,
         PAGE_SIZE,
         cursor,
-        outcome
+        outcome,
+        dateRangeOptions
       );
 
       if (reset) {
@@ -86,7 +102,7 @@ export function SessionsList({ timeRange, onSessionClick, mockSessions }: Sessio
       setIsLoading(false);
       setIsInitialLoad(false);
     }
-  }, [timeRange, outcomeFilter]);
+  }, [timeRange, dateRange, outcomeFilter]);
 
   /**
    * Reset and reload when filters change
@@ -114,7 +130,7 @@ export function SessionsList({ timeRange, onSessionClick, mockSessions }: Sessio
         abortControllerRef.current.abort();
       }
     };
-  }, [timeRange, outcomeFilter, loadSessions, useMockData, mockSessions]);
+  }, [timeRange, dateRange, outcomeFilter, loadSessions, useMockData, mockSessions]);
 
   /**
    * Intersection Observer for infinite scroll

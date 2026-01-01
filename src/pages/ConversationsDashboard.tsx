@@ -298,6 +298,12 @@ export function ConversationsDashboard() {
     }
   };
 
+  // Handle custom date range change - also set timeRange to 'custom'
+  const handleDateRangeChange = (range: DateRange) => {
+    setDateRange(range);
+    setTimeRange('custom');
+  };
+
   // Session timeline state (for new Sessions API)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
@@ -520,7 +526,7 @@ export function ConversationsDashboard() {
           showExport={false}
           showDatePicker={true}
           dateRange={dateRange}
-          onDateRangeChange={setDateRange}
+          onDateRangeChange={handleDateRangeChange}
           actions={
             <ExportDropdown
               onExport={handleExport}
@@ -591,6 +597,7 @@ export function ConversationsDashboard() {
           <>
             <SessionsList
               timeRange={timeRange as TimeRange}
+              dateRange={dateRange}
               onSessionClick={setSelectedSessionId}
               mockSessions={useMockData ? mockSessions : undefined}
             />

@@ -228,6 +228,12 @@ export function Dashboard() {
     }
   };
 
+  // Handle custom date range change - also set timeRange to 'custom'
+  const handleDateRangeChange = (range: DateRange) => {
+    setDateRange(range);
+    setTimeRange('custom');
+  };
+
   // Data state - formMetrics for form-specific stats
   const [formMetrics, setFormMetrics] = useState<FormSummaryMetrics | null>(null);
 
@@ -616,7 +622,7 @@ export function Dashboard() {
           showExport={false}
           showDatePicker={true}
           dateRange={dateRange}
-          onDateRangeChange={setDateRange}
+          onDateRangeChange={handleDateRangeChange}
           filters={
             <FilterDropdown
               value={selectedForm}

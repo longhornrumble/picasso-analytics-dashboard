@@ -373,16 +373,18 @@ export async function fetchConversationTrend(
  * Fetch paginated list of sessions with optional outcome filter
  * Uses cursor-based pagination for infinite scroll
  *
- * @param range - Time range filter (1d, 7d, 30d, 90d)
+ * @param range - Time range filter (1d, 7d, 30d, 90d, custom)
  * @param limit - Number of sessions per page (1-100, default 25)
  * @param cursor - Base64-encoded cursor for next page
  * @param outcome - Filter by session outcome
+ * @param dateRangeOptions - Custom date range options
  */
 export async function fetchSessionsList(
   range: TimeRange = '30d',
   limit: number = 25,
   cursor?: string,
-  outcome?: SessionOutcome
+  outcome?: SessionOutcome,
+  dateRangeOptions?: DateRangeOptions
 ): Promise<SessionsListResponse> {
   const params: Record<string, string> = {
     range,
@@ -395,6 +397,13 @@ export async function fetchSessionsList(
 
   if (outcome) {
     params.outcome = outcome;
+  }
+
+  if (dateRangeOptions?.startDate) {
+    params.start_date = dateRangeOptions.startDate;
+  }
+  if (dateRangeOptions?.endDate) {
+    params.end_date = dateRangeOptions.endDate;
   }
 
   return apiRequest<SessionsListResponse>('/sessions/list', params);
