@@ -278,7 +278,12 @@ const mockSessionDetails: Record<string, SessionDetailResponse> = {
   },
 };
 
-export function ConversationsDashboard() {
+interface ConversationsDashboardProps {
+  /** Callback when user clicks "View Form" to navigate to Forms dashboard */
+  onViewFormSubmission?: (sessionId: string, formId: string) => void;
+}
+
+export function ConversationsDashboard({ onViewFormSubmission }: ConversationsDashboardProps) {
   const { user } = useAuth();
 
   // Mock data is ONLY enabled for demo tenant MYR384719
@@ -600,12 +605,14 @@ export function ConversationsDashboard() {
               timeRange={timeRange as TimeRange}
               dateRange={dateRange}
               onSessionClick={setSelectedSessionId}
+              onViewFormSubmission={onViewFormSubmission}
               mockSessions={useMockData ? mockSessions : undefined}
             />
             <SessionTimeline
               sessionId={selectedSessionId}
               onClose={() => setSelectedSessionId(null)}
               mockSessionDetail={useMockData && selectedSessionId ? mockSessionDetails[selectedSessionId] : undefined}
+              onViewFormSubmission={onViewFormSubmission}
             />
           </>
         ) : (

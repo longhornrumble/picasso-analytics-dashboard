@@ -9,6 +9,8 @@ import { OutcomeBadge } from './OutcomeBadge';
 interface SessionCardProps {
   session: SessionSummary;
   onClick: (sessionId: string) => void;
+  /** Callback when "View Form" is clicked for sessions with form_id */
+  onViewFormSubmission?: (sessionId: string, formId: string) => void;
 }
 
 /**
@@ -70,7 +72,7 @@ function truncateText(text: string, maxLength: number): string {
   return text.substring(0, maxLength - 3) + '...';
 }
 
-export function SessionCard({ session, onClick }: SessionCardProps) {
+export function SessionCard({ session, onClick, onViewFormSubmission }: SessionCardProps) {
   const handleClick = () => {
     onClick(session.session_id);
   };
@@ -81,6 +83,19 @@ export function SessionCard({ session, onClick }: SessionCardProps) {
       onClick(session.session_id);
     }
   };
+
+  const handleViewForm = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onViewFormSubmission) {
+      // Pass form_id if available, otherwise empty string (search by session_id will still work)
+      onViewFormSubmission(session.session_id, session.form_id || '');
+    }
+  };
+
+  // Check if this session has a form - show link when:
+  // 1. form_id is present (from API), OR
+  // 2. outcome is 'form_completed' (indicates form was submitted)
+  const hasForm = !!session.form_id || session.outcome === 'form_completed';
 
   return (
     <div
@@ -141,11 +156,23 @@ export function SessionCard({ session, onClick }: SessionCardProps) {
         )}
       </div>
 
-      {/* Session ID (for debugging/support) */}
-      <div className="mt-3 pt-2 border-t border-gray-100">
+      {/* Footer row: Session ID + View Form link */}
+      <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between">
         <span className="text-xs text-gray-400 font-mono">
           {truncateText(session.session_id, 24)}
         </span>
+        {hasForm && onViewFormSubmission && (
+          <button
+            onClick={handleViewForm}
+            className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 transition-colors"
+            title="View form submission in Forms dashboard"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            View Form
+          </button>
+        )}
       </div>
     </div>
   );

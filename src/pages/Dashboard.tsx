@@ -63,11 +63,11 @@ const mockBottlenecks: FieldBottleneck[] = [
 ];
 
 const mockSubmissions: FormSubmission[] = [
-  { id: '1', name: 'Sarah Jenkins', email: 'sarah.j@email.com', phone: '(555) 123-4567', formType: 'Volunteer App', comments: 'I have 5 years of experience working with youth programs and would love to contribute to your mentorship initiative.', date: 'Dec 01', pipeline_status: 'new' },
-  { id: '2', name: 'Michael Chen', email: 'm.chen@email.com', phone: '(555) 234-5678', formType: 'Donation Req', comments: 'Looking to donate office supplies and furniture from our company that is relocating. Can arrange pickup or delivery.', date: 'Dec 01', pipeline_status: 'reviewing' },
-  { id: '3', name: 'Jessica Ford', email: 'jess.ford@email.com', phone: '(555) 345-6789', formType: 'Event Reg', comments: 'Dietary restriction: Please note I am vegetarian and allergic to nuts. Will need accommodation for the lunch portion.', date: 'Nov 30', pipeline_status: 'archived' },
-  { id: '4', name: 'Robert Smith', email: 'rob.smith@email.com', phone: '(555) 456-7890', formType: 'General Inquiry', comments: 'What are your opening hours on weekends? I work during the week and can only visit on Saturdays or Sundays.', date: 'Nov 30', pipeline_status: 'contacted' },
-  { id: '5', name: 'Emily Davis', email: 'emily.d@email.com', phone: '(555) 567-8901', formType: 'Volunteer App', comments: 'Interested in the mentorship program. I am a retired teacher with 30 years of experience in elementary education.', date: 'Nov 29', pipeline_status: 'archived' },
+  { id: '1', name: 'Sarah Jenkins', email: 'sarah.j@email.com', phone: '(555) 123-4567', formType: 'Volunteer App', comments: 'I have 5 years of experience working with youth programs and would love to contribute to your mentorship initiative.', date: 'Dec 01', session_id: 'sess_mock_001', pipeline_status: 'new' },
+  { id: '2', name: 'Michael Chen', email: 'm.chen@email.com', phone: '(555) 234-5678', formType: 'Donation Req', comments: 'Looking to donate office supplies and furniture from our company that is relocating. Can arrange pickup or delivery.', date: 'Dec 01', session_id: 'sess_mock_002', pipeline_status: 'reviewing' },
+  { id: '3', name: 'Jessica Ford', email: 'jess.ford@email.com', phone: '(555) 345-6789', formType: 'Event Reg', comments: 'Dietary restriction: Please note I am vegetarian and allergic to nuts. Will need accommodation for the lunch portion.', date: 'Nov 30', session_id: 'sess_mock_003', pipeline_status: 'archived' },
+  { id: '4', name: 'Robert Smith', email: 'rob.smith@email.com', phone: '(555) 456-7890', formType: 'General Inquiry', comments: 'What are your opening hours on weekends? I work during the week and can only visit on Saturdays or Sundays.', date: 'Nov 30', session_id: 'sess_mock_004', pipeline_status: 'contacted' },
+  { id: '5', name: 'Emily Davis', email: 'emily.d@email.com', phone: '(555) 567-8901', formType: 'Volunteer App', comments: 'Interested in the mentorship program. I am a retired teacher with 30 years of experience in elementary education.', date: 'Nov 29', session_id: 'sess_mock_005', pipeline_status: 'archived' },
 ];
 
 // Form-specific mock metrics (keyed by form ID, empty string = all forms)
@@ -204,7 +204,14 @@ const getSubmissionColumns = (onTypeClick?: (formType: string) => void): Column<
   },
 ];
 
-export function Dashboard() {
+interface DashboardProps {
+  /** Initial search query passed from cross-tab navigation */
+  initialSearchQuery?: string | null;
+  /** Callback when the initial search has been applied */
+  onSearchApplied?: () => void;
+}
+
+export function Dashboard({ initialSearchQuery, onSearchApplied }: DashboardProps) {
   const { user } = useAuth();
 
   // Mock data is ONLY enabled for demo tenant MYR384719
@@ -254,6 +261,19 @@ export function Dashboard() {
   const [tableDateFilter, setTableDateFilter] = useState<DateFilterRange>({ value: 'all' });
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+
+  // Apply initial search query from cross-tab navigation
+  useEffect(() => {
+    if (initialSearchQuery) {
+      setSearchQuery(initialSearchQuery);
+      setPage(1);
+      // Clear any filters that might hide the result
+      setTableFormTypeFilter(null);
+      setIsArchiveView(false);
+      // Notify parent that search has been applied
+      onSearchApplied?.();
+    }
+  }, [initialSearchQuery, onSearchApplied]);
 
   // Lead Workspace Drawer state
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
@@ -342,6 +362,7 @@ export function Dashboard() {
           formType: s.form_label || s.form_id,
           comments: s.fields?.comments || s.fields?.message || '',
           date: s.submitted_date,
+          session_id: s.session_id,
           // API doesn't return pipeline_status yet - treat as 'new' (active)
           pipeline_status: 'new' as PipelineStatus,
         }));
@@ -368,7 +389,9 @@ export function Dashboard() {
         row.name.toLowerCase().includes(query) ||
         row.email.toLowerCase().includes(query) ||
         (row.phone && row.phone.toLowerCase().includes(query)) ||
-        row.formType.toLowerCase().includes(query)
+        row.formType.toLowerCase().includes(query) ||
+        row.id.toLowerCase().includes(query) ||
+        (row.session_id && row.session_id.toLowerCase().includes(query))
       );
     }
 
@@ -863,6 +886,7 @@ export function Dashboard() {
                   formType: s.form_label || s.form_id,
                   comments: s.fields?.comments || s.fields?.message || '',
                   date: s.submitted_date,
+                  session_id: s.session_id,
                 }));
 
             // Apply archive filter (per PRD: Emerald Lead Reactivation Engine)
@@ -892,7 +916,9 @@ export function Dashboard() {
                 row.name.toLowerCase().includes(query) ||
                 row.email.toLowerCase().includes(query) ||
                 (row.phone && row.phone.toLowerCase().includes(query)) ||
-                row.formType.toLowerCase().includes(query)
+                row.formType.toLowerCase().includes(query) ||
+                row.id.toLowerCase().includes(query) ||
+                (row.session_id && row.session_id.toLowerCase().includes(query))
               );
             }
 
@@ -1012,7 +1038,9 @@ export function Dashboard() {
                 row.name.toLowerCase().includes(query) ||
                 row.email.toLowerCase().includes(query) ||
                 (row.phone && row.phone.toLowerCase().includes(query)) ||
-                row.formType.toLowerCase().includes(query)
+                row.formType.toLowerCase().includes(query) ||
+                row.id.toLowerCase().includes(query) ||
+                (row.session_id && row.session_id.toLowerCase().includes(query))
               );
             }
 
@@ -1025,6 +1053,7 @@ export function Dashboard() {
             setSearchQuery(query);
             setPage(1); // Reset to first page when searching
           }}
+          searchValue={searchQuery}
           sortColumn={sortColumn}
           sortDirection={sortDirection}
           onSort={(column, direction) => {

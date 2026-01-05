@@ -178,6 +178,8 @@ export interface FormSubmission {
   formType: string;
   comments: string;
   date: string;
+  /** Session ID from the conversation that led to this submission */
+  session_id?: string;
   /** Pipeline status for archive filtering (per PRD: Emerald Lead Reactivation Engine) */
   pipeline_status?: PipelineStatus;
 }

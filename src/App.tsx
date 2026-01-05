@@ -263,6 +263,9 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<DashboardTab>('conversations');
   const [lockedTab, setLockedTab] = useState<DashboardTab | null>(null);
 
+  // Cross-tab navigation: search query to pass to Forms dashboard
+  const [formsSearchQuery, setFormsSearchQuery] = useState<string | null>(null);
+
   const features = user?.features || DEFAULT_FEATURES;
 
   // Show loading state while checking auth OR while redirecting to Bubble
@@ -294,6 +297,20 @@ function AppContent() {
     setLockedTab(null);
   };
 
+  // Handle navigation from Conversations to Forms dashboard
+  const handleViewFormSubmission = (sessionId: string, _formId: string) => {
+    // Set search query to session ID to find the related form submission
+    setFormsSearchQuery(sessionId);
+    // Switch to Forms tab
+    setActiveTab('forms');
+    setLockedTab(null);
+  };
+
+  // Clear the search query after it's been consumed by Dashboard
+  const handleFormsSearchApplied = () => {
+    setFormsSearchQuery(null);
+  };
+
   const renderDashboardContent = () => {
     if (lockedTab) {
       return (
@@ -306,9 +323,18 @@ function AppContent() {
 
     switch (activeTab) {
       case 'forms':
-        return <Dashboard />;
+        return (
+          <Dashboard
+            initialSearchQuery={formsSearchQuery}
+            onSearchApplied={handleFormsSearchApplied}
+          />
+        );
       case 'conversations':
-        return <ConversationsDashboard />;
+        return (
+          <ConversationsDashboard
+            onViewFormSubmission={handleViewFormSubmission}
+          />
+        );
       case 'attribution':
         return (
           <PremiumLock
@@ -317,7 +343,11 @@ function AppContent() {
           />
         );
       default:
-        return <ConversationsDashboard />;
+        return (
+          <ConversationsDashboard
+            onViewFormSubmission={handleViewFormSubmission}
+          />
+        );
     }
   };
 

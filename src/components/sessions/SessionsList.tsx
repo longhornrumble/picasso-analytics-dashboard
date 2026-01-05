@@ -21,6 +21,8 @@ interface SessionsListProps {
   /** Custom date range for filtering (when timeRange is 'custom') */
   dateRange?: DateRange | null;
   onSessionClick: (sessionId: string) => void;
+  /** Callback when "View Form" is clicked for sessions with form_id */
+  onViewFormSubmission?: (sessionId: string, formId: string) => void;
   /** Optional mock data - when provided, API calls are skipped */
   mockSessions?: SessionSummary[];
 }
@@ -38,7 +40,7 @@ const OUTCOME_OPTIONS: { value: SessionOutcome | 'all'; label: string }[] = [
 /** Number of sessions to fetch per page */
 const PAGE_SIZE = 25;
 
-export function SessionsList({ timeRange, dateRange, onSessionClick, mockSessions }: SessionsListProps) {
+export function SessionsList({ timeRange, dateRange, onSessionClick, onViewFormSubmission, mockSessions }: SessionsListProps) {
   // Check if using mock data
   const useMockData = !!mockSessions;
 
@@ -266,6 +268,7 @@ export function SessionsList({ timeRange, dateRange, onSessionClick, mockSession
             key={session.session_id}
             session={session}
             onClick={onSessionClick}
+            onViewFormSubmission={onViewFormSubmission}
           />
         ))}
       </div>

@@ -51,6 +51,8 @@ interface DataTableProps<T extends object> {
   onPageChange: (page: number) => void;
   /** Search handler */
   onSearch?: (query: string) => void;
+  /** Controlled search value (syncs with internal state) */
+  searchValue?: string;
   /** Show search input */
   showSearch?: boolean;
   /** Show filter button */
@@ -94,6 +96,7 @@ export function DataTable<T extends object>({
   pageSize,
   onPageChange,
   onSearch,
+  searchValue,
   showSearch = true,
   showFilter = true,
   onFilter,
@@ -110,8 +113,15 @@ export function DataTable<T extends object>({
   headerAction,
   isArchiveView = false,
 }: DataTableProps<T>) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(searchValue || '');
   const totalPages = Math.ceil(totalCount / pageSize);
+
+  // Sync internal search state with controlled value
+  useEffect(() => {
+    if (searchValue !== undefined) {
+      setSearchQuery(searchValue);
+    }
+  }, [searchValue]);
   const startIndex = (page - 1) * pageSize + 1;
   const endIndex = Math.min(page * pageSize, totalCount);
 
