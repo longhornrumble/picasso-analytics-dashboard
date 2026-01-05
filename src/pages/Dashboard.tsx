@@ -612,7 +612,7 @@ export function Dashboard() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
         {/* Header */}
         <PageHeader
           sectionLabel="MISSION INTELLIGENCE"
@@ -631,6 +631,7 @@ export function Dashboard() {
                 ? mockForms.map(f => ({ id: f.id, name: f.name }))
                 : topForms.map(f => ({ id: f.form_id, name: f.form_label || f.form_id }))}
               placeholder="All Forms"
+              className="w-full sm:w-auto"
             />
           }
           actions={
@@ -644,7 +645,7 @@ export function Dashboard() {
         />
 
         {/* Stats Cards - Hero Tier */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <StatCard
             title="Total Form Views"
             value={totalViews.toLocaleString()}
@@ -674,7 +675,7 @@ export function Dashboard() {
         </div>
 
         {/* Funnel and Bottlenecks */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Funnel
             title="Form Conversion Funnel"
             stages={[
@@ -702,7 +703,7 @@ export function Dashboard() {
         </div>
 
         {/* Top Performing Forms */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <RankedCards
             title="Top Performing Forms"
             summaryValue={useMockData ? 521 : totalCompletions}

@@ -109,7 +109,7 @@ function NavigationBar({
         WebkitBackdropFilter: 'blur(20px)',
       }}
     >
-      <div className="max-w-7xl mx-auto px-4 md:px-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <MyRecruiterLogo />
@@ -207,7 +207,7 @@ function NavigationBar({
         `}
         style={{ top: '64px' }}
       >
-        <nav className="px-4 py-4 space-y-2 max-w-lg mx-auto">
+        <nav className="px-3 py-3 space-y-2 max-w-lg mx-auto">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             const isLocked = tab.locked;

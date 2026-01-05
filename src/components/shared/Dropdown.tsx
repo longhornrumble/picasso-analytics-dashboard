@@ -60,7 +60,7 @@ export function Dropdown({ value, onChange, options, className = '' }: DropdownP
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between gap-2 text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white hover:bg-slate-50 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-w-[140px] text-left"
+        className="flex items-center justify-between gap-2 text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white hover:bg-slate-50 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 w-full sm:min-w-[140px] text-left"
       >
         <span className="text-slate-700">{currentLabel}</span>
         <svg
@@ -75,7 +75,7 @@ export function Dropdown({ value, onChange, options, className = '' }: DropdownP
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-1 w-full min-w-[160px] bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1 max-h-60 overflow-auto">
+        <div className="absolute left-0 sm:left-auto sm:right-0 mt-1 w-full sm:min-w-[160px] bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1 max-h-60 overflow-auto">
           {options.map((option) => (
             <button
               key={option.value}

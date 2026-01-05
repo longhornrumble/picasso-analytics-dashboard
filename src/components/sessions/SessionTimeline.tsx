@@ -1,10 +1,11 @@
 /**
  * SessionTimeline Component
  * Modal dialog displaying full session timeline with all events
- * Uses native <dialog> element for accessibility
+ * Uses custom div-based modal for better mobile browser support
  */
 
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import type { SessionDetailResponse } from '../../types/analytics';
 import { fetchSessionDetail } from '../../services/analyticsApi';
 import { OutcomeBadge } from './OutcomeBadge';
@@ -84,13 +85,15 @@ function TimelineSkeleton() {
 }
 
 export function SessionTimeline({ sessionId, onClose, mockSessionDetail }: SessionTimelineProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const [session, setSession] = useState<SessionDetailResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Check if using mock data
   const useMockData = mockSessionDetail !== undefined;
+
+  // Whether modal is visible
+  const isOpen = sessionId !== null;
 
   /**
    * Load session detail when sessionId changes
@@ -111,14 +114,10 @@ export function SessionTimeline({ sessionId, onClose, mockSessionDetail }: Sessi
   }, []);
 
   /**
-   * Open/close dialog when sessionId changes
+   * Load data when sessionId changes
    */
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-
     if (sessionId) {
-      dialog.showModal();
       // Use mock data if provided, otherwise fetch from API
       if (useMockData && mockSessionDetail) {
         setSession(mockSessionDetail);
@@ -127,61 +126,96 @@ export function SessionTimeline({ sessionId, onClose, mockSessionDetail }: Sessi
       } else if (!useMockData) {
         loadSession(sessionId);
       }
-    } else {
-      dialog.close();
     }
   }, [sessionId, loadSession, useMockData, mockSessionDetail]);
 
   /**
-   * Handle dialog close (ESC key or backdrop click)
+   * Handle ESC key to close
    */
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
+    if (!isOpen) return;
 
-    const handleClose = () => {
-      onClose();
-    };
-
-    const handleClick = (e: MouseEvent) => {
-      // Close on backdrop click
-      if (e.target === dialog) {
-        onClose();
-      }
-    };
-
-    dialog.addEventListener('close', handleClose);
-    dialog.addEventListener('click', handleClick);
-
-    return () => {
-      dialog.removeEventListener('close', handleClose);
-      dialog.removeEventListener('click', handleClick);
-    };
-  }, [onClose]);
-
-  /**
-   * Handle keyboard navigation
-   */
-  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && sessionId) {
+      if (e.key === 'Escape') {
         onClose();
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [sessionId, onClose]);
+  }, [isOpen, onClose]);
 
-  return (
-    <dialog
-      ref={dialogRef}
-      className="w-full max-w-2xl max-h-[85vh] rounded-xl shadow-2xl p-0 backdrop:bg-black/50"
-      aria-labelledby="session-timeline-title"
+  /**
+   * Lock body scroll when open
+   * Using simple overflow:hidden instead of position:fixed to avoid z-index stacking issues
+   */
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  // Don't render anything if not open
+  if (!isOpen) return null;
+
+  // Render modal using portal to document.body
+  // Using a full-screen flex container for centering (more reliable than transforms on mobile)
+  return createPortal(
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2147483647, // Max z-index value
+        padding: '16px',
+        boxSizing: 'border-box',
+      }}
     >
-      <div className="flex flex-col h-full max-h-[85vh]">
+      {/* Backdrop - absolutely positioned within container */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        }}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Modal - centered via flexbox parent */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="session-timeline-title"
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: '672px',
+          maxHeight: 'calc(100% - 32px)',
+          backgroundColor: '#ffffff',
+          borderRadius: '12px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white rounded-t-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white">
           <h2 id="session-timeline-title" className="text-lg font-semibold text-gray-900">
             Session Timeline
           </h2>
@@ -197,7 +231,7 @@ export function SessionTimeline({ sessionId, onClose, mockSessionDetail }: Sessi
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-6 py-4" style={{ WebkitOverflowScrolling: 'touch' }}>
           {isLoading && <TimelineSkeleton />}
 
           {error && (
@@ -286,7 +320,7 @@ export function SessionTimeline({ sessionId, onClose, mockSessionDetail }: Sessi
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50">
           <div className="flex justify-end">
             <button
               onClick={onClose}
@@ -297,6 +331,7 @@ export function SessionTimeline({ sessionId, onClose, mockSessionDetail }: Sessi
           </div>
         </div>
       </div>
-    </dialog>
+    </div>,
+    document.body
   );
 }

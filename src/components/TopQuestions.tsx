@@ -52,13 +52,13 @@ export function TopQuestions({
   return (
     <div className="card-analytical h-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
         <h3 className="text-lg font-bold text-slate-900">Top Five Questions</h3>
-        <div className="text-right">
+        <div className="text-left sm:text-right flex items-baseline gap-2">
           <span className="text-2xl font-bold text-primary-500">
             {totalQuestions.toLocaleString()}
           </span>
-          <span className="label-swiss text-slate-500 ml-2">Total</span>
+          <span className="label-swiss text-slate-500">Total</span>
         </div>
       </div>
 

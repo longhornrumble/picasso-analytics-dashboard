@@ -516,7 +516,7 @@ export function ConversationsDashboard() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-6 py-8 overflow-visible">
+      <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-visible">
         {/* Header */}
         <PageHeader
           sectionLabel="MISSION INTELLIGENCE"
@@ -538,7 +538,7 @@ export function ConversationsDashboard() {
         />
 
         {/* Stats Cards - Hero Tier */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <StatCard
             title="Total Conversations"
             value={(useMockData ? mockSummary.total_conversations : (summary?.total_conversations ?? 0)).toLocaleString()}
@@ -569,7 +569,7 @@ export function ConversationsDashboard() {
         </div>
 
         {/* Heat Map and Top Questions */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <ConversationHeatMap
             data={useMockData ? mockHeatmap : heatmap}
             peak={useMockData ? mockPeak : peak}

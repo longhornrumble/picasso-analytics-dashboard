@@ -43,7 +43,7 @@ export function FieldBottlenecks({ bottlenecks, totalAbandons }: FieldBottleneck
   return (
     <div className="card-analytical">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-6">
         <div className="flex items-center gap-2">
           <h3 className="text-lg font-bold text-slate-900">Bottleneck Analysis</h3>
           <button className="text-slate-400 hover:text-slate-600 transition-colors">
@@ -52,7 +52,7 @@ export function FieldBottlenecks({ bottlenecks, totalAbandons }: FieldBottleneck
             </svg>
           </button>
         </div>
-        <div className="text-right">
+        <div className="text-left sm:text-right">
           <p className="text-2xl font-bold text-danger-500">{totalAbandons.toLocaleString()}</p>
           <p
             className="text-[10px] font-black uppercase text-danger-400"
@@ -69,8 +69,8 @@ export function FieldBottlenecks({ bottlenecks, totalAbandons }: FieldBottleneck
           bottlenecks.map((bottleneck) => {
             const isHovered = hoveredBar?.fieldName === bottleneck.fieldName;
             return (
-              <div key={bottleneck.fieldName} className="flex items-center gap-3">
-                <div className="w-28 text-sm font-medium text-slate-600 truncate" title={bottleneck.fieldName}>
+              <div key={bottleneck.fieldName} className="flex items-center gap-2 sm:gap-3">
+                <div className="w-24 sm:w-28 text-xs sm:text-sm font-medium text-slate-600 truncate" title={bottleneck.fieldName}>
                   {bottleneck.fieldName}
                 </div>
                 <div className="flex-1 relative">
@@ -93,7 +93,7 @@ export function FieldBottlenecks({ bottlenecks, totalAbandons }: FieldBottleneck
                     />
                   </div>
                 </div>
-                <div className="w-12 text-right text-sm font-bold text-danger-500">
+                <div className="w-10 sm:w-12 text-right text-xs sm:text-sm font-bold text-danger-500">
                   {bottleneck.abandonRate}%
                 </div>
               </div>

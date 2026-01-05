@@ -102,9 +102,9 @@ export function PageHeader({
       </div>
 
       {/* Filter Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 overflow-visible">
-        {/* Left: Time range pills */}
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 self-start">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 overflow-visible">
+        {/* Left: Time range pills - full width on mobile */}
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 w-full sm:w-auto overflow-x-auto scrollbar-hide">
           {timeRangeOptions.map((range) => {
             const isActive = timeRange === range.value;
             return (
@@ -112,7 +112,7 @@ export function PageHeader({
                 key={range.value}
                 onClick={() => onTimeRangeChange(range.value)}
                 className={`
-                  px-4 py-2 rounded-lg text-xs font-semibold tracking-wider
+                  px-3 sm:px-4 py-2 rounded-lg text-xs font-semibold tracking-wider whitespace-nowrap flex-shrink-0
                   transition-all duration-200
                   ${isActive
                     ? 'text-white shadow-sm bg-primary-500'
@@ -126,7 +126,7 @@ export function PageHeader({
           })}
         </div>
 
-        {/* Right: Filters, Date picker, Actions - stack full width on mobile */}
+        {/* Right: Filters, Date picker, Actions - stack full width on mobile, row on desktop */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 overflow-visible w-full sm:w-auto">
           {/* Dashboard-specific filters slot */}
           {filters}

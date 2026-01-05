@@ -99,8 +99,8 @@ export function ConversationHeatMap({
   return (
     <div className="card-analytical">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-6">
+        <div className="flex-1">
           <h3 className="text-lg font-bold text-slate-900">Engagement Density</h3>
           {peak && (
             <p className="text-sm text-slate-500 mt-1">
@@ -108,14 +108,14 @@ export function ConversationHeatMap({
             </p>
           )}
         </div>
-        <div className="text-right">
-          <p className="text-3xl font-bold text-primary-500">{totalConversations.toLocaleString()}</p>
+        <div className="text-left sm:text-right">
+          <p className="text-2xl sm:text-3xl font-bold text-primary-500">{totalConversations.toLocaleString()}</p>
           <p className="text-[10px] font-black uppercase text-slate-500 mt-1" style={{ letterSpacing: '0.2em' }}>Total</p>
         </div>
       </div>
 
       {/* Heatmap Grid */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
         <table className="w-full min-w-[400px] table-fixed">
           <colgroup>
             <col className="w-12" />
@@ -209,18 +209,18 @@ export function ConversationHeatMap({
       </div>
 
       {/* Legend */}
-      <div className="flex items-center justify-end gap-3 mt-6">
-        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Less</span>
+      <div className="flex items-center justify-center sm:justify-end gap-2 sm:gap-3 mt-6">
+        <span className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider">Less</span>
         <div className="flex gap-1">
           {Object.values(PRIMARY_GRADIENT).map((color, i) => (
             <div
               key={i}
-              className="w-5 h-5 rounded-lg"
+              className="w-4 h-4 sm:w-5 sm:h-5 rounded-lg"
               style={{ backgroundColor: color.bg }}
             />
           ))}
         </div>
-        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">More</span>
+        <span className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider">More</span>
       </div>
     </div>
   );

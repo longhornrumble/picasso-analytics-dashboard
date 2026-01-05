@@ -32,7 +32,7 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-3 sm:p-6 relative overflow-hidden">
       {/* Background "Vortex" - Atmospheric emerald glow */}
       <div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full pointer-events-none"
@@ -46,9 +46,9 @@ export function Login() {
       <div className="max-w-[480px] w-full relative animate-in fade-in zoom-in-95 duration-500">
         {/* Master Card - Ultra-round cornering */}
         <div
-          className="bg-white p-10 md:p-12 text-center relative"
+          className="bg-white p-6 sm:p-10 md:p-12 text-center relative"
           style={{
-            borderRadius: '3rem',
+            borderRadius: '2rem',
             boxShadow: '0 25px 80px -20px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.02)',
           }}
         >

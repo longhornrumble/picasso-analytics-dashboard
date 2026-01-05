@@ -70,13 +70,15 @@ export function Funnel({
   return (
     <div className="card-analytical">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-bold text-slate-900">{title}</h3>
-        {rate !== undefined && (
-          <span className="px-4 py-1.5 rounded-full text-sm font-semibold text-white bg-primary-500">
-            {rate}% {rateLabel}
-          </span>
-        )}
+      <div className="flex flex-col gap-3 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+          <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+          {rate !== undefined && (
+            <span className="px-4 py-1.5 rounded-full text-sm font-semibold text-white bg-primary-500 self-start sm:self-auto">
+              {rate}% {rateLabel}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Funnel bars */}
@@ -99,8 +101,8 @@ export function Funnel({
           const barGradient = gradientShades[Math.min(index, gradientShades.length - 1)];
 
           return (
-            <div key={stage.name} className="flex items-center gap-4">
-              <div className="w-24 text-sm font-medium text-slate-600 text-right">
+            <div key={stage.name} className="flex items-center gap-2 sm:gap-4">
+              <div className="w-20 sm:w-24 text-xs sm:text-sm font-medium text-slate-600 text-right">
                 {displayName}
               </div>
               <div className="flex-1 relative">
@@ -123,7 +125,7 @@ export function Funnel({
                   />
                 </div>
               </div>
-              <div className="w-16 text-right font-bold text-slate-900">
+              <div className="w-12 sm:w-16 text-right text-sm sm:text-base font-bold text-slate-900">
                 {stage.count.toLocaleString()}
               </div>
             </div>
