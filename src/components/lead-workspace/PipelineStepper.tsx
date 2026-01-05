@@ -4,8 +4,13 @@
  *
  * Phase 3: Pipeline Stepper
  * Follows Premium Emerald Design System (STYLE_GUIDE.md)
+ *
+ * Responsive Design:
+ * - Desktop: Pill buttons for quick status changes
+ * - Mobile: Dropdown select for space efficiency
  */
 
+import { useState } from 'react';
 import type { PipelineStatus } from '../../types/analytics';
 
 interface PipelineStepperProps {
@@ -24,36 +29,85 @@ interface PipelineStage {
   id: PipelineStatus;
   label: string;
   description: string;
-  icon: 'inbox' | 'eye' | 'phone' | 'archive';
+  color: 'green' | 'blue' | 'purple' | 'red' | 'amber' | 'gray';
 }
 
-/** Ordered pipeline stages */
+/** Ordered pipeline stages (excluding archived which is handled separately) */
 const PIPELINE_STAGES: PipelineStage[] = [
   {
     id: 'new',
     label: 'New',
     description: 'Awaiting review',
-    icon: 'inbox',
+    color: 'green',
   },
   {
     id: 'reviewing',
     label: 'Reviewing',
     description: 'Under evaluation',
-    icon: 'eye',
+    color: 'blue',
   },
   {
     id: 'contacted',
     label: 'Contacted',
     description: 'Outreach complete',
-    icon: 'phone',
+    color: 'purple',
   },
   {
-    id: 'archived',
-    label: 'Archived',
-    description: 'Processing complete',
-    icon: 'archive',
+    id: 'disqualified',
+    label: 'Disqualified',
+    description: 'Does not meet criteria',
+    color: 'red',
+  },
+  {
+    id: 'advancing',
+    label: 'Advancing',
+    description: 'Moving to next step',
+    color: 'amber',
   },
 ];
+
+/**
+ * Get color classes for a stage
+ */
+function getStageColors(color: PipelineStage['color'], isActive: boolean) {
+  if (isActive) {
+    switch (color) {
+      case 'green':
+        return 'bg-primary-500 text-white';
+      case 'blue':
+        return 'bg-blue-500 text-white';
+      case 'purple':
+        return 'bg-purple-500 text-white';
+      case 'red':
+        return 'bg-red-500 text-white';
+      case 'amber':
+        return 'bg-amber-500 text-white';
+      default:
+        return 'bg-gray-500 text-white';
+    }
+  }
+  return 'text-slate-400 bg-slate-100 hover:text-slate-500 hover:bg-slate-200';
+}
+
+/**
+ * Get dropdown option color for visual indicator
+ */
+function getDropdownDotColor(color: PipelineStage['color']) {
+  switch (color) {
+    case 'green':
+      return 'bg-primary-500';
+    case 'blue':
+      return 'bg-blue-500';
+    case 'purple':
+      return 'bg-purple-500';
+    case 'red':
+      return 'bg-red-500';
+    case 'amber':
+      return 'bg-amber-500';
+    default:
+      return 'bg-gray-500';
+  }
+}
 
 /**
  * Check if a stage is the current active stage
@@ -66,7 +120,6 @@ function isStageActive(stageId: PipelineStatus, currentStatus: PipelineStatus): 
  * Check if a stage can be selected (any stage except current)
  */
 function isStageSelectable(stageId: PipelineStatus, currentStatus: PipelineStatus): boolean {
-  // Can select any stage except the current one
   return stageId !== currentStatus;
 }
 
@@ -89,6 +142,8 @@ export function PipelineStepper({
   isSaving = false,
   disabled = false,
 }: PipelineStepperProps) {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
   const handleStageClick = (stageId: PipelineStatus) => {
     if (disabled || isSaving) return;
     if (!isStageSelectable(stageId, currentStatus)) return;
@@ -97,19 +152,27 @@ export function PipelineStepper({
     onStatusChange?.(stageId);
   };
 
-  // Only show first 3 stages in the main stepper (not archived)
-  const visibleStages = PIPELINE_STAGES.slice(0, 3);
+  const handleDropdownChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newStatus = e.target.value as PipelineStatus;
+    if (newStatus !== currentStatus) {
+      onStatusChange?.(newStatus);
+    }
+    setIsDropdownOpen(false);
+  };
+
+  // Find current stage for dropdown display
+  const currentStage = PIPELINE_STAGES.find(s => s.id === currentStatus) || PIPELINE_STAGES[0];
 
   return (
     <div>
       {/* Section Label */}
       <p className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-3">
-        EXECUTION PHASE
+        CONTACT PHASE
       </p>
 
-      {/* Compact Pill Buttons - modern minimal design */}
-      <div className="flex items-center gap-2">
-        {visibleStages.map((stage) => {
+      {/* Desktop: Pill Buttons (hidden on mobile) */}
+      <div className="hidden sm:flex items-center gap-2 flex-wrap">
+        {PIPELINE_STAGES.map((stage) => {
           const isActive = isStageActive(stage.id, currentStatus);
           const isSelectable = isStageSelectable(stage.id, currentStatus);
 
@@ -121,10 +184,7 @@ export function PipelineStepper({
               disabled={disabled || isSaving || (!isSelectable && !isActive)}
               className={`
                 px-4 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200
-                ${isActive
-                  ? 'bg-primary-500 text-white'
-                  : 'text-slate-400 bg-slate-100 hover:text-slate-500 hover:bg-slate-200'
-                }
+                ${getStageColors(stage.color, isActive)}
                 disabled:opacity-50 disabled:cursor-not-allowed
               `}
               aria-label={`${stage.label}: ${stage.description}`}
@@ -138,6 +198,55 @@ export function PipelineStepper({
             </button>
           );
         })}
+      </div>
+
+      {/* Mobile: Dropdown Select (hidden on desktop) */}
+      <div className="sm:hidden relative">
+        <select
+          value={currentStatus}
+          onChange={handleDropdownChange}
+          onFocus={() => setIsDropdownOpen(true)}
+          onBlur={() => setIsDropdownOpen(false)}
+          disabled={disabled || isSaving}
+          className={`
+            w-full px-4 py-2.5 text-sm font-medium rounded-lg border-2
+            appearance-none cursor-pointer
+            bg-white
+            ${isDropdownOpen ? 'border-primary-500 ring-2 ring-primary-100' : 'border-slate-200'}
+            disabled:opacity-50 disabled:cursor-not-allowed
+            focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100
+          `}
+          aria-label="Select contact phase"
+        >
+          {PIPELINE_STAGES.map((stage) => (
+            <option key={stage.id} value={stage.id}>
+              {stage.label} — {stage.description}
+            </option>
+          ))}
+        </select>
+
+        {/* Custom dropdown arrow */}
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+          {isSaving ? (
+            <LoadingSpinner />
+          ) : (
+            <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          )}
+        </div>
+
+        {/* Color indicator dot for current selection */}
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-2">
+          <span className={`w-2.5 h-2.5 rounded-full ${getDropdownDotColor(currentStage.color)}`} />
+        </div>
+
+        {/* Adjust padding for the color dot */}
+        <style>{`
+          .sm\\:hidden select {
+            padding-left: 2rem;
+          }
+        `}</style>
       </div>
 
       {/* Archived State Message */}

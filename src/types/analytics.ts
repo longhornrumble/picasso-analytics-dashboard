@@ -415,7 +415,7 @@ export interface SessionDetailResponse {
 // =============================================================================
 
 /** Pipeline status values for lead processing */
-export type PipelineStatus = 'new' | 'reviewing' | 'contacted' | 'archived';
+export type PipelineStatus = 'new' | 'reviewing' | 'contacted' | 'disqualified' | 'advancing' | 'archived';
 
 /** Submission type for badge coloring */
 export type SubmissionType = 'volunteer' | 'donor' | 'general';
