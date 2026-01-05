@@ -638,6 +638,7 @@ export function Dashboard() {
               onExport={handleExport}
               isExporting={isExporting}
               exportingFormat={exportingFormat}
+              className="w-full sm:w-auto"
             />
           }
         />

@@ -516,7 +516,7 @@ export function ConversationsDashboard() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-8 overflow-visible">
         {/* Header */}
         <PageHeader
           sectionLabel="MISSION INTELLIGENCE"
@@ -532,6 +532,7 @@ export function ConversationsDashboard() {
               onExport={handleExport}
               isExporting={isExporting}
               exportingFormat={exportingFormat}
+              className="w-full sm:w-auto"
             />
           }
         />

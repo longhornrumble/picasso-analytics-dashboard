@@ -25,6 +25,8 @@ interface ExportDropdownProps {
   options?: ExportOption[];
   /** Disabled state */
   disabled?: boolean;
+  /** Optional className for styling */
+  className?: string;
 }
 
 const defaultOptions: ExportOption[] = [
@@ -79,6 +81,7 @@ export function ExportDropdown({
   exportingFormat = null,
   options = defaultOptions,
   disabled = false,
+  className = '',
 }: ExportDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -108,27 +111,29 @@ export function ExportDropdown({
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className={`relative ${className}`} ref={dropdownRef}>
       {/* Trigger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={disabled || isExporting}
-        className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-sm bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="flex items-center justify-between gap-2 px-4 py-2 border border-slate-200 rounded-lg text-sm bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full"
       >
-        {isExporting ? (
-          <SpinnerIcon />
-        ) : (
-          <DownloadIcon />
-        )}
-        <span className="text-slate-700 font-medium">
-          {isExporting ? 'Exporting...' : 'Export Data'}
-        </span>
+        <div className="flex items-center gap-2">
+          {isExporting ? (
+            <SpinnerIcon />
+          ) : (
+            <DownloadIcon />
+          )}
+          <span className="text-slate-700 font-medium">
+            {isExporting ? 'Exporting...' : 'Export Data'}
+          </span>
+        </div>
         {!isExporting && <ChevronDownIcon />}
       </button>
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
+        <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-full sm:w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
           <div className="py-1">
             {options.map((option) => (
               <button

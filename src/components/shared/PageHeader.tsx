@@ -83,7 +83,7 @@ export function PageHeader({
   };
 
   return (
-    <header className="mb-8">
+    <header className="mb-8 overflow-visible">
       {/* Section Label and Title */}
       <div className="mb-6">
         {sectionLabel && (
@@ -102,9 +102,9 @@ export function PageHeader({
       </div>
 
       {/* Filter Row */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 overflow-visible">
         {/* Left: Time range pills */}
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100">
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 self-start">
           {timeRangeOptions.map((range) => {
             const isActive = timeRange === range.value;
             return (
@@ -126,8 +126,8 @@ export function PageHeader({
           })}
         </div>
 
-        {/* Right: Filters, Date picker, Actions */}
-        <div className="flex items-center gap-3">
+        {/* Right: Filters, Date picker, Actions - stack full width on mobile */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 overflow-visible w-full sm:w-auto">
           {/* Dashboard-specific filters slot */}
           {filters}
 
@@ -136,6 +136,7 @@ export function PageHeader({
             <DateRangePicker
               dateRange={timeRange === 'custom' ? dateRange : null}
               onDateRangeChange={handleDateRangeChange}
+              className="w-full sm:w-auto"
             />
           )}
 

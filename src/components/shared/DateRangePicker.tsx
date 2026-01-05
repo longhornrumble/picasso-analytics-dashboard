@@ -99,7 +99,7 @@ export function DateRangePicker({
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm bg-white hover:bg-slate-50 transition-colors ${
+        className={`flex items-center justify-between gap-2 px-4 py-2 border rounded-lg text-sm bg-white hover:bg-slate-50 transition-colors w-full ${
           dateRange ? 'border-primary-300 bg-primary-50' : 'border-slate-200'
         }`}
       >
@@ -114,9 +114,11 @@ export function DateRangePicker({
         </svg>
       </button>
 
-      {/* Dropdown */}
+      {/* Dropdown - full width on mobile, fixed width on desktop */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-slate-200 z-50 p-4 min-w-[340px]">
+        <div
+          className="absolute top-full mt-2 bg-white rounded-xl shadow-xl border border-slate-200 z-50 p-3 sm:p-4 box-border left-0 sm:left-auto sm:right-0 w-full sm:w-[220px]"
+        >
           {/* Presets */}
           <div className="flex flex-wrap gap-2 mb-4 pb-4 border-b border-slate-100">
             {presets.map((preset) => (
@@ -130,9 +132,9 @@ export function DateRangePicker({
             ))}
           </div>
 
-          {/* Calendar */}
-          <div className="flex gap-4 mb-4">
-            <div className="flex-1">
+          {/* Calendar - always stack vertically for compact layout */}
+          <div className="flex flex-col gap-2 mb-4">
+            <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Start Date</label>
               <DatePicker
                 selected={startDate}
@@ -142,11 +144,11 @@ export function DateRangePicker({
                 endDate={endDate}
                 maxDate={endDate || new Date()}
                 dateFormat="MMM d, yyyy"
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 placeholderText="Start date"
               />
             </div>
-            <div className="flex-1">
+            <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">End Date</label>
               <DatePicker
                 selected={endDate}
@@ -157,7 +159,7 @@ export function DateRangePicker({
                 minDate={startDate || undefined}
                 maxDate={new Date()}
                 dateFormat="MMM d, yyyy"
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 placeholderText="End date"
               />
             </div>
