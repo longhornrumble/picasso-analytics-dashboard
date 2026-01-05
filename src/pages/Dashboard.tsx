@@ -151,6 +151,36 @@ function shouldUseMockData(tenantId: string | undefined): boolean {
 }
 
 // Column definitions for submissions table (function to allow filter callback)
+/**
+ * Get status badge color classes for pipeline status
+ */
+function getStatusBadgeClasses(status: string | undefined): string {
+  switch (status) {
+    case 'new':
+      return 'bg-emerald-100 text-emerald-700';
+    case 'reviewing':
+      return 'bg-blue-100 text-blue-700';
+    case 'contacted':
+      return 'bg-purple-100 text-purple-700';
+    case 'disqualified':
+      return 'bg-red-100 text-red-700';
+    case 'advancing':
+      return 'bg-amber-100 text-amber-700';
+    case 'archived':
+      return 'bg-gray-100 text-gray-500';
+    default:
+      return 'bg-gray-100 text-gray-500';
+  }
+}
+
+/**
+ * Format status label for display
+ */
+function formatStatusLabel(status: string | undefined): string {
+  if (!status) return '—';
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
 const getSubmissionColumns = (onTypeClick?: (formType: string) => void): Column<FormSubmission>[] => [
   {
     key: 'date',
@@ -196,6 +226,17 @@ const getSubmissionColumns = (onTypeClick?: (formType: string) => void): Column<
     ),
     sortable: true,
     sortKey: 'formType',
+  },
+  {
+    key: 'status',
+    header: 'Status',
+    render: (row) => (
+      <span className={`inline-block px-2 py-1 rounded-md text-xs font-medium ${getStatusBadgeClasses(row.pipeline_status)}`}>
+        {formatStatusLabel(row.pipeline_status)}
+      </span>
+    ),
+    sortable: true,
+    sortKey: 'pipeline_status',
   },
   {
     key: 'comments',

@@ -7,10 +7,10 @@
  *
  * Responsive Design:
  * - Desktop: Pill buttons for quick status changes
- * - Mobile: Dropdown select for space efficiency
+ * - Mobile: Custom dropdown for space efficiency (avoids native select positioning issues)
  */
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { PipelineStatus } from '../../types/analytics';
 
 interface PipelineStepperProps {
@@ -67,7 +67,7 @@ const PIPELINE_STAGES: PipelineStage[] = [
 ];
 
 /**
- * Get color classes for a stage
+ * Get color classes for a stage button
  */
 function getStageColors(color: PipelineStage['color'], isActive: boolean) {
   if (isActive) {
@@ -90,9 +90,9 @@ function getStageColors(color: PipelineStage['color'], isActive: boolean) {
 }
 
 /**
- * Get dropdown option color for visual indicator
+ * Get color dot class for dropdown items
  */
-function getDropdownDotColor(color: PipelineStage['color']) {
+function getDotColor(color: PipelineStage['color']) {
   switch (color) {
     case 'green':
       return 'bg-primary-500';
@@ -126,9 +126,9 @@ function isStageSelectable(stageId: PipelineStatus, currentStatus: PipelineStatu
 /**
  * Loading spinner for saving state
  */
-function LoadingSpinner() {
+function LoadingSpinner({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+    <svg className={`animate-spin ${className}`} fill="none" viewBox="0 0 24 24">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path className="opacity-75" fill="currentColor"
         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -143,25 +143,46 @@ export function PipelineStepper({
   disabled = false,
 }: PipelineStepperProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Find current stage
+  const currentStage = PIPELINE_STAGES.find(s => s.id === currentStatus) || PIPELINE_STAGES[0];
 
   const handleStageClick = (stageId: PipelineStatus) => {
     if (disabled || isSaving) return;
     if (!isStageSelectable(stageId, currentStatus)) return;
-    if (stageId === currentStatus) return;
 
     onStatusChange?.(stageId);
-  };
-
-  const handleDropdownChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newStatus = e.target.value as PipelineStatus;
-    if (newStatus !== currentStatus) {
-      onStatusChange?.(newStatus);
-    }
     setIsDropdownOpen(false);
   };
 
-  // Find current stage for dropdown display
-  const currentStage = PIPELINE_STAGES.find(s => s.id === currentStatus) || PIPELINE_STAGES[0];
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isDropdownOpen]);
+
+  // Close dropdown on escape
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isDropdownOpen]);
 
   return (
     <div>
@@ -200,53 +221,84 @@ export function PipelineStepper({
         })}
       </div>
 
-      {/* Mobile: Dropdown Select (hidden on desktop) */}
-      <div className="sm:hidden relative">
-        <select
-          value={currentStatus}
-          onChange={handleDropdownChange}
-          onFocus={() => setIsDropdownOpen(true)}
-          onBlur={() => setIsDropdownOpen(false)}
+      {/* Mobile: Custom Dropdown (hidden on desktop) */}
+      <div className="sm:hidden relative" ref={dropdownRef}>
+        {/* Dropdown Trigger Button */}
+        <button
+          type="button"
+          onClick={() => !disabled && !isSaving && setIsDropdownOpen(!isDropdownOpen)}
           disabled={disabled || isSaving}
           className={`
-            w-full px-4 py-2.5 text-sm font-medium rounded-lg border-2
-            appearance-none cursor-pointer
-            bg-white
+            w-full flex items-center justify-between px-4 py-2.5
+            text-sm font-medium rounded-lg border-2 bg-white
             ${isDropdownOpen ? 'border-primary-500 ring-2 ring-primary-100' : 'border-slate-200'}
             disabled:opacity-50 disabled:cursor-not-allowed
-            focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100
+            transition-all duration-200
           `}
-          aria-label="Select contact phase"
+          aria-expanded={isDropdownOpen}
+          aria-haspopup="listbox"
         >
-          {PIPELINE_STAGES.map((stage) => (
-            <option key={stage.id} value={stage.id}>
-              {stage.label} — {stage.description}
-            </option>
-          ))}
-        </select>
-
-        {/* Custom dropdown arrow */}
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+          <span className="flex items-center gap-2">
+            <span className={`w-2.5 h-2.5 rounded-full ${getDotColor(currentStage.color)}`} />
+            <span>{currentStage.label} — {currentStage.description}</span>
+          </span>
           {isSaving ? (
-            <LoadingSpinner />
+            <LoadingSpinner className="w-5 h-5 text-slate-400" />
           ) : (
-            <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className={`w-5 h-5 text-slate-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           )}
-        </div>
+        </button>
 
-        {/* Color indicator dot for current selection */}
-        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-2">
-          <span className={`w-2.5 h-2.5 rounded-full ${getDropdownDotColor(currentStage.color)}`} />
-        </div>
+        {/* Dropdown Menu */}
+        {isDropdownOpen && (
+          <div
+            className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden"
+            role="listbox"
+            aria-label="Select contact phase"
+          >
+            {PIPELINE_STAGES.map((stage) => {
+              const isActive = stage.id === currentStatus;
 
-        {/* Adjust padding for the color dot */}
-        <style>{`
-          .sm\\:hidden select {
-            padding-left: 2rem;
-          }
-        `}</style>
+              return (
+                <button
+                  key={stage.id}
+                  type="button"
+                  onClick={() => handleStageClick(stage.id)}
+                  disabled={isActive}
+                  className={`
+                    w-full flex items-center gap-3 px-4 py-3 text-left text-sm
+                    transition-colors duration-150
+                    ${isActive
+                      ? 'bg-primary-50 text-primary-700 font-medium'
+                      : 'hover:bg-slate-50 text-slate-700'
+                    }
+                    disabled:cursor-default
+                  `}
+                  role="option"
+                  aria-selected={isActive}
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${getDotColor(stage.color)}`} />
+                  <span className="flex-1">
+                    <span className="font-medium">{stage.label}</span>
+                    <span className="text-slate-400"> — {stage.description}</span>
+                  </span>
+                  {isActive && (
+                    <svg className="w-4 h-4 text-primary-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Archived State Message */}
