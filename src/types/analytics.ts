@@ -363,6 +363,8 @@ export interface SessionSummary {
   bot_message_count: number;
   first_question: string | null;
   form_id?: string;
+  /** Event count (computed from events table) */
+  event_count?: number;
 }
 
 /** Pagination info for sessions list */
