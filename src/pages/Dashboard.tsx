@@ -33,6 +33,7 @@ import {
   fetchSubmissions,
   fetchTopPerformers,
   exportFormSubmissionsData,
+  getTenantOverride,
 } from '../services/analyticsApi';
 import type {
   FormSummaryMetrics,
@@ -256,10 +257,12 @@ export function Dashboard({ initialSearchQuery, onSearchApplied }: DashboardProp
   const { user } = useAuth();
 
   // Mock data is ONLY enabled for demo tenant MYR384719
-  const useMockData = shouldUseMockData(user?.tenant_id);
+  // Use effective tenant (override if set, else user's tenant)
+  const effectiveTenantId = getTenantOverride() || user?.tenant_id;
+  const useMockData = shouldUseMockData(effectiveTenantId);
 
   // State
-  const [timeRange, setTimeRange] = useState<TimeRangeValue>('7d');
+  const [timeRange, setTimeRange] = useState<TimeRangeValue>('30d');
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [selectedForm, setSelectedForm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -928,13 +931,21 @@ export function Dashboard({ initialSearchQuery, onSearchApplied }: DashboardProp
                   comments: s.fields?.comments || s.fields?.message || '',
                   date: s.submitted_date,
                   session_id: s.session_id,
+                  // Default to 'new' for API data, can be overridden by mockStatusOverrides
+                  pipeline_status: 'new' as PipelineStatus,
                 }));
+
+            // Apply status overrides (from Lead Workspace changes) to the data
+            // This ensures the Status column shows the correct value
+            const dataWithOverrides = transformedData.map(row => ({
+              ...row,
+              pipeline_status: mockStatusOverrides[row.id] ?? row.pipeline_status,
+            }));
 
             // Apply archive filter (per PRD: Emerald Lead Reactivation Engine)
             // Archive Vault shows only archived leads; Form Submissions shows non-archived
-            // Apply status overrides for mock data (from archive/reactivate actions)
-            let filteredData = transformedData.filter(row => {
-              const effectiveStatus = mockStatusOverrides[row.id] ?? row.pipeline_status;
+            let filteredData = dataWithOverrides.filter(row => {
+              const effectiveStatus = row.pipeline_status;
               if (isArchiveView) {
                 return effectiveStatus === 'archived';
               } else {
