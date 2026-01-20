@@ -26,6 +26,7 @@ import {
   fetchRecentConversations,
   fetchConversationTrend,
   exportConversationsData,
+  getTenantOverride,
 } from '../services/analyticsApi';
 import type {
   ConversationSummaryMetrics,
@@ -287,7 +288,9 @@ export function ConversationsDashboard({ onViewFormSubmission }: ConversationsDa
   const { user } = useAuth();
 
   // Mock data is ONLY enabled for demo tenant MYR384719
-  const useMockData = shouldUseMockData(user?.tenant_id);
+  // Use effective tenant (override if set, else user's tenant)
+  const effectiveTenantId = getTenantOverride() || user?.tenant_id;
+  const useMockData = shouldUseMockData(effectiveTenantId);
 
   // State
   const [timeRange, setTimeRange] = useState<TimeRangeValue>('30d');

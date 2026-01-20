@@ -23,6 +23,7 @@ import type {
   SessionDetailResponse,
   SessionOutcome,
   FeaturesResponse,
+  TenantOption,
   // Lead Workspace types
   PipelineStatus,
   LeadDetailResponse,
@@ -36,11 +37,49 @@ import type {
 const API_BASE_URL = import.meta.env.VITE_ANALYTICS_API_URL ||
   'https://uniywvlgstv2ymc46uyqs3z3du0vucst.lambda-url.us-east-1.on.aws';
 
+// Tenant override for super admin tenant switching
+let _tenantOverride: string | null = null;
+
+/**
+ * Set tenant override for super admin viewing other tenants
+ * Pass null to clear and use JWT tenant
+ */
+export function setTenantOverride(tenantId: string | null): void {
+  _tenantOverride = tenantId;
+}
+
+/**
+ * Get current tenant override
+ */
+export function getTenantOverride(): string | null {
+  return _tenantOverride;
+}
+
 /**
  * Get auth token from storage
  */
 function getAuthToken(): string | null {
   return localStorage.getItem('analytics_token');
+}
+
+/**
+ * Build headers for API requests, including tenant override if set
+ */
+function buildHeaders(): Record<string, string> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  if (_tenantOverride) {
+    headers['X-Tenant-Override'] = _tenantOverride;
+  }
+
+  return headers;
 }
 
 /**
@@ -61,10 +100,7 @@ async function apiRequest<T>(
 
   const response = await fetch(url, {
     method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: buildHeaders(),
   });
 
   if (!response.ok) {
@@ -92,10 +128,7 @@ async function apiPatch<T>(
 
   const response = await fetch(url, {
     method: 'PATCH',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: buildHeaders(),
     body: JSON.stringify(body),
   });
 
@@ -609,6 +642,15 @@ export async function exportConversationsSummaryData(range: TimeRange = '30d'): 
  */
 export async function fetchFeatures(): Promise<FeaturesResponse> {
   return apiRequest<FeaturesResponse>('/features');
+}
+
+/**
+ * Fetch list of tenants for super_admin tenant switching
+ * Only returns data for users with super_admin role
+ */
+export async function fetchTenantList(): Promise<TenantOption[]> {
+  const response = await apiRequest<{ tenants: TenantOption[] }>('/admin/tenants');
+  return response.tenants;
 }
 
 // =============================================================================

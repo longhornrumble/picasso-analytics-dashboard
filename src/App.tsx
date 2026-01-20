@@ -3,13 +3,14 @@
  * Premium Emerald Design System
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Dashboard } from './pages/Dashboard';
 import { ConversationsDashboard } from './pages/ConversationsDashboard';
 import { Login } from './pages/Login';
 import { PremiumLock } from './components/PremiumLock';
-import type { DashboardFeatures } from './types/analytics';
+import { fetchTenantList, setTenantOverride } from './services/analyticsApi';
+import type { DashboardFeatures, User, TenantOption } from './types/analytics';
 
 type DashboardTab = 'conversations' | 'forms' | 'attribution';
 
@@ -48,14 +49,30 @@ function NavigationBar({
   onLockedTabClick,
   features = DEFAULT_FEATURES,
   onSignOut,
+  user,
+  tenantList = [],
+  selectedTenantId,
+  onTenantChange,
 }: {
   activeTab: DashboardTab;
   onTabChange: (tab: DashboardTab) => void;
   onLockedTabClick: (tab: DashboardTab) => void;
   features?: DashboardFeatures;
   onSignOut: () => void;
+  user: User | null;
+  tenantList?: TenantOption[];
+  selectedTenantId?: string;
+  onTenantChange?: (tenantId: string) => void;
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [tenantDropdownOpen, setTenantDropdownOpen] = useState(false);
+
+  // Check if user is super admin
+  const isSuperAdmin = user?.role === 'super_admin';
+
+  // Get current tenant name for display
+  const currentTenant = tenantList.find(t => t.tenant_id === (selectedTenantId || user?.tenant_id));
+  const currentTenantName = currentTenant?.name || selectedTenantId || user?.tenant_id || 'Select Tenant';
 
   const tabs: { id: DashboardTab; label: string; icon: React.ReactNode; locked: boolean }[] = [
     {
@@ -148,8 +165,90 @@ function NavigationBar({
             })}
           </nav>
 
-          {/* Right side - Desktop Sign Out + Mobile Menu Button */}
-          <div className="flex items-center gap-2">
+          {/* Right side - User Info + Sign Out + Mobile Menu Button */}
+          <div className="flex items-center gap-3">
+            {/* Desktop User Info - hidden on mobile */}
+            {user && (
+              <div className="hidden md:flex items-center gap-3">
+                {/* User Avatar */}
+                <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
+                  <span className="text-sm font-semibold text-primary-700">
+                    {user.name ? user.name.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase() || '?'}
+                  </span>
+                </div>
+                {/* User Name & Company */}
+                <div className="text-right">
+                  <div className="text-sm font-medium text-slate-700">
+                    {user.name || user.email || 'User'}
+                  </div>
+                  {user.company && (
+                    <div className="text-xs text-slate-500">
+                      {user.company}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Super Admin Tenant Selector - Desktop only */}
+            {isSuperAdmin && tenantList.length > 0 && (
+              <div className="hidden md:block relative">
+                <button
+                  onClick={() => setTenantDropdownOpen(!tenantDropdownOpen)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  <span className="max-w-32 truncate">{currentTenantName}</span>
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform ${tenantDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {tenantDropdownOpen && (
+                  <>
+                    {/* Backdrop */}
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setTenantDropdownOpen(false)}
+                    />
+                    {/* Dropdown */}
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-slate-200 z-50 py-2 max-h-80 overflow-y-auto">
+                      <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Switch Tenant
+                      </div>
+                      {tenantList.map((tenant) => (
+                        <button
+                          key={tenant.tenant_id}
+                          onClick={() => {
+                            onTenantChange?.(tenant.tenant_id);
+                            setTenantDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center justify-between ${
+                            (selectedTenantId || user?.tenant_id) === tenant.tenant_id
+                              ? 'text-primary-600 bg-primary-50'
+                              : 'text-slate-700'
+                          }`}
+                        >
+                          <div>
+                            <div className="font-medium">{tenant.name}</div>
+                            <div className="text-xs text-slate-400">{tenant.tenant_id}</div>
+                          </div>
+                          {(selectedTenantId || user?.tenant_id) === tenant.tenant_id && (
+                            <svg className="w-4 h-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Desktop Sign Out - hidden on mobile */}
             <button
               onClick={onSignOut}
@@ -234,8 +333,52 @@ function NavigationBar({
             );
           })}
 
-          {/* Mobile Sign Out */}
-          <div className="pt-4 mt-2 border-t border-slate-100">
+          {/* Mobile User Info + Tenant Selector + Sign Out */}
+          <div className="pt-4 mt-2 border-t border-slate-100 space-y-3">
+            {/* Mobile User Info */}
+            {user && (
+              <div className="flex items-center gap-3 px-4 py-2">
+                <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
+                  <span className="text-base font-semibold text-primary-700">
+                    {user.name ? user.name.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase() || '?'}
+                  </span>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-slate-700">
+                    {user.name || user.email || 'User'}
+                  </div>
+                  {user.company && (
+                    <div className="text-xs text-slate-500">
+                      {user.company}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Mobile Tenant Selector - Super Admin only */}
+            {isSuperAdmin && tenantList.length > 0 && (
+              <div className="px-4">
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  Switch Tenant
+                </label>
+                <select
+                  value={selectedTenantId || user?.tenant_id || ''}
+                  onChange={(e) => {
+                    onTenantChange?.(e.target.value);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full px-3 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border-0 focus:ring-2 focus:ring-primary-500"
+                >
+                  {tenantList.map((tenant) => (
+                    <option key={tenant.tenant_id} value={tenant.tenant_id}>
+                      {tenant.name} ({tenant.tenant_id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
@@ -265,6 +408,38 @@ function AppContent() {
 
   // Cross-tab navigation: search query to pass to Forms dashboard
   const [formsSearchQuery, setFormsSearchQuery] = useState<string | null>(null);
+
+  // Super admin tenant switching
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+  const [tenantList, setTenantList] = useState<TenantOption[]>([]);
+  const isSuperAdmin = user?.role === 'super_admin';
+
+  // Fetch tenant list for super_admin users
+  useEffect(() => {
+    if (isSuperAdmin && isAuthenticated) {
+      fetchTenantList()
+        .then(setTenantList)
+        .catch((err) => console.warn('Failed to fetch tenant list:', err));
+    }
+  }, [isSuperAdmin, isAuthenticated]);
+
+  // Handle tenant change - sets API override and triggers refetch via key change
+  const handleTenantChange = (tenantId: string) => {
+    // Find the tenant to get its ID for the API override
+    const isOwnTenant = tenantId === user?.tenant_id;
+
+    if (isOwnTenant) {
+      // Switching back to own tenant - clear override
+      setTenantOverride(null);
+      setSelectedTenantId(null);
+    } else {
+      // Switching to different tenant - set override
+      setTenantOverride(tenantId);
+      setSelectedTenantId(tenantId);
+    }
+
+    console.log('[Super Admin] Switched to tenant:', tenantId, isOwnTenant ? '(own)' : '(override)');
+  };
 
   const features = user?.features || DEFAULT_FEATURES;
 
@@ -362,8 +537,15 @@ function AppContent() {
         onLockedTabClick={handleLockedTabClick}
         features={features}
         onSignOut={logout}
+        user={user}
+        tenantList={tenantList}
+        selectedTenantId={selectedTenantId || undefined}
+        onTenantChange={handleTenantChange}
       />
-      <main className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <main
+        key={selectedTenantId || 'default'}
+        className="animate-in fade-in slide-in-from-bottom-4 duration-500"
+      >
         {renderDashboardContent()}
       </main>
     </div>

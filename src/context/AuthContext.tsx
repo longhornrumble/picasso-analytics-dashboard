@@ -4,7 +4,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { AuthState, User, DashboardFeatures } from '../types/analytics';
+import type { AuthState, User, DashboardFeatures, UserRole } from '../types/analytics';
 import { fetchFeatures } from '../services/analyticsApi';
 
 interface AuthContextType extends AuthState {
@@ -72,11 +72,21 @@ function extractUserFromToken(token: string): User | null {
   const payload = decodeJwtPayload(token);
   if (!payload) return null;
 
+  // Validate and normalize role if present
+  const rawRole = payload.role as string | undefined;
+  const normalizedRole = rawRole?.toLowerCase().replace(/\s+/g, '_'); // "Super Admin" -> "super_admin"
+  const validRoles: UserRole[] = ['super_admin', 'admin', 'viewer'];
+  const validatedRole = normalizedRole && validRoles.includes(normalizedRole as UserRole)
+    ? (normalizedRole as UserRole)
+    : undefined;
+
   return {
     tenant_id: (payload.tenant_id as string) || (payload.sub as string) || '',
     tenant_hash: (payload.tenant_hash as string) || '',
     email: payload.email as string | undefined,
     name: payload.name as string | undefined,
+    role: validatedRole,
+    company: payload.company as string | undefined,
     features: extractDashboardFeatures(payload),
   };
 }

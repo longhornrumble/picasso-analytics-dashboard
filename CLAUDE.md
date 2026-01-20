@@ -325,6 +325,23 @@ aws cloudfront create-invalidation --distribution-id EJ0Y6ZUIUBSAT --paths "/*"
 **Infrastructure:**
 - **S3 Bucket**: `app-myrecruiter-ai`
 - **CloudFront Distribution**: `EJ0Y6ZUIUBSAT`
+- **S3 Versioning**: Enabled (30-day retention)
+
+### Rollback to Previous Version
+
+S3 versioning is enabled, allowing rollback to any deployment within the last 30 days:
+
+```bash
+# List versions of the main JS bundle
+aws s3api list-object-versions --bucket app-myrecruiter-ai --prefix assets/index --profile chris-admin
+
+# Restore a specific version (replace VERSION_ID)
+aws s3api copy-object --bucket app-myrecruiter-ai --key assets/index-XXX.js \
+  --copy-source "app-myrecruiter-ai/assets/index-XXX.js?versionId=VERSION_ID" --profile chris-admin
+
+# Invalidate CloudFront after rollback
+aws cloudfront create-invalidation --distribution-id EJ0Y6ZUIUBSAT --paths "/*" --profile chris-admin
+```
 - **Domain**: `d3r39xkfb0snuq.cloudfront.net`
 
 ## Known Issues & Fixes

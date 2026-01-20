@@ -197,12 +197,17 @@ export interface FeaturesResponse {
   features: DashboardFeatures;
 }
 
+// User roles for access control
+export type UserRole = 'super_admin' | 'admin' | 'viewer';
+
 // Auth types
 export interface User {
   tenant_id: string;
   tenant_hash: string;
   email?: string;
   name?: string;
+  role?: UserRole;
+  company?: string;
   features?: DashboardFeatures;
 }
 
@@ -212,6 +217,13 @@ export interface AuthState {
   token: string | null;
   loading: boolean;
   error: string | null;
+}
+
+// Tenant option for super admin tenant switching
+export interface TenantOption {
+  tenant_id: string;
+  tenant_hash: string;
+  name: string;
 }
 
 // Filter state
