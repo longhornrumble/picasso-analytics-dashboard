@@ -7,7 +7,7 @@
  */
 
 interface PremiumLockProps {
-  feature: 'forms' | 'conversations' | 'attribution';
+  feature: 'forms' | 'conversations' | 'attribution' | 'notifications';
   onReturn: () => void;
 }
 
@@ -40,6 +40,16 @@ const featureInfo: Record<string, { title: string; description: string; benefits
       'Campaign ROI & effectiveness',
       'Path-to-purchase path mapping',
       'Optimized media spend allocation',
+    ],
+  },
+  notifications: {
+    title: 'Notification Analytics',
+    description: 'Track every email notification sent to your team and applicants with full delivery visibility.',
+    benefits: [
+      'Real-time delivery tracking',
+      'Open and click monitoring',
+      'Bounce detection and alerts',
+      'Per-form recipient management',
     ],
   },
 };

@@ -62,6 +62,8 @@ function extractDashboardFeatures(payload: Record<string, unknown>): DashboardFe
     dashboard_conversations: features.dashboard_conversations !== false, // default true (FREE tier)
     dashboard_forms: features.dashboard_forms === true,                  // default false (PREMIUM only)
     dashboard_attribution: features.dashboard_attribution === true,      // default false (PREMIUM only)
+    dashboard_notifications: features.dashboard_notifications === true,  // default false (feature-flagged)
+    dashboard_settings: features.dashboard_settings === true,            // default false (Phase 3)
   };
 }
 

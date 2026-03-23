@@ -31,6 +31,9 @@ import type {
   NotesUpdateResponse,
   LeadQueueResponse,
   ReactivateLeadResponse,
+  // Notifications types
+  NotificationSummary,
+  NotificationEvent,
 } from '../types/analytics';
 
 // API endpoint - configurable via environment variable
@@ -762,4 +765,60 @@ export async function fetchLeadQueue(
   }
 
   return apiRequest<LeadQueueResponse>('/leads/queue', params);
+}
+
+// =============================================================================
+// Notifications API Functions
+// =============================================================================
+
+/**
+ * Fetch notification summary metrics for the given time range
+ * Returns aggregated delivery stats: sent, delivered, bounced, opened, etc.
+ *
+ * @param range - Time range filter (1d, 7d, 30d, 90d)
+ */
+export async function fetchNotificationSummary(
+  range: string = '7d'
+): Promise<NotificationSummary> {
+  return apiRequest<NotificationSummary>('/notifications/summary', { range });
+}
+
+/**
+ * Fetch paginated notification events with optional filters
+ *
+ * @param params.range   - Time range (default '7d')
+ * @param params.page    - Page number (default 1)
+ * @param params.limit   - Items per page (default 25)
+ * @param params.channel - Filter by channel (email, sms)
+ * @param params.status  - Filter by event type / status
+ * @param params.search  - Search by recipient address
+ */
+export async function fetchNotificationEvents(params: {
+  range?: string;
+  page?: number;
+  limit?: number;
+  channel?: string;
+  status?: string;
+  search?: string;
+}): Promise<{ events: NotificationEvent[]; total: number; page: number; has_more: boolean }> {
+  const queryParams: Record<string, string> = {
+    range: params.range ?? '7d',
+    page: String(params.page ?? 1),
+    limit: String(params.limit ?? 25),
+  };
+
+  if (params.channel) {
+    queryParams.channel = params.channel;
+  }
+  if (params.status) {
+    queryParams.status = params.status;
+  }
+  if (params.search) {
+    queryParams.search = params.search;
+  }
+
+  return apiRequest<{ events: NotificationEvent[]; total: number; page: number; has_more: boolean }>(
+    '/notifications/events',
+    queryParams
+  );
 }

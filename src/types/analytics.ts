@@ -189,7 +189,40 @@ export interface DashboardFeatures {
   dashboard_conversations: boolean;
   dashboard_forms: boolean;
   dashboard_attribution: boolean;
+  dashboard_notifications: boolean;
+  dashboard_settings: boolean;  // Phase 3 placeholder
 }
+
+// =============================================================================
+// Notifications API Response Types
+// =============================================================================
+
+export interface NotificationSummary {
+  sent: number;
+  delivered: number;
+  bounced: number;
+  complained: number;
+  opened: number;
+  clicked: number;
+  failed: number;
+  delivery_rate: number;
+  open_rate: number;
+  bounce_rate: number;
+  period: string;
+}
+
+export interface NotificationEvent {
+  timestamp: string;
+  event_type: 'send' | 'delivery' | 'bounce' | 'complaint' | 'open' | 'click';
+  channel: string;
+  recipient: string;
+  form_id: string;
+  status: string;
+  message_id: string;
+  detail?: Record<string, unknown>;
+}
+
+export type NotificationSubTab = 'dashboard' | 'recipients' | 'templates';
 
 // Features API response
 export interface FeaturesResponse {
