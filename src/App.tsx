@@ -3,15 +3,20 @@
  * Premium Emerald Design System
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Show, SignIn, UserButton, useAuth as useClerkAuth } from '@clerk/react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Dashboard } from './pages/Dashboard';
 import { ConversationsDashboard } from './pages/ConversationsDashboard';
 import { NotificationsDashboard } from './pages/NotificationsDashboard';
-import { Login } from './pages/Login';
 import { PremiumLock } from './components/PremiumLock';
 import { fetchTenantList, setTenantOverride } from './services/analyticsApi';
 import type { DashboardFeatures, User, TenantOption } from './types/analytics';
+
+// Reuse the same base URL as analyticsApi.ts — avoids duplicating the default.
+const AUTH_API_BASE_URL =
+  import.meta.env.VITE_ANALYTICS_API_URL ||
+  'https://uniywvlgstv2ymc46uyqs3z3du0vucst.lambda-url.us-east-1.on.aws';
 
 type DashboardTab = 'conversations' | 'forms' | 'attribution' | 'notifications';
 
@@ -262,14 +267,21 @@ function NavigationBar({
               </div>
             )}
 
-            {/* Desktop Sign Out - hidden on mobile */}
-            <button
-              onClick={onSignOut}
-              className="hidden md:block px-4 py-2 text-xs font-semibold text-white rounded-lg transition-all duration-200 hover:opacity-90"
-              style={{ backgroundColor: '#1e293b' }}
-            >
-              SIGN OUT
-            </button>
+            {/* Desktop Sign Out — Clerk UserButton with fallback */}
+            <div className="hidden md:block">
+              <Show when="signed-in">
+                <UserButton />
+              </Show>
+              <Show when="signed-out">
+                <button
+                  onClick={onSignOut}
+                  className="px-4 py-2 text-xs font-semibold text-white rounded-lg transition-all duration-200 hover:opacity-90"
+                  style={{ backgroundColor: '#1e293b' }}
+                >
+                  SIGN OUT
+                </button>
+              </Show>
+            </div>
 
             {/* Mobile Menu Button - visible on mobile only */}
             <button
@@ -411,13 +423,66 @@ function NavigationBar({
   );
 }
 
-// Check if Bubble SSO is configured
-const BUBBLE_AUTH_URL = import.meta.env.VITE_BUBBLE_AUTH_URL || '';
+// Bubble SSO URL removed — replaced by Clerk auth
 
 function AppContent() {
-  const { isAuthenticated, loading, user, logout } = useAuth();
+  const { isAuthenticated, loading, user, logout, login } = useAuth();
+  const { isSignedIn, getToken: getClerkToken } = useClerkAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('conversations');
   const [lockedTab, setLockedTab] = useState<DashboardTab | null>(null);
+
+  // Track whether the bridge is in-flight to prevent duplicate calls.
+  const bridgingRef = useRef(false);
+  // Track bridge error for display.
+  const [bridgeError, setBridgeError] = useState<string | null>(null);
+
+  /**
+   * Clerk-to-internal-JWT bridge.
+   * Fires when Clerk is signed in but we don't yet have an internal Picasso JWT.
+   * POSTs the Clerk session token to /auth/clerk and calls login() with the result.
+   */
+  useEffect(() => {
+    if (!isSignedIn || isAuthenticated || bridgingRef.current) return;
+
+    bridgingRef.current = true;
+    setBridgeError(null);
+
+    (async () => {
+      try {
+        const clerkToken = await getClerkToken();
+        if (!clerkToken) throw new Error('Could not obtain Clerk session token');
+
+        const resp = await fetch(`${AUTH_API_BASE_URL}/auth/clerk`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clerk_token: clerkToken }),
+        });
+
+        const data = await resp.json();
+
+        if (!resp.ok) {
+          throw new Error(data.error || `Auth bridge returned ${resp.status}`);
+        }
+
+        if (!data.token) throw new Error('Backend did not return a token');
+
+        login(data.token);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown auth error';
+        console.error('[clerk-bridge] Auth bridge failed:', message);
+        setBridgeError(message);
+        bridgingRef.current = false; // allow retry on next render
+      }
+    })();
+  }, [isSignedIn, isAuthenticated, getClerkToken, login]);
+
+  // When Clerk signs out, clear the internal JWT too
+  useEffect(() => {
+    if (!isSignedIn && isAuthenticated) {
+      logout();
+      bridgingRef.current = false;
+    }
+  }, [isSignedIn, isAuthenticated, logout]);
 
   // Cross-tab navigation: search query to pass to Forms dashboard
   const [formsSearchQuery, setFormsSearchQuery] = useState<string | null>(null);
@@ -456,25 +521,150 @@ function AppContent() {
 
   const features = user?.features || DEFAULT_FEATURES;
 
-  // Show loading state while checking auth OR while redirecting to Bubble
-  if (loading || (!isAuthenticated && BUBBLE_AUTH_URL)) {
+  // Show loading state
+  if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <div
             className="w-12 h-12 rounded-full animate-spin mx-auto mb-4 border-4 border-primary-200 border-t-primary-500"
           />
-          <p className="text-slate-500 font-medium">
-            {loading ? 'Loading...' : 'Redirecting to login...'}
-          </p>
+          <p className="text-slate-500 font-medium">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // Show login only if not authenticated AND no Bubble URL (dev mode)
+  // Clerk login gate — show sign-in when Clerk session is absent.
+  // When Clerk is signed in but internal JWT is not yet established, the
+  // bridge useEffect above is running; show a spinner instead of <Login />.
   if (!isAuthenticated) {
-    return <Login />;
+    return (
+      <>
+        {/* Clerk signed-out: show sign-in CTA */}
+        <Show when="signed-out">
+          <div className="min-h-screen flex">
+            {/* Left panel — hero image + copy (hidden on mobile) */}
+            <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-600 to-primary-800 relative overflow-hidden">
+              {/* Decorative circles */}
+              <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-primary-500/20" />
+              <div className="absolute -bottom-32 -right-32 w-[500px] h-[500px] rounded-full bg-primary-400/10" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full bg-primary-500/10" />
+
+              {/* Content */}
+              <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16 text-white max-w-lg mx-auto">
+                <img
+                  src="/myrecruiter-logo.png"
+                  alt="MyRecruiter"
+                  className="h-14 w-auto mb-8 brightness-0 invert"
+                />
+                <h1 className="text-3xl xl:text-4xl font-bold leading-tight mb-4">
+                  Mission Intelligence Portal
+                </h1>
+                <p className="text-primary-100 text-lg leading-relaxed mb-8">
+                  Real-time analytics, notification delivery tracking, and self-service tools for your nonprofit — all in one place.
+                </p>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <span className="text-sm text-primary-50">Conversation and form analytics</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <span className="text-sm text-primary-50">Email delivery tracking and notifications</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <span className="text-sm text-primary-50">Recipient and template management</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right panel — auth (always visible) */}
+            <div className="w-full lg:w-1/2 bg-gradient-to-br from-slate-50 via-white to-primary-50/30 flex items-center justify-center px-4 py-12">
+              <div className="w-full max-w-sm space-y-6">
+                {/* Mobile-only logo + heading (hidden on desktop where left panel shows it) */}
+                <div className="lg:hidden text-center space-y-2">
+                  <div className="flex justify-center">
+                    <img
+                      src="/myrecruiter-logo.png"
+                      alt="MyRecruiter"
+                      className="h-12 w-auto"
+                    />
+                  </div>
+                  <h1 className="text-xl font-bold text-slate-800">Mission Intelligence Portal</h1>
+                </div>
+
+                {/* Embedded Clerk sign-in */}
+                <div className="flex justify-center">
+                  <SignIn
+                    routing="hash"
+                    appearance={{
+                      elements: {
+                        rootBox: 'w-full',
+                        card: 'shadow-xl border border-slate-100 w-full',
+                        footer: 'hidden',
+                      },
+                    }}
+                  />
+                </div>
+
+                {/* Get started link */}
+                <div className="text-center">
+                  <a
+                    href="https://www.myrecruiter.ai/#pricing"
+                    className="text-sm text-slate-500 hover:text-primary-600 transition-colors"
+                  >
+                    Don't have an account? <span className="font-semibold text-primary-500">Get started</span>
+                  </a>
+                </div>
+
+                {/* Footer */}
+                <p className="text-center text-xs text-slate-400">
+                  Powered by MyRecruiter AI
+                </p>
+              </div>
+            </div>
+          </div>
+        </Show>
+
+        {/* Clerk signed-in but internal JWT not yet issued: show bridge spinner or error */}
+        <Show when="signed-in">
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+            <div className="text-center space-y-4">
+              {bridgeError ? (
+                <>
+                  <p className="text-red-500 font-medium text-sm max-w-xs">
+                    Sign-in failed: {bridgeError}
+                  </p>
+                  <p className="text-slate-400 text-xs">
+                    Contact support if this persists.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="w-10 h-10 rounded-full animate-spin mx-auto border-4 border-primary-200 border-t-primary-500" />
+                  <p className="text-slate-500 text-sm font-medium">Signing you in...</p>
+                </>
+              )}
+            </div>
+          </div>
+        </Show>
+      </>
+    );
   }
 
   const handleLockedTabClick = (tab: DashboardTab) => {
