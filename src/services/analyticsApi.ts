@@ -34,6 +34,8 @@ import type {
   // Notifications types
   NotificationSummary,
   NotificationEvent,
+  NotificationSettingsResponse,
+  TemplatePreviewResponse,
 } from '../types/analytics';
 
 // API endpoint - configurable via environment variable
@@ -104,6 +106,35 @@ async function apiRequest<T>(
   const response = await fetch(url, {
     method: 'GET',
     headers: buildHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `API error: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Make authenticated POST request
+ */
+async function apiPost<T>(
+  endpoint: string,
+  body: Record<string, unknown> = {}
+): Promise<T> {
+  const token = getAuthToken();
+
+  if (!token) {
+    throw new Error('Not authenticated');
+  }
+
+  const url = `${API_BASE_URL}${endpoint}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -820,5 +851,88 @@ export async function fetchNotificationEvents(params: {
   return apiRequest<{ events: NotificationEvent[]; total: number; page: number; has_more: boolean }>(
     '/notifications/events',
     queryParams
+  );
+}
+
+// =============================================================================
+// Notification Settings & Templates API Functions (Phase 2b/2c)
+// =============================================================================
+
+/**
+ * Fetch all form notification settings (recipients, channels, enabled flags)
+ */
+export async function fetchNotificationSettings(): Promise<NotificationSettingsResponse> {
+  return apiRequest<NotificationSettingsResponse>('/settings/notifications');
+}
+
+/**
+ * Update notification settings for a single form
+ *
+ * @param formId - The form ID to update
+ * @param notifications - Partial notifications object (internal / applicant_confirmation)
+ */
+export async function updateNotificationSettings(
+  formId: string,
+  notifications: Record<string, unknown>
+): Promise<unknown> {
+  return apiPatch<unknown>('/settings/notifications', { form_id: formId, notifications });
+}
+
+/**
+ * Send a test notification email to the given address for the given form
+ *
+ * @param email   - Recipient email address
+ * @param formId  - Form ID to use as context for the test
+ */
+export async function sendTestNotification(email: string, formId: string): Promise<unknown> {
+  return apiPost<unknown>('/settings/notifications/recipients/test-send', { email, form_id: formId });
+}
+
+/**
+ * Fetch all form notification templates (subject + body for each form)
+ */
+export async function fetchNotificationTemplates(): Promise<NotificationSettingsResponse> {
+  return apiRequest<NotificationSettingsResponse>('/settings/notifications/templates');
+}
+
+/**
+ * Update notification templates for a single form
+ *
+ * @param formId    - The form ID whose templates to update
+ * @param templates - Partial template fields (subject, body_template, etc.)
+ */
+export async function updateNotificationTemplate(
+  formId: string,
+  templates: Record<string, unknown>
+): Promise<unknown> {
+  return apiPatch<unknown>(`/settings/notifications/templates/${encodeURIComponent(formId)}`, templates);
+}
+
+/**
+ * Preview a rendered notification template (returns HTML)
+ *
+ * @param formId       - The form ID
+ * @param templateType - 'internal' | 'applicant_confirmation'
+ */
+export async function previewTemplate(
+  formId: string,
+  templateType: string
+): Promise<TemplatePreviewResponse> {
+  return apiPost<TemplatePreviewResponse>(
+    `/settings/notifications/templates/${encodeURIComponent(formId)}/preview`,
+    { template_type: templateType }
+  );
+}
+
+/**
+ * Send a test email using the current templates for the given form
+ * Sends to the authenticated user's email address
+ *
+ * @param formId - The form ID whose templates to test
+ */
+export async function sendTestTemplate(formId: string): Promise<unknown> {
+  return apiPost<unknown>(
+    `/settings/notifications/templates/${encodeURIComponent(formId)}/test-send`,
+    {}
   );
 }

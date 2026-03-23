@@ -524,3 +524,35 @@ export interface LeadQueueResponse {
   next_lead_id: string | null;
   queue_count: number;
 }
+
+// =============================================================================
+// Notification Settings & Templates Types (Phase 2b/2c)
+// =============================================================================
+
+export interface FormNotificationSettings {
+  form_title: string;
+  notifications: {
+    internal: {
+      enabled: boolean;
+      recipients: string[];
+      subject: string;
+      body_template: string;
+      channels: { email: boolean; sms: boolean };
+    };
+    applicant_confirmation: {
+      enabled: boolean;
+      subject: string;
+      body_template: string;
+      use_tenant_branding: boolean;
+    };
+  };
+}
+
+export interface NotificationSettingsResponse {
+  forms: Record<string, FormNotificationSettings>;
+}
+
+export interface TemplatePreviewResponse {
+  subject: string;
+  body_html: string;
+}
