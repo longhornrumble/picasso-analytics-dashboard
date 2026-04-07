@@ -37,6 +37,124 @@ import type {
 } from '../types/analytics';
 
 // ---------------------------------------------------------------------------
+// Mock Data (Demo Mode)
+// ---------------------------------------------------------------------------
+
+const DEMO_TENANT_ID = 'MYR384719';
+const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA === 'true';
+
+function shouldUseMock(tenantId?: string): boolean {
+  return USE_MOCK && tenantId === DEMO_TENANT_ID;
+}
+
+const MOCK_SUMMARY: NotificationSummary = {
+  sent: 247,
+  delivered: 238,
+  bounced: 6,
+  complained: 1,
+  opened: 156,
+  clicked: 43,
+  failed: 3,
+  delivery_rate: 96.4,
+  open_rate: 65.5,
+  bounce_rate: 2.4,
+  period: '30d',
+};
+
+function generateMockEvents(): NotificationEvent[] {
+  const recipients = [
+    'sarah.johnson@example-nonprofit.org',
+    'mike.chen@example-nonprofit.org',
+    'director@example-nonprofit.org',
+    'volunteer@example-nonprofit.org',
+    'info@example-nonprofit.org',
+  ];
+  const forms = ['volunteer_signup', 'mentor_application', 'contact_form', 'donation_inquiry'];
+  const statuses: NotificationEvent['event_type'][] = ['send', 'delivery', 'bounce', 'open', 'click'];
+  const events: NotificationEvent[] = [];
+
+  for (let i = 0; i < 50; i++) {
+    const minutesAgo = Math.floor(Math.random() * 43200); // up to 30 days in minutes
+    const ts = new Date(Date.now() - minutesAgo * 60_000).toISOString();
+    const eventType = statuses[Math.floor(Math.random() * statuses.length)];
+    const msgId = `0100019d${Math.random().toString(16).slice(2, 10)}-${Math.random().toString(16).slice(2, 14)}`;
+
+    events.push({
+      timestamp: ts,
+      event_type: eventType,
+      channel: 'email',
+      recipient: recipients[Math.floor(Math.random() * recipients.length)],
+      form_id: forms[Math.floor(Math.random() * forms.length)],
+      status: eventType,
+      message_id: msgId,
+    });
+  }
+
+  return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+}
+
+const MOCK_EVENTS = generateMockEvents();
+
+const MOCK_SETTINGS: NotificationSettingsResponse = {
+  forms: {
+    volunteer_signup: {
+      form_title: 'Volunteer Signup',
+      notifications: {
+        internal: {
+          enabled: true,
+          recipients: ['sarah.johnson@example-nonprofit.org', 'director@example-nonprofit.org'],
+          subject: 'New Volunteer Signup: {first_name} {last_name}',
+          body_template: 'Hi team,\n\nA new volunteer has signed up.\n\n{form_data}\n\nBest,\nMyRecruiter',
+          channels: { email: true, sms: false },
+        },
+        applicant_confirmation: {
+          enabled: true,
+          subject: 'Welcome, {first_name}! Thanks for signing up',
+          body_template: 'Hi {first_name},\n\nThank you for signing up to volunteer with Our Organization! Our team will be in touch soon.\n\nWarm regards,\nOur Organization',
+          use_tenant_branding: true,
+        },
+      },
+    },
+    mentor_application: {
+      form_title: 'Mentor Application',
+      notifications: {
+        internal: {
+          enabled: true,
+          recipients: ['mike.chen@example-nonprofit.org'],
+          subject: 'New Mentor Application: {first_name} {last_name}',
+          body_template: 'Hi team,\n\nA new mentor application has been submitted.\n\n{form_data}\n\nBest,\nMyRecruiter',
+          channels: { email: true, sms: false },
+        },
+        applicant_confirmation: {
+          enabled: true,
+          subject: 'Thank you for applying, {first_name}!',
+          body_template: 'Hi {first_name},\n\nWe received your mentor application. Our team will review and follow up shortly.\n\nWarm regards,\nOur Organization',
+          use_tenant_branding: true,
+        },
+      },
+    },
+    contact_form: {
+      form_title: 'Contact Form',
+      notifications: {
+        internal: {
+          enabled: true,
+          recipients: ['info@example-nonprofit.org'],
+          subject: 'New Contact Inquiry from {first_name}',
+          body_template: 'Hi team,\n\nA new contact inquiry was submitted.\n\n{form_data}\n\nBest,\nMyRecruiter',
+          channels: { email: true, sms: false },
+        },
+        applicant_confirmation: {
+          enabled: false,
+          subject: '',
+          body_template: '',
+          use_tenant_branding: true,
+        },
+      },
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -347,27 +465,38 @@ function NotificationDashboardTab() {
     setError(null);
 
     try {
-      const [summaryData, eventsData] = await Promise.all([
-        fetchNotificationSummary(timeRange),
-        fetchNotificationEvents({
-          range: timeRange,
-          page,
-          limit: pageSize,
-          channel: channelFilter || undefined,
-          status: statusFilter || undefined,
-        }),
-      ]);
+      if (shouldUseMock(user?.tenant_id)) {
+        // Mock data for demo tenant
+        setSummary({ ...MOCK_SUMMARY, period: timeRange });
+        let filtered = [...MOCK_EVENTS];
+        if (channelFilter) filtered = filtered.filter(e => e.channel === channelFilter);
+        if (statusFilter) filtered = filtered.filter(e => e.event_type === statusFilter);
+        const start = (page - 1) * pageSize;
+        setEvents(filtered.slice(start, start + pageSize));
+        setTotalEvents(filtered.length);
+      } else {
+        const [summaryData, eventsData] = await Promise.all([
+          fetchNotificationSummary(timeRange),
+          fetchNotificationEvents({
+            range: timeRange,
+            page,
+            limit: pageSize,
+            channel: channelFilter || undefined,
+            status: statusFilter || undefined,
+          }),
+        ]);
 
-      setSummary(summaryData);
-      setEvents(eventsData.events);
-      setTotalEvents(eventsData.total);
+        setSummary(summaryData);
+        setEvents(eventsData.events);
+        setTotalEvents(eventsData.total);
+      }
     } catch (err) {
       console.error('Notifications data load error:', err);
       setError(err instanceof Error ? err.message : 'Failed to load notification data');
     } finally {
       setIsLoading(false);
     }
-  }, [timeRange, page, channelFilter, statusFilter]);
+  }, [timeRange, page, channelFilter, statusFilter, user?.tenant_id]);
 
   useEffect(() => {
     loadData();
@@ -541,6 +670,7 @@ function cloneSettings(s: FormNotificationSettings): FormNotificationSettings {
 }
 
 function RecipientsTab() {
+  const { user } = useAuth();
   const [settings, setSettings] = useState<NotificationSettingsResponse | null>(null);
   const [draft, setDraft] = useState<Record<string, FormNotificationSettings>>({});
   const [dirtyForms, setDirtyForms] = useState<Set<string>>(new Set());
@@ -556,9 +686,8 @@ function RecipientsTab() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchNotificationSettings();
+      const data = shouldUseMock(user?.tenant_id) ? MOCK_SETTINGS : await fetchNotificationSettings();
       setSettings(data);
-      // Initialise draft as deep clone so edits don't mutate source
       const initialDraft: Record<string, FormNotificationSettings> = {};
       for (const [id, s] of Object.entries(data.forms)) {
         initialDraft[id] = cloneSettings(s);
@@ -569,7 +698,7 @@ function RecipientsTab() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user?.tenant_id]);
 
   useEffect(() => {
     loadSettings();
@@ -1028,6 +1157,7 @@ const TEMPLATE_VARIABLES = [
 ];
 
 function TemplatesTab() {
+  const { user } = useAuth();
   const [templates, setTemplates] = useState<NotificationSettingsResponse | null>(null);
   const [draft, setDraft] = useState<Record<string, FormNotificationSettings>>({});
   const [dirtyForms, setDirtyForms] = useState<Set<string>>(new Set());
@@ -1038,13 +1168,13 @@ function TemplatesTab() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [previewData, setPreviewData] = useState<TemplatePreviewResponse | null>(null);
-  const [previewLoading, setPreviewLoading] = useState<string | null>(null); // templateType being previewed
+  const [previewLoading, setPreviewLoading] = useState<string | null>(null);
 
   const loadTemplates = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchNotificationSettings();
+      const data = shouldUseMock(user?.tenant_id) ? MOCK_SETTINGS : await fetchNotificationSettings();
       setTemplates(data);
       const initialDraft: Record<string, FormNotificationSettings> = {};
       for (const [id, s] of Object.entries(data.forms)) {
