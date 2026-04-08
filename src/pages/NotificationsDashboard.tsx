@@ -26,6 +26,7 @@ import {
   updateNotificationTemplate,
   previewTemplate,
   sendTestTemplate,
+  fetchNotificationEventDetail,
 } from '../services/analyticsApi';
 import type {
   NotificationSummary,
@@ -34,6 +35,7 @@ import type {
   NotificationSettingsResponse,
   FormNotificationSettings,
   TemplatePreviewResponse,
+  NotificationEventLifecycle,
 } from '../types/analytics';
 
 // ---------------------------------------------------------------------------
@@ -398,6 +400,29 @@ const eventColumns: Column<NotificationEvent>[] = [
     render: (row) => <StatusBadge status={row.status || row.event_type} />,
   },
   {
+    key: 'detail',
+    header: 'Detail',
+    render: (row) => {
+      if (!row.detail) return <span className="text-slate-300">—</span>;
+      const d = row.detail as Record<string, string>;
+      if (d.bounce_type) {
+        return (
+          <span className="block text-left text-xs text-red-600" title={JSON.stringify(d)}>
+            {d.bounce_type}{d.bounce_subtype ? ` — ${d.bounce_subtype}` : ''}
+          </span>
+        );
+      }
+      if (d.complaint_type) {
+        return (
+          <span className="block text-left text-xs text-amber-600" title={JSON.stringify(d)}>
+            {d.complaint_type}{d.complaint_sub_type ? ` — ${d.complaint_sub_type}` : ''}
+          </span>
+        );
+      }
+      return <span className="text-slate-300">—</span>;
+    },
+  },
+  {
     key: 'channel',
     header: 'Channel',
     render: (row) => (
@@ -439,6 +464,152 @@ const STATUS_OPTIONS = [
   { id: 'click', name: 'Clicked' },
 ];
 
+// ---------------------------------------------------------------------------
+// EventDetailModal — shows full lifecycle for a single message
+// ---------------------------------------------------------------------------
+
+function EventDetailModal({
+  messageId,
+  onClose,
+}: {
+  messageId: string | null;
+  onClose: () => void;
+}) {
+  const [lifecycle, setLifecycle] = useState<NotificationEventLifecycle | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!messageId) {
+      setLifecycle(null);
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    fetchNotificationEventDetail(messageId)
+      .then(setLifecycle)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load event detail'))
+      .finally(() => setIsLoading(false));
+  }, [messageId]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!messageId) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [messageId, onClose]);
+
+  if (!messageId) return null;
+
+  const eventTypeColors: Record<string, string> = {
+    send: 'bg-blue-100 text-blue-700',
+    delivery: 'bg-green-100 text-green-700',
+    bounce: 'bg-red-100 text-red-700',
+    complaint: 'bg-amber-100 text-amber-700',
+    open: 'bg-purple-100 text-purple-700',
+    click: 'bg-indigo-100 text-indigo-700',
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h3 className="text-sm font-semibold text-slate-800">Message Lifecycle</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 transition-colors"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-4">
+          {isLoading && (
+            <p className="text-sm text-slate-500 text-center py-8">Loading...</p>
+          )}
+          {error && (
+            <p className="text-sm text-red-600 text-center py-8">{error}</p>
+          )}
+          {lifecycle && lifecycle.events.length === 0 && (
+            <p className="text-sm text-slate-400 text-center py-8">No events found for this message.</p>
+          )}
+          {lifecycle && lifecycle.events.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-xs text-slate-400 font-mono mb-3 truncate" title={lifecycle.message_id}>
+                ID: {lifecycle.message_id}
+              </p>
+              {lifecycle.events.map((evt, i) => {
+                const detail = evt.detail || {};
+                const colorClass = eventTypeColors[evt.event_type] || 'bg-slate-100 text-slate-700';
+                return (
+                  <div key={i} className="flex items-start gap-3">
+                    {/* Timeline dot */}
+                    <div className="flex flex-col items-center pt-1">
+                      <div className={`w-2.5 h-2.5 rounded-full ${
+                        evt.event_type === 'delivery' ? 'bg-green-500' :
+                        evt.event_type === 'bounce' ? 'bg-red-500' :
+                        evt.event_type === 'complaint' ? 'bg-amber-500' :
+                        'bg-slate-400'
+                      }`} />
+                      {i < lifecycle.events.length - 1 && (
+                        <div className="w-px h-6 bg-slate-200 mt-1" />
+                      )}
+                    </div>
+                    {/* Event detail */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${colorClass}`}>
+                          {evt.event_type}
+                        </span>
+                        <span className="text-xs text-slate-400">{evt.timestamp}</span>
+                      </div>
+                      {/* Bounce/complaint detail */}
+                      {detail.bounce_type && (
+                        <p className="text-xs text-red-600 mt-1">
+                          {String(detail.bounce_type)}{detail.bounce_subtype ? ` — ${detail.bounce_subtype}` : ''}
+                        </p>
+                      )}
+                      {detail.complaint_type && (
+                        <p className="text-xs text-amber-600 mt-1">{String(detail.complaint_type)}</p>
+                      )}
+                      {/* Open/click detail */}
+                      {detail.user_agent && (
+                        <p className="text-xs text-slate-400 mt-1 truncate" title={String(detail.user_agent)}>
+                          {String(detail.user_agent)}
+                        </p>
+                      )}
+                      {detail.link && (
+                        <p className="text-xs text-indigo-600 mt-1 truncate" title={String(detail.link)}>
+                          {String(detail.link)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
 function NotificationDashboardTab() {
   const { user } = useAuth();
 
@@ -451,6 +622,9 @@ function NotificationDashboardTab() {
   const [totalEvents, setTotalEvents] = useState(0);
   const [page, setPage] = useState(1);
   const pageSize = 25;
+
+  // Event detail modal state
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
 
   // Filter state
   const [channelFilter, setChannelFilter] = useState('');
@@ -653,9 +827,16 @@ function NotificationDashboardTab() {
             page={page}
             pageSize={pageSize}
             onPageChange={setPage}
+            onRowClick={(row) => setSelectedMessageId(row.message_id)}
           />
         )}
       </section>
+
+      {/* Event detail modal */}
+      <EventDetailModal
+        messageId={selectedMessageId}
+        onClose={() => setSelectedMessageId(null)}
+      />
     </div>
   );
 }
@@ -681,6 +862,8 @@ function RecipientsTab() {
   const [testingForms, setTestingForms] = useState<Set<string>>(new Set());
   const [newEmailInput, setNewEmailInput] = useState<Record<string, string>>({});
   const [emailErrors, setEmailErrors] = useState<Record<string, string>>({});
+  const [newPhoneInput, setNewPhoneInput] = useState<Record<string, string>>({});
+  const [phoneErrors, setPhoneErrors] = useState<Record<string, string>>({});
 
   const loadSettings = useCallback(async () => {
     setIsLoading(true);
@@ -784,6 +967,47 @@ function RecipientsTab() {
       next[formId] = cloneSettings(next[formId]);
       next[formId].notifications.internal.recipients =
         next[formId].notifications.internal.recipients.filter((r) => r !== email);
+      return next;
+    });
+    markDirty(formId);
+  };
+
+  // --- Add SMS recipient ---
+  const addSmsRecipient = (formId: string) => {
+    const raw = (newPhoneInput[formId] ?? '').trim();
+    // Normalize: strip spaces/dashes/parens, prepend +1 if needed
+    const digits = raw.replace(/[\s\-().]/g, '');
+    const phone = digits.startsWith('+') ? digits : digits.startsWith('1') ? `+${digits}` : `+1${digits}`;
+    if (!/^\+1\d{10}$/.test(phone)) {
+      setPhoneErrors((prev) => ({ ...prev, [formId]: 'Enter a valid US phone number (e.g. 512-555-1234)' }));
+      return;
+    }
+    const smsRecipients = draft[formId].notifications.internal.sms_recipients || [];
+    if (smsRecipients.includes(phone)) {
+      setPhoneErrors((prev) => ({ ...prev, [formId]: 'This number is already in the list' }));
+      return;
+    }
+    setPhoneErrors((prev) => ({ ...prev, [formId]: '' }));
+    setDraft((prev) => {
+      const next = { ...prev };
+      next[formId] = cloneSettings(next[formId]);
+      if (!next[formId].notifications.internal.sms_recipients) {
+        next[formId].notifications.internal.sms_recipients = [];
+      }
+      next[formId].notifications.internal.sms_recipients!.push(phone);
+      return next;
+    });
+    setNewPhoneInput((prev) => ({ ...prev, [formId]: '' }));
+    markDirty(formId);
+  };
+
+  // --- Remove SMS recipient ---
+  const removeSmsRecipient = (formId: string, phone: string) => {
+    setDraft((prev) => {
+      const next = { ...prev };
+      next[formId] = cloneSettings(next[formId]);
+      next[formId].notifications.internal.sms_recipients =
+        (next[formId].notifications.internal.sms_recipients || []).filter((p) => p !== phone);
       return next;
     });
     markDirty(formId);
@@ -1052,6 +1276,62 @@ function RecipientsTab() {
                           </label>
                         </div>
                       </fieldset>
+
+                      {/* SMS Recipients (visible when SMS channel enabled) */}
+                      {internal.channels.sms && (
+                        <div>
+                          <p className="text-xs font-medium text-slate-600 mb-2">SMS Recipients</p>
+                          {(internal.sms_recipients || []).length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {(internal.sms_recipients || []).map((phone) => (
+                                <span
+                                  key={phone}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 text-sm text-slate-700 bg-slate-100 rounded-full"
+                                >
+                                  📱 {phone}
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSmsRecipient(formId, phone)}
+                                    className="text-slate-400 hover:text-red-500 transition-colors"
+                                    aria-label={`Remove ${phone}`}
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <input
+                                type="tel"
+                                placeholder="512-555-1234"
+                                value={newPhoneInput[formId] ?? ''}
+                                onChange={(e) =>
+                                  setNewPhoneInput((prev) => ({ ...prev, [formId]: e.target.value }))
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    addSmsRecipient(formId);
+                                  }
+                                }}
+                                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                              />
+                              {phoneErrors[formId] && (
+                                <p className="text-xs text-red-500 mt-1">{phoneErrors[formId]}</p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => addSmsRecipient(formId)}
+                              className="shrink-0 px-3 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors"
+                            >
+                              + Add
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Test email */}
                       <div>

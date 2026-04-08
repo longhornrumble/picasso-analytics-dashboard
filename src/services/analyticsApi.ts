@@ -839,9 +839,26 @@ export async function previewTemplate(
  *
  * @param formId - The form ID whose templates to test
  */
-export async function sendTestTemplate(formId: string): Promise<unknown> {
+export async function sendTestTemplate(formId: string, templateType: string = 'internal'): Promise<unknown> {
   return apiPost<unknown>(
     `/settings/notifications/templates/${encodeURIComponent(formId)}/test-send`,
-    {}
+    { template_type: templateType }
   );
+}
+
+// ---------------------------------------------------------------------------
+// Notification event detail (lifecycle for a single message)
+// ---------------------------------------------------------------------------
+
+export interface NotificationEventLifecycle {
+  message_id: string;
+  events: Array<{
+    event_type: string;
+    timestamp: string;
+    detail: Record<string, unknown>;
+  }>;
+}
+
+export async function fetchNotificationEventDetail(messageId: string): Promise<NotificationEventLifecycle> {
+  return apiRequest<NotificationEventLifecycle>(`/notifications/events/${encodeURIComponent(messageId)}`);
 }

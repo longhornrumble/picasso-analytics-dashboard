@@ -535,8 +535,10 @@ export interface FormNotificationSettings {
     internal: {
       enabled: boolean;
       recipients: string[];
+      sms_recipients?: string[];
       subject: string;
       body_template: string;
+      sms_template?: string;
       channels: { email: boolean; sms: boolean };
     };
     applicant_confirmation: {
