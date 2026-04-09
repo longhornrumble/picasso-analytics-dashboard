@@ -7,7 +7,7 @@
  */
 
 interface PremiumLockProps {
-  feature: 'forms' | 'conversations' | 'attribution' | 'notifications';
+  feature: 'forms' | 'conversations' | 'attribution' | 'notifications' | 'settings';
   onReturn: () => void;
 }
 
@@ -50,6 +50,16 @@ const featureInfo: Record<string, { title: string; description: string; benefits
       'Open and click monitoring',
       'Bounce detection and alerts',
       'Per-form recipient management',
+    ],
+  },
+  settings: {
+    title: 'Settings & Administration',
+    description: 'Manage your team, notifications, and organization settings from a unified control center.',
+    benefits: [
+      'Team member management',
+      'Notification configuration',
+      'Profile and preferences',
+      'Organization settings',
     ],
   },
 };
