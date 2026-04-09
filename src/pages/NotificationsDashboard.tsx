@@ -551,8 +551,8 @@ function EventDetailModal({
               <p className="text-xs text-slate-400 font-mono mb-3 truncate" title={lifecycle.message_id}>
                 ID: {lifecycle.message_id}
               </p>
-              {lifecycle.events.map((evt, i) => {
-                const detail = evt.detail || {};
+              {lifecycle.events.map((evt: NotificationEventLifecycle['events'][number], i: number) => {
+                const detail = (evt.detail || {}) as Record<string, string>;
                 const colorClass = eventTypeColors[evt.event_type] || 'bg-slate-100 text-slate-700';
                 return (
                   <div key={i} className="flex items-start gap-3">
@@ -579,7 +579,7 @@ function EventDetailModal({
                       {/* Bounce/complaint detail */}
                       {detail.bounce_type && (
                         <p className="text-xs text-red-600 mt-1">
-                          {String(detail.bounce_type)}{detail.bounce_subtype ? ` — ${detail.bounce_subtype}` : ''}
+                          {String(detail.bounce_type)}{detail.bounce_subtype ? ` — ${String(detail.bounce_subtype)}` : ''}
                         </p>
                       )}
                       {detail.complaint_type && (
@@ -852,6 +852,7 @@ function cloneSettings(s: FormNotificationSettings): FormNotificationSettings {
 
 function RecipientsTab() {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [settings, setSettings] = useState<NotificationSettingsResponse | null>(null);
   const [draft, setDraft] = useState<Record<string, FormNotificationSettings>>({});
   const [dirtyForms, setDirtyForms] = useState<Set<string>>(new Set());
@@ -1164,6 +1165,7 @@ function RecipientsTab() {
                         className="sr-only peer"
                         checked={internal.enabled}
                         onChange={() => toggleInternalEnabled(formId)}
+                        disabled={!isAdmin}
                       />
                       <div
                         className={`w-10 h-5 rounded-full transition-colors duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500 peer-focus-visible:ring-offset-1 ${
@@ -1202,7 +1204,7 @@ function RecipientsTab() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                 </svg>
                                 {email}
-                                <button
+                                {isAdmin && <button
                                   type="button"
                                   onClick={() => removeRecipient(formId, email)}
                                   aria-label={`Remove ${email}`}
@@ -1211,13 +1213,14 @@ function RecipientsTab() {
                                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                                   </svg>
-                                </button>
+                                </button>}
                               </span>
                             ))}
                           </div>
                         )}
 
-                        {/* Add recipient */}
+                        {/* Add recipient (admin only) */}
+                        {isAdmin && (
                         <div className="flex items-start gap-2">
                           <div className="flex-1">
                             <input
@@ -1250,6 +1253,7 @@ function RecipientsTab() {
                             + Add
                           </button>
                         </div>
+                        )}
                       </div>
 
                       {/* Channels */}
@@ -1261,6 +1265,7 @@ function RecipientsTab() {
                               type="checkbox"
                               checked={internal.channels.email}
                               onChange={() => toggleChannel(formId, 'email')}
+                              disabled={!isAdmin}
                               className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500"
                             />
                             Email
@@ -1270,6 +1275,7 @@ function RecipientsTab() {
                               type="checkbox"
                               checked={internal.channels.sms}
                               onChange={() => toggleChannel(formId, 'sms')}
+                              disabled={!isAdmin}
                               className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500"
                             />
                             SMS
@@ -1289,18 +1295,19 @@ function RecipientsTab() {
                                   className="inline-flex items-center gap-1.5 px-3 py-1 text-sm text-slate-700 bg-slate-100 rounded-full"
                                 >
                                   📱 {phone}
-                                  <button
+                                  {isAdmin && <button
                                     type="button"
                                     onClick={() => removeSmsRecipient(formId, phone)}
                                     className="text-slate-400 hover:text-red-500 transition-colors"
                                     aria-label={`Remove ${phone}`}
                                   >
                                     ×
-                                  </button>
+                                  </button>}
                                 </span>
                               ))}
                             </div>
                           )}
+                          {isAdmin && (
                           <div className="flex gap-2">
                             <div className="flex-1">
                               <input
@@ -1330,11 +1337,12 @@ function RecipientsTab() {
                               + Add
                             </button>
                           </div>
+                          )}
                         </div>
                       )}
 
-                      {/* Test email */}
-                      <div>
+                      {/* Test email (admin only) */}
+                      {isAdmin && <div>
                         <button
                           type="button"
                           onClick={() => handleTestSend(formId)}
@@ -1346,7 +1354,7 @@ function RecipientsTab() {
                         {internal.recipients.length === 0 && (
                           <p className="text-xs text-slate-400 mt-1">Add a recipient first.</p>
                         )}
-                      </div>
+                      </div>}
                     </div>
                   )}
                 </div>
@@ -1368,6 +1376,7 @@ function RecipientsTab() {
                         className="sr-only peer"
                         checked={applicant.enabled}
                         onChange={() => toggleApplicantEnabled(formId)}
+                        disabled={!isAdmin}
                       />
                       <div
                         className={`w-10 h-5 rounded-full transition-colors duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500 peer-focus-visible:ring-offset-1 ${
@@ -1389,6 +1398,7 @@ function RecipientsTab() {
                         type="checkbox"
                         checked={applicant.use_tenant_branding}
                         onChange={() => toggleApplicantBranding(formId)}
+                        disabled={!isAdmin}
                         className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500"
                       />
                       Use tenant branding
@@ -1396,7 +1406,8 @@ function RecipientsTab() {
                   )}
                 </div>
 
-                {/* Save row */}
+                {/* Save row (admin only) */}
+                {isAdmin && (
                 <div className="flex justify-end pt-2">
                   <button
                     type="button"
@@ -1407,6 +1418,7 @@ function RecipientsTab() {
                     {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
+                )}
               </div>
             </div>
           );
@@ -1438,6 +1450,7 @@ const TEMPLATE_VARIABLES = [
 
 function TemplatesTab() {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [templates, setTemplates] = useState<NotificationSettingsResponse | null>(null);
   const [draft, setDraft] = useState<Record<string, FormNotificationSettings>>({});
   const [dirtyForms, setDirtyForms] = useState<Set<string>>(new Set());
@@ -1665,6 +1678,7 @@ function TemplatesTab() {
                     id={`internal-subject-${selectedFormId}`}
                     value={currentForm.notifications.internal.subject}
                     onChange={(e) => updateField('internal', 'subject', e.target.value)}
+                    readOnly={!isAdmin}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                     placeholder="New submission: {first_name} {last_name}"
                   />
@@ -1678,6 +1692,7 @@ function TemplatesTab() {
                     id={`internal-body-${selectedFormId}`}
                     value={currentForm.notifications.internal.body_template}
                     onChange={(e) => updateField('internal', 'body_template', e.target.value)}
+                    readOnly={!isAdmin}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none min-h-[120px] resize-y"
                     placeholder="Hi Team,&#10;&#10;{form_data}&#10;&#10;Best, MyRecruiter AI"
                   />
@@ -1730,6 +1745,7 @@ function TemplatesTab() {
                     id={`applicant-subject-${selectedFormId}`}
                     value={currentForm.notifications.applicant_confirmation.subject}
                     onChange={(e) => updateField('applicant_confirmation', 'subject', e.target.value)}
+                    readOnly={!isAdmin}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                     placeholder="Thanks for applying, {first_name}!"
                   />
@@ -1743,6 +1759,7 @@ function TemplatesTab() {
                     id={`applicant-body-${selectedFormId}`}
                     value={currentForm.notifications.applicant_confirmation.body_template}
                     onChange={(e) => updateField('applicant_confirmation', 'body_template', e.target.value)}
+                    readOnly={!isAdmin}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none min-h-[120px] resize-y"
                     placeholder="Hi {first_name},&#10;&#10;Thank you for your submission!&#10;&#10;Best regards"
                   />
@@ -1795,7 +1812,8 @@ function TemplatesTab() {
               </div>
             </div>
 
-            {/* Action row */}
+            {/* Action row (admin only) */}
+            {isAdmin && (
             <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
               <button
                 type="button"
@@ -1814,6 +1832,7 @@ function TemplatesTab() {
                 {isSaving ? 'Saving...' : 'Save'}
               </button>
             </div>
+            )}
           </div>
         </div>
       )}
