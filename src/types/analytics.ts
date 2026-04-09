@@ -604,9 +604,4 @@ export interface TeamInvitationsResponse {
   invitations: TeamInvitation[];
 }
 
-export interface UserProfile {
-  first_name: string;
-  last_name: string;
-  email: string;
-  image_url?: string;
-}
+// Profile management handled by Clerk's UserButton modal — no portal types needed

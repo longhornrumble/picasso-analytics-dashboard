@@ -1,16 +1,16 @@
 /**
  * Settings Page
- * Container for Notifications, Team, Profile sub-tabs
+ * Container for Notifications and Team sub-tabs
+ * Profile management handled by Clerk's UserButton modal
  */
 
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { NotificationsDashboard } from './NotificationsDashboard';
 import { TeamManagement } from './TeamManagement';
-import { ProfileSettings } from './ProfileSettings';
 import type { DashboardFeatures } from '../types/analytics';
 
-type SettingsSubTab = 'notifications' | 'team' | 'profile';
+type SettingsSubTab = 'notifications' | 'team';
 
 const DEFAULT_FEATURES: DashboardFeatures = {
   dashboard_conversations: true,
@@ -36,11 +36,6 @@ export function SettingsPage() {
     {
       id: 'team',
       label: 'Team',
-      available: true,
-    },
-    {
-      id: 'profile',
-      label: 'Profile',
       available: true,
     },
   ];
@@ -81,10 +76,6 @@ export function SettingsPage() {
 
       {activeSubTab === 'team' && (
         <TeamManagement />
-      )}
-
-      {activeSubTab === 'profile' && (
-        <ProfileSettings />
       )}
     </div>
   );

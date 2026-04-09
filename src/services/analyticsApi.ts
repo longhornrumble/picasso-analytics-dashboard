@@ -37,7 +37,6 @@ import type {
   TeamMembersResponse,
   TeamInvitationsResponse,
   TeamMemberRole,
-  UserProfile,
 } from '../types/analytics';
 
 // API endpoint - configurable via environment variable
@@ -910,14 +909,4 @@ export async function removeTeamMember(membershipId: string): Promise<{ membersh
   return apiDelete<{ membership_id: string; removed: boolean }>(`/team/members/${encodeURIComponent(membershipId)}`);
 }
 
-// =============================================================================
-// Profile API Functions (Phase 3)
-// =============================================================================
-
-export async function fetchProfile(): Promise<UserProfile> {
-  return apiRequest<UserProfile>('/profile');
-}
-
-export async function updateProfile(data: { first_name: string; last_name: string }): Promise<{ first_name: string; last_name: string; updated: boolean }> {
-  return apiPatch<{ first_name: string; last_name: string; updated: boolean }>('/profile', data);
-}
+// Profile management handled by Clerk's UserButton modal — no portal API needed
