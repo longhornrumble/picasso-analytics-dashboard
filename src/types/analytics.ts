@@ -231,7 +231,7 @@ export interface FeaturesResponse {
 }
 
 // User roles for access control
-export type UserRole = 'super_admin' | 'admin' | 'viewer';
+export type UserRole = 'super_admin' | 'admin' | 'member';
 
 // Auth types
 export interface User {
@@ -557,4 +557,13 @@ export interface NotificationSettingsResponse {
 export interface TemplatePreviewResponse {
   subject: string;
   body_html: string;
+}
+
+export interface NotificationEventLifecycle {
+  message_id: string;
+  events: Array<{
+    event_type: string;
+    timestamp: string;
+    detail: Record<string, unknown>;
+  }>;
 }

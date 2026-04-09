@@ -77,7 +77,7 @@ function extractUserFromToken(token: string): User | null {
   // Validate and normalize role if present
   const rawRole = payload.role as string | undefined;
   const normalizedRole = rawRole?.toLowerCase().replace(/\s+/g, '_'); // "Super Admin" -> "super_admin"
-  const validRoles: UserRole[] = ['super_admin', 'admin', 'viewer'];
+  const validRoles: UserRole[] = ['super_admin', 'admin', 'member'];
   const validatedRole = normalizedRole && validRoles.includes(normalizedRole as UserRole)
     ? (normalizedRole as UserRole)
     : undefined;
