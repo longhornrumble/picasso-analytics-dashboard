@@ -4,13 +4,14 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Show, SignIn, UserButton, OrganizationSwitcher, useAuth as useClerkAuth, useOrganization } from '@clerk/react';
+import { Show, SignIn, UserButton, useAuth as useClerkAuth } from '@clerk/react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Dashboard } from './pages/Dashboard';
 import { ConversationsDashboard } from './pages/ConversationsDashboard';
 import { NotificationsDashboard } from './pages/NotificationsDashboard';
 import { PremiumLock } from './components/PremiumLock';
-import type { DashboardFeatures, User } from './types/analytics';
+import { fetchTenantList, setTenantOverride } from './services/analyticsApi';
+import type { DashboardFeatures, User, TenantOption } from './types/analytics';
 
 // Reuse the same base URL as analyticsApi.ts — avoids duplicating the default.
 const AUTH_API_BASE_URL =
@@ -55,22 +56,30 @@ function NavigationBar({
   onTabChange,
   onLockedTabClick,
   features = DEFAULT_FEATURES,
-  onSignOut,
   user,
+  tenantList = [],
+  selectedTenantId,
+  onTenantChange,
 }: {
   activeTab: DashboardTab;
   onTabChange: (tab: DashboardTab) => void;
   onLockedTabClick: (tab: DashboardTab) => void;
   features?: DashboardFeatures;
-  onSignOut: () => void;
   user: User | null;
+  tenantList?: TenantOption[];
+  selectedTenantId?: string;
+  onTenantChange?: (tenantId: string) => void;
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [tenantDropdownOpen, setTenantDropdownOpen] = useState(false);
 
   // Check if user is super admin
   const isSuperAdmin = user?.role === 'super_admin';
 
   // Get current tenant name for display
+  const currentTenant = tenantList.find(t => t.tenant_id === (selectedTenantId || user?.tenant_id));
+  const currentTenantName = currentTenant?.name || selectedTenantId || user?.tenant_id || 'Select Tenant';
+
   const tabs: { id: DashboardTab; label: string; icon: React.ReactNode; locked: boolean }[] = [
     {
       id: 'conversations',
@@ -197,35 +206,68 @@ function NavigationBar({
               </div>
             )}
 
-            {/* Organization Switcher - visible for multi-org (super admin) users */}
-            {isSuperAdmin && (
-              <div className="hidden md:block">
-                <OrganizationSwitcher
-                  hidePersonal={true}
-                  appearance={{
-                    elements: {
-                      rootBox: '',
-                      organizationSwitcherTrigger: 'px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors',
-                    },
-                  }}
-                />
+            {/* Super Admin Tenant Selector - Desktop only */}
+            {isSuperAdmin && tenantList.length > 0 && (
+              <div className="hidden md:block relative">
+                <button
+                  onClick={() => setTenantDropdownOpen(!tenantDropdownOpen)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  <span className="max-w-32 truncate">{currentTenantName}</span>
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform ${tenantDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {tenantDropdownOpen && (
+                  <>
+                    {/* Backdrop */}
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setTenantDropdownOpen(false)}
+                    />
+                    {/* Dropdown */}
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-slate-200 z-50 py-2 max-h-80 overflow-y-auto">
+                      <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Switch Tenant
+                      </div>
+                      {tenantList.map((tenant) => (
+                        <button
+                          key={tenant.tenant_id}
+                          onClick={() => {
+                            onTenantChange?.(tenant.tenant_id);
+                            setTenantDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center justify-between ${
+                            (selectedTenantId || user?.tenant_id) === tenant.tenant_id
+                              ? 'text-primary-600 bg-primary-50'
+                              : 'text-slate-700'
+                          }`}
+                        >
+                          <div>
+                            <div className="font-medium">{tenant.name}</div>
+                            <div className="text-xs text-slate-400">{tenant.tenant_id}</div>
+                          </div>
+                          {(selectedTenantId || user?.tenant_id) === tenant.tenant_id && (
+                            <svg className="w-4 h-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
-            {/* Desktop Sign Out — Clerk UserButton with fallback */}
+            {/* Clerk UserButton (includes sign out) */}
             <div className="hidden md:block">
-              <Show when="signed-in">
-                <UserButton />
-              </Show>
-              <Show when="signed-out">
-                <button
-                  onClick={onSignOut}
-                  className="px-4 py-2 text-xs font-semibold text-white rounded-lg transition-all duration-200 hover:opacity-90"
-                  style={{ backgroundColor: '#1e293b' }}
-                >
-                  SIGN OUT
-                </button>
-              </Show>
+              <UserButton />
             </div>
 
             {/* Mobile Menu Button - visible on mobile only */}
@@ -326,36 +368,33 @@ function NavigationBar({
               </div>
             )}
 
-            {/* Mobile Organization Switcher - Super Admin only */}
-            {isSuperAdmin && (
+            {/* Mobile Tenant Selector - Super Admin only */}
+            {isSuperAdmin && tenantList.length > 0 && (
               <div className="px-4">
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                  Switch Organization
+                  Switch Tenant
                 </label>
-                <OrganizationSwitcher
-                  hidePersonal={true}
-                  appearance={{
-                    elements: {
-                      rootBox: 'w-full',
-                      organizationSwitcherTrigger: 'w-full px-3 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg',
-                    },
+                <select
+                  value={selectedTenantId || user?.tenant_id || ''}
+                  onChange={(e) => {
+                    onTenantChange?.(e.target.value);
+                    setMobileMenuOpen(false);
                   }}
-                />
+                  className="w-full px-3 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border-0 focus:ring-2 focus:ring-primary-500"
+                >
+                  {tenantList.map((tenant) => (
+                    <option key={tenant.tenant_id} value={tenant.tenant_id}>
+                      {tenant.name} ({tenant.tenant_id})
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                onSignOut();
-              }}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold text-white rounded-xl transition-all duration-200 hover:opacity-90 bg-slate-800"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              SIGN OUT
-            </button>
+            {/* Mobile Clerk UserButton (includes sign out) */}
+            <div className="flex justify-center">
+              <UserButton />
+            </div>
           </div>
         </nav>
       </div>
@@ -368,7 +407,6 @@ function NavigationBar({
 function AppContent() {
   const { isAuthenticated, loading, user, logout, login } = useAuth();
   const { isSignedIn, getToken: getClerkToken } = useClerkAuth();
-  const { organization } = useOrganization();
   const [activeTab, setActiveTab] = useState<DashboardTab>('conversations');
   const [lockedTab, setLockedTab] = useState<DashboardTab | null>(null);
 
@@ -376,13 +414,12 @@ function AppContent() {
   const bridgingRef = useRef(false);
   // Track bridge error for display.
   const [bridgeError, setBridgeError] = useState<string | null>(null);
-  // Track previous org ID to detect org switches
-  const prevOrgIdRef = useRef<string | undefined>(undefined);
 
   /**
    * Clerk-to-internal-JWT bridge.
    * Fires when Clerk is signed in but we don't yet have an internal Picasso JWT.
-   * POSTs the Clerk session token + active org_id to /auth/clerk and calls login() with the result.
+   * POSTs the Clerk session token to /auth/clerk. The backend resolves the
+   * user's org membership via Clerk API and issues a Picasso JWT.
    */
   useEffect(() => {
     if (!isSignedIn || isAuthenticated || bridgingRef.current) return;
@@ -398,10 +435,7 @@ function AppContent() {
         const resp = await fetch(`${AUTH_API_BASE_URL}/auth/clerk`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clerk_token: clerkToken,
-            org_id: organization?.id || '',
-          }),
+          body: JSON.stringify({ clerk_token: clerkToken }),
         });
 
         const data = await resp.json();
@@ -412,8 +446,6 @@ function AppContent() {
 
         if (!data.token) throw new Error('Backend did not return a token');
 
-        // Track the org we authenticated with
-        prevOrgIdRef.current = organization?.id;
         login(data.token);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown auth error';
@@ -422,7 +454,7 @@ function AppContent() {
         bridgingRef.current = false; // allow retry on next render
       }
     })();
-  }, [isSignedIn, isAuthenticated, getClerkToken, login, organization?.id]);
+  }, [isSignedIn, isAuthenticated, getClerkToken, login]);
 
   // When Clerk signs out, clear the internal JWT too
   useEffect(() => {
@@ -432,19 +464,34 @@ function AppContent() {
     }
   }, [isSignedIn, isAuthenticated, logout]);
 
-  // When the active Clerk org changes, clear the Picasso JWT to trigger re-bridge
-  useEffect(() => {
-    if (!organization?.id || !isAuthenticated) return;
-    if (prevOrgIdRef.current && prevOrgIdRef.current !== organization.id) {
-      console.log('[clerk-bridge] Organization changed, re-authenticating...');
-      bridgingRef.current = false;
-      logout();
-    }
-    prevOrgIdRef.current = organization.id;
-  }, [organization?.id, isAuthenticated, logout]);
-
   // Cross-tab navigation: search query to pass to Forms dashboard
   const [formsSearchQuery, setFormsSearchQuery] = useState<string | null>(null);
+
+  // Super admin tenant switching
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+  const [tenantList, setTenantList] = useState<TenantOption[]>([]);
+  const isSuperAdmin = user?.role === 'super_admin';
+
+  // Fetch tenant list for super_admin users
+  useEffect(() => {
+    if (isSuperAdmin && isAuthenticated) {
+      fetchTenantList()
+        .then(setTenantList)
+        .catch((err) => console.warn('Failed to fetch tenant list:', err));
+    }
+  }, [isSuperAdmin, isAuthenticated]);
+
+  // Handle tenant change - sets API override and triggers refetch via key change
+  const handleTenantChange = (tenantId: string) => {
+    const isOwnTenant = tenantId === user?.tenant_id;
+    if (isOwnTenant) {
+      setTenantOverride(null);
+      setSelectedTenantId(null);
+    } else {
+      setTenantOverride(tenantId);
+      setSelectedTenantId(tenantId);
+    }
+  };
 
   const features = user?.features || DEFAULT_FEATURES;
 
@@ -668,10 +715,13 @@ function AppContent() {
         }}
         onLockedTabClick={handleLockedTabClick}
         features={features}
-        onSignOut={logout}
         user={user}
+        tenantList={tenantList}
+        selectedTenantId={selectedTenantId || undefined}
+        onTenantChange={handleTenantChange}
       />
       <main
+        key={selectedTenantId || 'default'}
         className="animate-in fade-in slide-in-from-bottom-4 duration-500"
       >
         {renderDashboardContent()}
