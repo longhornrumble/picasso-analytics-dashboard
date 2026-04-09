@@ -32,6 +32,12 @@ import type {
   NotificationEvent,
   NotificationSettingsResponse,
   TemplatePreviewResponse,
+  NotificationEventLifecycle,
+  // Team Management types (Phase 3)
+  TeamMembersResponse,
+  TeamInvitationsResponse,
+  TeamMemberRole,
+  UserProfile,
 } from '../types/analytics';
 
 // API endpoint - configurable via environment variable
@@ -170,6 +176,28 @@ async function apiPatch<T>(
   return response.json();
 }
 
+
+async function apiDelete<T>(endpoint: string): Promise<T> {
+  const token = getAuthToken();
+
+  if (!token) {
+    throw new Error('Not authenticated');
+  }
+
+  const url = `${API_BASE_URL}${endpoint}`;
+
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: buildHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `API error: ${response.status}`);
+  }
+
+  return response.json();
+}
 
 // =============================================================================
 // Forms API Functions
@@ -850,15 +878,46 @@ export async function sendTestTemplate(formId: string, templateType: string = 'i
 // Notification event detail (lifecycle for a single message)
 // ---------------------------------------------------------------------------
 
-export interface NotificationEventLifecycle {
-  message_id: string;
-  events: Array<{
-    event_type: string;
-    timestamp: string;
-    detail: Record<string, unknown>;
-  }>;
-}
-
 export async function fetchNotificationEventDetail(messageId: string): Promise<NotificationEventLifecycle> {
   return apiRequest<NotificationEventLifecycle>(`/notifications/events/${encodeURIComponent(messageId)}`);
+}
+
+// =============================================================================
+// Team Management API Functions (Phase 3)
+// =============================================================================
+
+export async function fetchTeamMembers(): Promise<TeamMembersResponse> {
+  return apiRequest<TeamMembersResponse>('/team/members');
+}
+
+export async function inviteTeamMember(email: string, role: TeamMemberRole): Promise<{ invitation_id: string; email: string; role: string; status: string }> {
+  return apiPost<{ invitation_id: string; email: string; role: string; status: string }>('/team/invite', { email, role });
+}
+
+export async function fetchTeamInvitations(): Promise<TeamInvitationsResponse> {
+  return apiRequest<TeamInvitationsResponse>('/team/invitations');
+}
+
+export async function revokeTeamInvitation(invitationId: string): Promise<{ invitation_id: string; revoked: boolean }> {
+  return apiPost<{ invitation_id: string; revoked: boolean }>(`/team/invitations/${encodeURIComponent(invitationId)}/revoke`, {});
+}
+
+export async function updateTeamMemberRole(membershipId: string, role: TeamMemberRole): Promise<{ membership_id: string; role: string; updated: boolean }> {
+  return apiPatch<{ membership_id: string; role: string; updated: boolean }>(`/team/members/${encodeURIComponent(membershipId)}`, { role });
+}
+
+export async function removeTeamMember(membershipId: string): Promise<{ membership_id: string; removed: boolean }> {
+  return apiDelete<{ membership_id: string; removed: boolean }>(`/team/members/${encodeURIComponent(membershipId)}`);
+}
+
+// =============================================================================
+// Profile API Functions (Phase 3)
+// =============================================================================
+
+export async function fetchProfile(): Promise<UserProfile> {
+  return apiRequest<UserProfile>('/profile');
+}
+
+export async function updateProfile(data: { first_name: string; last_name: string }): Promise<{ first_name: string; last_name: string; updated: boolean }> {
+  return apiPatch<{ first_name: string; last_name: string; updated: boolean }>('/profile', data);
 }

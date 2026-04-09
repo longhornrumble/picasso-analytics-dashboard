@@ -567,3 +567,46 @@ export interface NotificationEventLifecycle {
     detail: Record<string, unknown>;
   }>;
 }
+
+// =============================================================================
+// Team Management Types (Phase 3)
+// =============================================================================
+
+export type TeamMemberRole = 'admin' | 'member';
+
+export interface TeamMember {
+  membership_id: string;
+  user_id: string;
+  name: string;
+  email: string;
+  role: TeamMemberRole;
+  status: 'active' | 'pending';
+  image_url?: string;
+  joined_at: string;
+}
+
+export interface TeamMembersResponse {
+  members: TeamMember[];
+  admin_count: number;
+  total: number;
+  can_edit: boolean;
+}
+
+export interface TeamInvitation {
+  invitation_id: string;
+  email: string;
+  role: TeamMemberRole;
+  status: string;
+  created_at: string;
+}
+
+export interface TeamInvitationsResponse {
+  invitations: TeamInvitation[];
+}
+
+export interface UserProfile {
+  first_name: string;
+  last_name: string;
+  email: string;
+  image_url?: string;
+}
