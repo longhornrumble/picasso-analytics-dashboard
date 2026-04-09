@@ -184,29 +184,6 @@ function NavigationBar({
 
           {/* Right side - User Info + Sign Out + Mobile Menu Button */}
           <div className="flex items-center gap-3">
-            {/* Desktop User Info - hidden on mobile */}
-            {user && (
-              <div className="hidden md:flex items-center gap-3">
-                {/* User Avatar */}
-                <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-                  <span className="text-sm font-semibold text-primary-700">
-                    {user.name ? user.name.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase() || '?'}
-                  </span>
-                </div>
-                {/* User Name & Company */}
-                <div className="text-right">
-                  <div className="text-sm font-medium text-slate-700">
-                    {user.name || user.email || 'User'}
-                  </div>
-                  {user.company && (
-                    <div className="text-xs text-slate-500">
-                      {user.company}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* Super Admin Tenant Selector - Desktop only */}
             {isSuperAdmin && tenantList.length > 0 && (
               <div className="hidden md:block relative">
@@ -266,9 +243,23 @@ function NavigationBar({
               </div>
             )}
 
-            {/* Clerk UserButton (includes sign out) */}
-            <div className="hidden md:block">
-              <UserButton />
+            {/* Clerk avatar + user info */}
+            <div className="hidden md:flex items-center gap-2">
+              <div className="[&_.cl-avatarBox]:w-[35px] [&_.cl-avatarBox]:h-[35px] [&_.cl-userButtonTrigger]:p-0 flex items-center">
+                <UserButton />
+              </div>
+              {user && (
+                <div className="flex flex-col justify-center leading-tight">
+                  <div className="text-sm font-medium text-slate-700 leading-snug">
+                    {user.name || user.email || 'User'}
+                  </div>
+                  {user.company && (
+                    <div className="text-xs text-slate-500 leading-snug">
+                      {user.company}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Mobile Menu Button - visible on mobile only */}
@@ -346,16 +337,12 @@ function NavigationBar({
             );
           })}
 
-          {/* Mobile User Info + Tenant Selector + Sign Out */}
+          {/* Mobile User Info + Tenant Selector */}
           <div className="pt-4 mt-2 border-t border-slate-100 space-y-3">
-            {/* Mobile User Info */}
-            {user && (
-              <div className="flex items-center gap-3 px-4 py-2">
-                <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
-                  <span className="text-base font-semibold text-primary-700">
-                    {user.name ? user.name.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase() || '?'}
-                  </span>
-                </div>
+            {/* Mobile User Info — Clerk avatar + name/org */}
+            <div className="flex items-center gap-3 px-4 py-2">
+              <UserButton />
+              {user && (
                 <div>
                   <div className="text-sm font-medium text-slate-700">
                     {user.name || user.email || 'User'}
@@ -366,8 +353,8 @@ function NavigationBar({
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Mobile Tenant Selector - Super Admin only */}
             {isSuperAdmin && tenantList.length > 0 && (
@@ -392,10 +379,6 @@ function NavigationBar({
               </div>
             )}
 
-            {/* Mobile Clerk UserButton (includes sign out) */}
-            <div className="flex justify-center">
-              <UserButton />
-            </div>
           </div>
         </nav>
       </div>
