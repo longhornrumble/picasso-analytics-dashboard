@@ -16,9 +16,10 @@ import {
   DataTable,
   type Column,
   type TimeRangeValue,
+  type SortDirection,
+  type DateRange,
 } from '../components/shared';
 import {
-  fetchNotificationSummary,
   fetchNotificationEvents,
   fetchNotificationSettings,
   updateNotificationSettings,
@@ -27,15 +28,16 @@ import {
   previewTemplate,
   sendTestTemplate,
   fetchNotificationEventDetail,
+  fetchTeamMembers,
 } from '../services/analyticsApi';
 import type {
-  NotificationSummary,
   NotificationEvent,
   NotificationSubTab,
   NotificationSettingsResponse,
   FormNotificationSettings,
   TemplatePreviewResponse,
   NotificationEventLifecycle,
+  TeamMember,
 } from '../types/analytics';
 
 // ---------------------------------------------------------------------------
@@ -48,20 +50,6 @@ const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 function shouldUseMock(tenantId?: string): boolean {
   return USE_MOCK && tenantId === DEMO_TENANT_ID;
 }
-
-const MOCK_SUMMARY: NotificationSummary = {
-  sent: 247,
-  delivered: 238,
-  bounced: 6,
-  complained: 1,
-  opened: 156,
-  clicked: 43,
-  failed: 3,
-  delivery_rate: 96.4,
-  open_rate: 65.5,
-  bounce_rate: 2.4,
-  period: '30d',
-};
 
 function generateMockEvents(): NotificationEvent[] {
   const recipients = [
@@ -81,14 +69,17 @@ function generateMockEvents(): NotificationEvent[] {
     const eventType = statuses[Math.floor(Math.random() * statuses.length)];
     const msgId = `0100019d${Math.random().toString(16).slice(2, 10)}-${Math.random().toString(16).slice(2, 14)}`;
 
+    const formId = forms[Math.floor(Math.random() * forms.length)];
     events.push({
       timestamp: ts,
       event_type: eventType,
       channel: 'email',
       recipient: recipients[Math.floor(Math.random() * recipients.length)],
-      form_id: forms[Math.floor(Math.random() * forms.length)],
+      form_id: formId,
+      form_title: formId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
       status: eventType,
       message_id: msgId,
+      email_type: Math.random() > 0.5 ? 'internal_notification' : 'applicant_confirmation',
     });
   }
 
@@ -161,18 +152,80 @@ const MOCK_SETTINGS: NotificationSettingsResponse = {
 // ---------------------------------------------------------------------------
 
 /**
- * Format an ISO timestamp as a human-readable relative time string.
- * Returns strings like "2m ago", "1h ago", "3d ago".
+ * Format an ISO timestamp as a human-friendly string.
+ * Today → "10:32 AM", Yesterday → "Yesterday 3:15 PM", older → "Apr 8, 2:00 PM"
  */
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+function friendlyTime(iso: string): string {
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return iso || '—';
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86_400_000);
+  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  if (date >= today) return time;
+  if (date >= yesterday) return `Yesterday ${time}`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ` ${time}`;
+}
+
+/**
+ * Group notification events by message_id, returning one row per message
+ * with the highest-priority status. Metadata (recipient, form, timestamp)
+ * comes from the earliest event (send), status from the most significant.
+ *
+ * Priority (highest → lowest):
+ *   complaint > bounce > reject > click > open > delivery > send
+ */
+const STATUS_PRIORITY: Record<string, number> = {
+  complaint: 7,
+  bounce: 6,
+  reject: 5,
+  click: 4,
+  open: 3,
+  delivery: 2,
+  send: 1,
+};
+
+function groupEventsByMessage(events: NotificationEvent[]): NotificationEvent[] {
+  const groups = new Map<string, NotificationEvent[]>();
+
+  for (const evt of events) {
+    const key = evt.message_id;
+    if (!key) continue;
+    const group = groups.get(key);
+    if (group) {
+      group.push(evt);
+    } else {
+      groups.set(key, [evt]);
+    }
+  }
+
+  const grouped: NotificationEvent[] = [];
+  for (const [, group] of groups) {
+    // Sort by priority descending to find the most significant event
+    group.sort((a, b) =>
+      (STATUS_PRIORITY[b.event_type] ?? 0) - (STATUS_PRIORITY[a.event_type] ?? 0)
+    );
+    const highest = group[0];
+
+    // Use the send event for metadata (recipient, form, timestamp) if available
+    const sendEvent = group.find(e => e.event_type === 'send');
+    const base = sendEvent || group[group.length - 1]; // fallback to earliest
+
+    grouped.push({
+      ...base,
+      // Override status and event_type with the highest-priority event
+      status: highest.event_type,
+      event_type: highest.event_type,
+      // Merge detail from the highest-priority event (bounce/complaint info)
+      detail: highest.detail,
+      // Keep send timestamp for "when was this sent"
+      timestamp: base.timestamp,
+    });
+  }
+
+  // Sort by timestamp descending (newest first)
+  grouped.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  return grouped;
 }
 
 /** Validate email format */
@@ -196,13 +249,24 @@ function StatusBadge({ status }: { status: string }) {
     failed: 'bg-red-100 text-red-700',
   };
 
+  const labels: Record<string, string> = {
+    send: 'Sent',
+    delivery: 'Delivered',
+    bounce: 'Bounced',
+    complaint: 'Complaint',
+    open: 'Opened',
+    click: 'Clicked',
+    sent: 'Sent',
+    failed: 'Failed',
+  };
+
   return (
     <span
       className={`px-2 py-0.5 rounded-full text-xs font-medium ${
         styles[status] ?? 'bg-slate-100 text-slate-700'
       }`}
     >
-      {status}
+      {labels[status] ?? status}
     </span>
   );
 }
@@ -379,6 +443,8 @@ const eventColumns: Column<NotificationEvent>[] = [
   {
     key: 'recipient',
     header: 'Recipient',
+    sortable: true,
+    sortKey: 'recipient',
     render: (row) => (
       <span className="block text-left text-sm text-slate-700 truncate max-w-[180px]">
         {row.recipient}
@@ -386,45 +452,92 @@ const eventColumns: Column<NotificationEvent>[] = [
     ),
   },
   {
-    key: 'form_id',
+    key: 'form_title',
     header: 'Form',
+    sortable: true,
+    sortKey: 'form_title',
     render: (row) => (
-      <span className="block text-left text-sm text-slate-600">
-        {row.form_id || '—'}
+      <span className="block text-left text-sm text-slate-600 truncate max-w-[160px]">
+        {row.form_title || '—'}
       </span>
     ),
   },
   {
+    key: 'email_type',
+    header: 'Type',
+    sortable: true,
+    sortKey: 'email_type',
+    render: (row) => {
+      const label = row.email_type === 'internal_notification' ? 'Internal'
+        : row.email_type === 'applicant_confirmation' ? 'Inquiry'
+        : 'Internal';
+      const color = row.email_type === 'applicant_confirmation' ? 'text-purple-600' : 'text-blue-600';
+      return (
+        <span className={`block text-left text-xs font-medium ${color}`}>
+          {label}
+        </span>
+      );
+    },
+  },
+  {
     key: 'status',
     header: 'Status',
+    sortable: true,
+    sortKey: 'status',
     render: (row) => <StatusBadge status={row.status || row.event_type} />,
   },
   {
     key: 'detail',
     header: 'Detail',
+    sortable: true,
+    sortKey: 'event_type',
     render: (row) => {
-      if (!row.detail) return <span className="text-slate-300">—</span>;
-      const d = row.detail as Record<string, string>;
+      const d = (row.detail || {}) as Record<string, string>;
       if (d.bounce_type) {
+        const label = `${d.bounce_type}${d.bounce_subtype ? ` — ${d.bounce_subtype}` : ''}`;
+        const tip = d.bounce_type === 'Permanent'
+          ? 'This address does not exist or permanently rejected the message. It has been hard-bounced and should be removed.'
+          : d.bounce_type === 'Transient'
+            ? 'Delivery failed temporarily (e.g. mailbox full). The system will retry automatically.'
+            : 'The message could not be delivered. Check the recipient address.';
         return (
-          <span className="block text-left text-xs text-red-600" title={JSON.stringify(d)}>
-            {d.bounce_type}{d.bounce_subtype ? ` — ${d.bounce_subtype}` : ''}
+          <span className="block text-left text-xs text-red-600" title={tip}>
+            {label}
           </span>
         );
       }
       if (d.complaint_type) {
+        const label = `${d.complaint_type}${d.complaint_sub_type ? ` — ${d.complaint_sub_type}` : ''}`;
+        const tip = d.complaint_type === 'abuse'
+          ? 'The recipient marked this email as spam. Consider removing them from future notifications.'
+          : `The recipient filed a "${d.complaint_type}" complaint. Review whether they should continue receiving emails.`;
         return (
-          <span className="block text-left text-xs text-amber-600" title={JSON.stringify(d)}>
-            {d.complaint_type}{d.complaint_sub_type ? ` — ${d.complaint_sub_type}` : ''}
+          <span className="block text-left text-xs text-amber-600" title={tip}>
+            {label}
           </span>
         );
       }
-      return <span className="text-slate-300">—</span>;
+      // Status-appropriate default
+      const et = row.event_type || row.status;
+      const defaults: Record<string, string> = {
+        send: 'Pending delivery',
+        delivery: 'Delivered successfully',
+        open: 'Opened by recipient',
+        click: 'Link clicked',
+        reject: 'Rejected by SES',
+      };
+      return (
+        <span className="block text-left text-xs text-slate-400">
+          {defaults[et] || et}
+        </span>
+      );
     },
   },
   {
     key: 'channel',
     header: 'Channel',
+    sortable: true,
+    sortKey: 'channel',
     render: (row) => (
       <span className="block text-left text-xs uppercase tracking-wider text-slate-500">
         {row.channel}
@@ -439,7 +552,7 @@ const eventColumns: Column<NotificationEvent>[] = [
         className="block text-left text-sm text-slate-500"
         title={row.timestamp}
       >
-        {relativeTime(row.timestamp)}
+        {friendlyTime(row.timestamp)}
       </span>
     ),
     sortable: true,
@@ -454,6 +567,11 @@ const eventColumns: Column<NotificationEvent>[] = [
 const CHANNEL_OPTIONS = [
   { id: 'email', name: 'Email' },
   { id: 'sms', name: 'SMS' },
+];
+
+const AUDIENCE_OPTIONS = [
+  { id: 'internal_notification', name: 'Internal' },
+  { id: 'applicant_confirmation', name: 'Form Inquiry' },
 ];
 
 const STATUS_OPTIONS = [
@@ -511,6 +629,15 @@ function EventDetailModal({
     complaint: 'bg-amber-100 text-amber-700',
     open: 'bg-purple-100 text-purple-700',
     click: 'bg-indigo-100 text-indigo-700',
+  };
+
+  const eventTypeLabels: Record<string, string> = {
+    send: 'Sent',
+    delivery: 'Delivered',
+    bounce: 'Bounced',
+    complaint: 'Complaint',
+    open: 'Opened',
+    click: 'Clicked',
   };
 
   return (
@@ -572,9 +699,9 @@ function EventDetailModal({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${colorClass}`}>
-                          {evt.event_type}
+                          {eventTypeLabels[evt.event_type] ?? evt.event_type}
                         </span>
-                        <span className="text-xs text-slate-400">{evt.timestamp}</span>
+                        <span className="text-xs text-slate-400">{new Date(evt.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</span>
                       </div>
                       {/* Bounce/complaint detail */}
                       {detail.bounce_type && (
@@ -614,12 +741,11 @@ function NotificationDashboardTab() {
   const { user } = useAuth();
 
   // PageHeader state
-  const [timeRange, setTimeRange] = useState<TimeRangeValue>('7d');
+  const [timeRange, setTimeRange] = useState<TimeRangeValue>('30d');
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
 
-  // Summary and event log state
-  const [summary, setSummary] = useState<NotificationSummary | null>(null);
-  const [events, setEvents] = useState<NotificationEvent[]>([]);
-  const [totalEvents, setTotalEvents] = useState(0);
+  // Event log state (grouped by message_id)
+  const [allGroupedEvents, setAllGroupedEvents] = useState<NotificationEvent[]>([]);
   const [page, setPage] = useState(1);
   const pageSize = 25;
 
@@ -629,6 +755,21 @@ function NotificationDashboardTab() {
   // Filter state
   const [channelFilter, setChannelFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [audienceFilter, setAudienceFilter] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [sortColumn, setSortColumn] = useState<string | null>('timestamp');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Derived: search filter + paginate the grouped events client-side
+  const searchLower = searchInput.trim().toLowerCase();
+  const filteredEvents = searchLower
+    ? allGroupedEvents.filter(e =>
+        e.recipient.toLowerCase().includes(searchLower) ||
+        (e.form_title || '').toLowerCase().includes(searchLower)
+      )
+    : allGroupedEvents;
+  const totalEvents = filteredEvents.length;
+  const events = filteredEvents.slice((page - 1) * pageSize, page * pageSize);
 
   // Loading / error state
   const [isLoading, setIsLoading] = useState(true);
@@ -638,31 +779,65 @@ function NotificationDashboardTab() {
     setIsLoading(true);
     setError(null);
 
+    // Build date range options for custom range
+    const dateRangeOptions = timeRange === 'custom' && dateRange ? {
+      startDate: dateRange.startDate.toISOString().split('T')[0],
+      endDate: dateRange.endDate.toISOString().split('T')[0],
+    } : undefined;
+
     try {
       if (shouldUseMock(user?.tenant_id)) {
         // Mock data for demo tenant
-        setSummary({ ...MOCK_SUMMARY, period: timeRange });
         let filtered = [...MOCK_EVENTS];
         if (channelFilter) filtered = filtered.filter(e => e.channel === channelFilter);
         if (statusFilter) filtered = filtered.filter(e => e.event_type === statusFilter);
-        const start = (page - 1) * pageSize;
-        setEvents(filtered.slice(start, start + pageSize));
-        setTotalEvents(filtered.length);
+        const grouped = groupEventsByMessage(filtered);
+        // Apply status filter on grouped results (filter by rolled-up status)
+        const finalGrouped = statusFilter
+          ? grouped.filter(e => e.event_type === statusFilter)
+          : grouped;
+        setAllGroupedEvents(finalGrouped);
       } else {
-        const [summaryData, eventsData] = await Promise.all([
-          fetchNotificationSummary(timeRange),
-          fetchNotificationEvents({
-            range: timeRange,
-            page,
-            limit: pageSize,
-            channel: channelFilter || undefined,
-            status: statusFilter || undefined,
-          }),
-        ]);
+        // Fetch all events (paginate through API's 100-item max) so we can
+        // group by message_id client-side before displaying.
+        const firstPage = await fetchNotificationEvents({
+          range: timeRange,
+          page: 1,
+          limit: 100,
+          channel: channelFilter || undefined,
+          email_type: audienceFilter || undefined,
+          startDate: dateRangeOptions?.startDate,
+          endDate: dateRangeOptions?.endDate,
+        });
 
-        setSummary(summaryData);
-        setEvents(eventsData.events);
-        setTotalEvents(eventsData.total);
+        let allRawEvents = [...firstPage.events];
+
+        // Fetch remaining pages if needed
+        if (firstPage.has_more) {
+          let apiPage = 2;
+          let hasMore = true;
+          while (hasMore) {
+            const nextPage = await fetchNotificationEvents({
+              range: timeRange,
+              page: apiPage,
+              limit: 100,
+              channel: channelFilter || undefined,
+              email_type: audienceFilter || undefined,
+              startDate: dateRangeOptions?.startDate,
+              endDate: dateRangeOptions?.endDate,
+            });
+            allRawEvents = [...allRawEvents, ...nextPage.events];
+            hasMore = nextPage.has_more;
+            apiPage++;
+          }
+        }
+
+        const grouped = groupEventsByMessage(allRawEvents);
+        // Apply status filter on grouped results (filter by rolled-up status)
+        const finalGrouped = statusFilter
+          ? grouped.filter(e => e.event_type === statusFilter)
+          : grouped;
+        setAllGroupedEvents(finalGrouped);
       }
     } catch (err) {
       console.error('Notifications data load error:', err);
@@ -670,7 +845,7 @@ function NotificationDashboardTab() {
     } finally {
       setIsLoading(false);
     }
-  }, [timeRange, page, channelFilter, statusFilter, user?.tenant_id]);
+  }, [timeRange, dateRange, channelFilter, statusFilter, audienceFilter, user?.tenant_id]);
 
   useEffect(() => {
     loadData();
@@ -679,7 +854,7 @@ function NotificationDashboardTab() {
   // Reset to page 1 when filters or range change
   useEffect(() => {
     setPage(1);
-  }, [timeRange, channelFilter, statusFilter]);
+  }, [timeRange, channelFilter, statusFilter, audienceFilter]);
 
   // Suppress unused user warning — matches Dashboard.tsx pattern (user kept for future tenant context)
   void user;
@@ -688,6 +863,14 @@ function NotificationDashboardTab() {
 
   const handleTimeRangeChange = (range: TimeRangeValue) => {
     setTimeRange(range);
+    if (range !== 'custom') {
+      setDateRange(null);
+    }
+  };
+
+  const handleDateRangeChange = (range: DateRange) => {
+    setDateRange(range);
+    setTimeRange('custom');
   };
 
   if (error) {
@@ -714,10 +897,12 @@ function NotificationDashboardTab() {
         timeRange={timeRange}
         onTimeRangeChange={handleTimeRangeChange}
         showExport={false}
-        showDatePicker={false}
+        showDatePicker={true}
+        dateRange={dateRange}
+        onDateRangeChange={handleDateRangeChange}
       />
 
-      {/* ---- Stat cards ---- */}
+      {/* ---- Stat cards (derived from grouped messages) ---- */}
       {isLoading ? (
         /* Skeleton row */
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8" aria-busy="true" aria-label="Loading metrics">
@@ -728,34 +913,44 @@ function NotificationDashboardTab() {
             </div>
           ))}
         </div>
-      ) : summary ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatCard
-            tier="hero"
-            title="SENT"
-            value={summary.sent.toLocaleString()}
-            subtitle={`${summary.period} period`}
-          />
-          <StatCard
-            tier="hero"
-            title="DELIVERED"
-            value={summary.delivered.toLocaleString()}
-            subtitle={`${summary.delivery_rate}% delivery rate`}
-          />
-          <StatCard
-            tier="hero"
-            title="BOUNCED"
-            value={summary.bounced.toLocaleString()}
-            subtitle={`${summary.bounce_rate}% bounce rate`}
-          />
-          <StatCard
-            tier="hero"
-            title="OPENED"
-            value={summary.opened.toLocaleString()}
-            subtitle={`${summary.open_rate}% open rate`}
-          />
-        </div>
-      ) : null}
+      ) : (() => {
+        const total = allGroupedEvents.length;
+        const delivered = allGroupedEvents.filter(e => e.event_type === 'delivery' || e.event_type === 'open' || e.event_type === 'click').length;
+        const bounced = allGroupedEvents.filter(e => e.event_type === 'bounce').length;
+        const opened = allGroupedEvents.filter(e => e.event_type === 'open' || e.event_type === 'click').length;
+        const deliveryRate = total > 0 ? ((delivered / total) * 100).toFixed(1) : '0.0';
+        const bounceRate = total > 0 ? ((bounced / total) * 100).toFixed(1) : '0.0';
+        const openRate = total > 0 ? ((opened / total) * 100).toFixed(1) : '0.0';
+
+        return (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <StatCard
+              tier="hero"
+              title="SENT"
+              value={total.toLocaleString()}
+              subtitle="Total messages"
+            />
+            <StatCard
+              tier="hero"
+              title="DELIVERED"
+              value={delivered.toLocaleString()}
+              subtitle={`${deliveryRate}% delivery rate`}
+            />
+            <StatCard
+              tier="hero"
+              title="BOUNCED"
+              value={bounced.toLocaleString()}
+              subtitle={`${bounceRate}% bounce rate`}
+            />
+            <StatCard
+              tier="hero"
+              title="OPENED"
+              value={opened.toLocaleString()}
+              subtitle={`${openRate}% open rate`}
+            />
+          </div>
+        );
+      })()}
 
       {/* ---- Event log ---- */}
       <section aria-labelledby="notification-events-heading">
@@ -781,6 +976,12 @@ function NotificationDashboardTab() {
               options={STATUS_OPTIONS}
               placeholder="All Statuses"
             />
+            <FilterDropdown
+              value={audienceFilter}
+              onChange={(v) => setAudienceFilter(v)}
+              options={AUDIENCE_OPTIONS}
+              placeholder="All Types"
+            />
           </div>
         </div>
 
@@ -793,8 +994,8 @@ function NotificationDashboardTab() {
               ))}
             </div>
           </div>
-        ) : events.length === 0 ? (
-          /* Empty state */
+        ) : allGroupedEvents.length === 0 ? (
+          /* Empty state — only when no data exists at all */
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center py-16 px-6 text-center">
             <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mb-4">
               <svg
@@ -822,12 +1023,31 @@ function NotificationDashboardTab() {
             title="Notification Events"
             rowKey="message_id"
             columns={eventColumns}
-            data={events}
+            data={
+              sortColumn && sortDirection
+                ? [...events].sort((a, b) => {
+                    const aVal = String((a as unknown as Record<string, unknown>)[sortColumn] ?? '');
+                    const bVal = String((b as unknown as Record<string, unknown>)[sortColumn] ?? '');
+                    const cmp = aVal.localeCompare(bVal);
+                    return sortDirection === 'asc' ? cmp : -cmp;
+                  })
+                : events
+            }
             totalCount={totalEvents}
             page={page}
             pageSize={pageSize}
             onPageChange={setPage}
             onRowClick={(row) => setSelectedMessageId(row.message_id)}
+            onSearch={(q) => {
+              setSearchInput(q);
+              setPage(1);
+            }}
+            searchValue={searchInput}
+            emptyMessage="No messages match your search"
+            showFilter={false}
+            sortColumn={sortColumn}
+            sortDirection={sortDirection}
+            onSort={(col, dir) => { setSortColumn(col); setSortDirection(dir); }}
           />
         )}
       </section>
@@ -850,6 +1070,18 @@ function cloneSettings(s: FormNotificationSettings): FormNotificationSettings {
   return JSON.parse(JSON.stringify(s));
 }
 
+function formatPhoneDisplay(e164: string): string {
+  // Convert +15125551234 → (512) 555-1234
+  const digits = e164.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    const area = digits.slice(1, 4);
+    const prefix = digits.slice(4, 7);
+    const line = digits.slice(7);
+    return `(${area}) ${prefix}-${line}`;
+  }
+  return e164;
+}
+
 function RecipientsTab() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
@@ -861,6 +1093,9 @@ function RecipientsTab() {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [savingForms, setSavingForms] = useState<Set<string>>(new Set());
   const [testingForms, setTestingForms] = useState<Set<string>>(new Set());
+  // Team members for checklist UI (null = legacy fallback mode)
+  const [teamMembers, setTeamMembers] = useState<TeamMember[] | null>(null);
+  // Legacy text input state (only used in fallback mode)
   const [newEmailInput, setNewEmailInput] = useState<Record<string, string>>({});
   const [emailErrors, setEmailErrors] = useState<Record<string, string>>({});
   const [newPhoneInput, setNewPhoneInput] = useState<Record<string, string>>({});
@@ -870,13 +1105,28 @@ function RecipientsTab() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = shouldUseMock(user?.tenant_id) ? MOCK_SETTINGS : await fetchNotificationSettings();
+      const [settingsResult, teamResult] = await Promise.allSettled([
+        shouldUseMock(user?.tenant_id) ? Promise.resolve(MOCK_SETTINGS) : fetchNotificationSettings(),
+        fetchTeamMembers(),
+      ]);
+
+      if (settingsResult.status === 'rejected') {
+        throw settingsResult.reason;
+      }
+      const data = settingsResult.value;
       setSettings(data);
       const initialDraft: Record<string, FormNotificationSettings> = {};
       for (const [id, s] of Object.entries(data.forms)) {
         initialDraft[id] = cloneSettings(s);
       }
       setDraft(initialDraft);
+
+      // Team members: null signals legacy fallback
+      if (teamResult.status === 'fulfilled' && teamResult.value.members.length > 0) {
+        setTeamMembers(teamResult.value.members);
+      } else {
+        setTeamMembers(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load notification settings');
     } finally {
@@ -939,7 +1189,33 @@ function RecipientsTab() {
     markDirty(formId);
   };
 
-  // --- Add recipient ---
+  // --- Toggle recipient user (member checklist mode) ---
+  const toggleRecipientUser = (formId: string, userId: string) => {
+    setDraft((prev) => {
+      const next = { ...prev };
+      next[formId] = cloneSettings(next[formId]);
+      const current = next[formId].notifications.internal.recipient_user_ids || [];
+      next[formId].notifications.internal.recipient_user_ids = current.includes(userId)
+        ? current.filter(id => id !== userId)
+        : [...current, userId];
+      return next;
+    });
+    markDirty(formId);
+  };
+
+  // --- Remove stale user_id ---
+  const removeStaleUserId = (formId: string, userId: string) => {
+    setDraft((prev) => {
+      const next = { ...prev };
+      next[formId] = cloneSettings(next[formId]);
+      next[formId].notifications.internal.recipient_user_ids =
+        (next[formId].notifications.internal.recipient_user_ids || []).filter(id => id !== userId);
+      return next;
+    });
+    markDirty(formId);
+  };
+
+  // --- Legacy: Add recipient ---
   const addRecipient = (formId: string) => {
     const email = (newEmailInput[formId] ?? '').trim();
     if (!isValidEmail(email)) {
@@ -961,7 +1237,7 @@ function RecipientsTab() {
     markDirty(formId);
   };
 
-  // --- Remove recipient ---
+  // --- Legacy: Remove recipient ---
   const removeRecipient = (formId: string, email: string) => {
     setDraft((prev) => {
       const next = { ...prev };
@@ -973,10 +1249,9 @@ function RecipientsTab() {
     markDirty(formId);
   };
 
-  // --- Add SMS recipient ---
+  // --- Legacy: Add SMS recipient ---
   const addSmsRecipient = (formId: string) => {
     const raw = (newPhoneInput[formId] ?? '').trim();
-    // Normalize: strip spaces/dashes/parens, prepend +1 if needed
     const digits = raw.replace(/[\s\-().]/g, '');
     const phone = digits.startsWith('+') ? digits : digits.startsWith('1') ? `+${digits}` : `+1${digits}`;
     if (!/^\+1\d{10}$/.test(phone)) {
@@ -1002,7 +1277,7 @@ function RecipientsTab() {
     markDirty(formId);
   };
 
-  // --- Remove SMS recipient ---
+  // --- Legacy: Remove SMS recipient ---
   const removeSmsRecipient = (formId: string, phone: string) => {
     setDraft((prev) => {
       const next = { ...prev };
@@ -1016,6 +1291,14 @@ function RecipientsTab() {
 
   // --- Save ---
   const handleSave = async (formId: string) => {
+    const formDraft = draft[formId];
+    const internal = formDraft.notifications.internal;
+    const hasUserIds = teamMembers && (internal.recipient_user_ids || []).length > 0;
+    const hasLegacy = internal.recipients.length > 0;
+    if (internal.enabled && !hasUserIds && !hasLegacy) {
+      setFeedback({ type: 'error', message: 'Select at least one recipient before saving. Internal notifications are enabled but no recipients are configured.' });
+      return;
+    }
     setSavingForms((prev) => new Set(prev).add(formId));
     setFeedback(null);
     try {
@@ -1042,16 +1325,29 @@ function RecipientsTab() {
 
   // --- Send test email ---
   const handleTestSend = async (formId: string) => {
-    const recipients = draft[formId].notifications.internal.recipients;
-    if (recipients.length === 0) {
+    const internal = draft[formId].notifications.internal;
+    const userIds = internal.recipient_user_ids || [];
+    const legacyRecipients = internal.recipients;
+
+    // Prefer user_id if available (member checklist mode)
+    const hasUserIds = teamMembers && userIds.length > 0;
+    if (!hasUserIds && legacyRecipients.length === 0) {
       setFeedback({ type: 'error', message: 'Add at least one recipient before sending a test.' });
       return;
     }
+
     setTestingForms((prev) => new Set(prev).add(formId));
     setFeedback(null);
     try {
-      await sendTestNotification(recipients[0], formId);
-      setFeedback({ type: 'success', message: `Test email sent to ${recipients[0]}.` });
+      if (hasUserIds) {
+        const firstUserId = userIds[0];
+        const member = teamMembers?.find(m => m.user_id === firstUserId);
+        await sendTestNotification(member?.email || '', formId, firstUserId);
+        setFeedback({ type: 'success', message: `Test email sent to ${member?.name || firstUserId}.` });
+      } else {
+        await sendTestNotification(legacyRecipients[0], formId);
+        setFeedback({ type: 'success', message: `Test email sent to ${legacyRecipients[0]}.` });
+      }
     } catch (err) {
       setFeedback({
         type: 'error',
@@ -1064,6 +1360,152 @@ function RecipientsTab() {
         return next;
       });
     }
+  };
+
+  // ----- Render helpers -----
+
+  const renderMemberChecklist = (formId: string, internal: FormNotificationSettings['notifications']['internal']) => {
+    const selectedIds = internal.recipient_user_ids || [];
+    const memberIds = new Set(teamMembers!.map(m => m.user_id));
+    const staleIds = selectedIds.filter(id => !memberIds.has(id));
+
+    return (
+      <div>
+        <p className="text-xs font-medium text-slate-600 mb-2">Team Members</p>
+        <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden">
+          {teamMembers!.map((member) => {
+            const isSelected = selectedIds.includes(member.user_id);
+            return (
+              <label
+                key={member.user_id}
+                className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors ${
+                  !isAdmin ? 'cursor-default' : ''
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggleRecipientUser(formId, member.user_id)}
+                  disabled={!isAdmin}
+                  className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500 shrink-0"
+                />
+                {member.image_url && (
+                  <img src={member.image_url} alt="" className="w-7 h-7 rounded-full shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-800 truncate">{member.name}</p>
+                  <p className="text-xs text-slate-500 truncate">{member.email}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xs text-slate-500">
+                    {member.phone ? formatPhoneDisplay(member.phone) : '\u2014'}
+                  </p>
+                  {member.sms_opted_in ? (
+                    <span className="text-[10px] text-emerald-600 font-medium">SMS opted in</span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400">Email only</span>
+                  )}
+                </div>
+              </label>
+            );
+          })}
+
+          {/* Stale user_ids — in config but not in current team */}
+          {staleIds.map((userId) => (
+            <div key={userId} className="flex items-center gap-3 px-4 py-3 bg-amber-50">
+              <svg className="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-amber-800 font-medium">Former team member</p>
+                <p className="text-xs text-amber-600 truncate">{userId}</p>
+              </div>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => removeStaleUserId(formId, userId)}
+                  className="text-xs text-amber-700 hover:text-red-600 font-medium transition-colors"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {selectedIds.length === 0 && (
+          <p className="text-xs text-slate-400 mt-2 italic">No team members selected. Check the boxes above to add recipients.</p>
+        )}
+      </div>
+    );
+  };
+
+  const renderLegacyRecipients = (formId: string, internal: FormNotificationSettings['notifications']['internal']) => {
+    const inputEmail = newEmailInput[formId] ?? '';
+    const emailError = emailErrors[formId] ?? '';
+
+    return (
+      <>
+        {/* Email recipients */}
+        <div>
+          <p className="text-xs font-medium text-slate-600 mb-2">Recipients</p>
+          {internal.recipients.length === 0 ? (
+            <p className="text-sm text-slate-400 italic mb-2">No recipients yet.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2 mb-3" role="list" aria-label="Recipient email addresses">
+              {internal.recipients.map((email) => (
+                <span key={email} role="listitem" className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 rounded-full text-sm">
+                  <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  {email}
+                  {isAdmin && <button type="button" onClick={() => removeRecipient(formId, email)} aria-label={`Remove ${email}`} className="ml-0.5 text-primary-500 hover:text-primary-700 transition-colors">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>}
+                </span>
+              ))}
+            </div>
+          )}
+          {isAdmin && (
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                <input type="email" value={inputEmail} onChange={(e) => { setNewEmailInput((prev) => ({ ...prev, [formId]: e.target.value })); if (emailError) setEmailErrors((prev) => ({ ...prev, [formId]: '' })); }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRecipient(formId); } }} placeholder="email@example.com" aria-label="New recipient email" aria-describedby={emailError ? `email-error-${formId}` : undefined} aria-invalid={!!emailError} className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-shadow ${emailError ? 'border-red-400' : 'border-slate-200'}`} />
+                {emailError && <p id={`email-error-${formId}`} role="alert" className="text-xs text-red-600 mt-1">{emailError}</p>}
+              </div>
+              <button type="button" onClick={() => addRecipient(formId)} className="shrink-0 px-3 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors">+ Add</button>
+            </div>
+          )}
+        </div>
+
+        {/* SMS recipients (legacy) */}
+        {internal.channels.sms && (
+          <div>
+            <p className="text-xs font-medium text-slate-600 mb-2">SMS Recipients</p>
+            {(internal.sms_recipients || []).length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {(internal.sms_recipients || []).map((phone) => (
+                  <span key={phone} className="inline-flex items-center gap-1.5 px-3 py-1 text-sm text-slate-700 bg-slate-100 rounded-full">
+                    {formatPhoneDisplay(phone)}
+                    {isAdmin && <button type="button" onClick={() => removeSmsRecipient(formId, phone)} className="text-slate-400 hover:text-red-500 transition-colors" aria-label={`Remove ${phone}`}>&times;</button>}
+                  </span>
+                ))}
+              </div>
+            )}
+            {isAdmin && (
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <input type="tel" placeholder="512-555-1234" value={newPhoneInput[formId] ?? ''} onChange={(e) => setNewPhoneInput((prev) => ({ ...prev, [formId]: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSmsRecipient(formId); } }} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                  {phoneErrors[formId] && <p className="text-xs text-red-500 mt-1">{phoneErrors[formId]}</p>}
+                </div>
+                <button type="button" onClick={() => addSmsRecipient(formId)} className="shrink-0 px-3 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors">+ Add</button>
+              </div>
+            )}
+          </div>
+        )}
+      </>
+    );
   };
 
   // ----- Render -----
@@ -1102,6 +1544,7 @@ function RecipientsTab() {
 
   const formEntries = Object.entries(draft);
   const anyDirty = dirtyForms.size > 0;
+  const useChecklist = teamMembers !== null;
 
   return (
     <section aria-labelledby="recipients-heading">
@@ -1124,8 +1567,9 @@ function RecipientsTab() {
           const isDirty = dirtyForms.has(formId);
           const isSaving = savingForms.has(formId);
           const isTesting = testingForms.has(formId);
-          const inputEmail = newEmailInput[formId] ?? '';
-          const emailError = emailErrors[formId] ?? '';
+          const hasRecipients = useChecklist
+            ? (internal.recipient_user_ids || []).length > 0
+            : internal.recipients.length > 0;
 
           return (
             <div
@@ -1156,7 +1600,6 @@ function RecipientsTab() {
                     <p className="text-sm font-semibold text-slate-700 uppercase tracking-wider">
                       Internal Notifications
                     </p>
-                    {/* Toggle */}
                     <label className="relative inline-flex items-center cursor-pointer" htmlFor={`internal-toggle-${formId}`}>
                       <span className="sr-only">Enable internal notifications</span>
                       <input
@@ -1183,178 +1626,63 @@ function RecipientsTab() {
 
                   {internal.enabled && (
                     <div className="space-y-4">
-                      {/* Recipient list */}
-                      <div>
-                        <p className="text-xs font-medium text-slate-600 mb-2">Recipients</p>
-                        {internal.recipients.length === 0 ? (
-                          <p className="text-sm text-slate-400 italic mb-2">No recipients yet.</p>
-                        ) : (
-                          <div
-                            className="flex flex-wrap gap-2 mb-3"
-                            role="list"
-                            aria-label="Recipient email addresses"
-                          >
-                            {internal.recipients.map((email) => (
-                              <span
-                                key={email}
-                                role="listitem"
-                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 rounded-full text-sm"
-                              >
-                                <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                </svg>
+                      {/* Recipients: member checklist or legacy text inputs */}
+                      {useChecklist
+                        ? renderMemberChecklist(formId, internal)
+                        : renderLegacyRecipients(formId, internal)
+                      }
+
+                      {/* Legacy recipients shown read-only in checklist mode (mixed-mode) */}
+                      {useChecklist && internal.recipients.length > 0 && (
+                        <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                          <p className="text-xs font-medium text-slate-500 mb-1.5">Legacy email recipients (direct)</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {internal.recipients.map(email => (
+                              <span key={email} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-slate-200 text-slate-600 rounded text-xs">
                                 {email}
-                                {isAdmin && <button
-                                  type="button"
-                                  onClick={() => removeRecipient(formId, email)}
-                                  aria-label={`Remove ${email}`}
-                                  className="ml-0.5 text-primary-500 hover:text-primary-700 transition-colors"
-                                >
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                </button>}
+                                {isAdmin && (
+                                  <button type="button" onClick={() => removeRecipient(formId, email)} className="text-slate-400 hover:text-red-500" aria-label={`Remove ${email}`}>&times;</button>
+                                )}
                               </span>
                             ))}
                           </div>
-                        )}
-
-                        {/* Add recipient (admin only) */}
-                        {isAdmin && (
-                        <div className="flex items-start gap-2">
-                          <div className="flex-1">
-                            <input
-                              type="email"
-                              value={inputEmail}
-                              onChange={(e) => {
-                                setNewEmailInput((prev) => ({ ...prev, [formId]: e.target.value }));
-                                if (emailError) setEmailErrors((prev) => ({ ...prev, [formId]: '' }));
-                              }}
-                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRecipient(formId); } }}
-                              placeholder="email@example.com"
-                              aria-label="New recipient email"
-                              aria-describedby={emailError ? `email-error-${formId}` : undefined}
-                              aria-invalid={!!emailError}
-                              className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-shadow ${
-                                emailError ? 'border-red-400' : 'border-slate-200'
-                              }`}
-                            />
-                            {emailError && (
-                              <p id={`email-error-${formId}`} role="alert" className="text-xs text-red-600 mt-1">
-                                {emailError}
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => addRecipient(formId)}
-                            className="shrink-0 px-3 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors"
-                          >
-                            + Add
-                          </button>
+                          <p className="text-[10px] text-slate-400 mt-1">These will be sent alongside team member notifications.</p>
                         </div>
-                        )}
-                      </div>
+                      )}
 
                       {/* Channels */}
                       <fieldset>
                         <legend className="text-xs font-medium text-slate-600 mb-2">Channels</legend>
                         <div className="flex items-center gap-4">
                           <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-700">
-                            <input
-                              type="checkbox"
-                              checked={internal.channels.email}
-                              onChange={() => toggleChannel(formId, 'email')}
-                              disabled={!isAdmin}
-                              className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500"
-                            />
+                            <input type="checkbox" checked={internal.channels.email} onChange={() => toggleChannel(formId, 'email')} disabled={!isAdmin} className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500" />
                             Email
                           </label>
                           <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-700">
-                            <input
-                              type="checkbox"
-                              checked={internal.channels.sms}
-                              onChange={() => toggleChannel(formId, 'sms')}
-                              disabled={!isAdmin}
-                              className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500"
-                            />
+                            <input type="checkbox" checked={internal.channels.sms} onChange={() => toggleChannel(formId, 'sms')} disabled={!isAdmin} className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500" />
                             SMS
                           </label>
                         </div>
                       </fieldset>
 
-                      {/* SMS Recipients (visible when SMS channel enabled) */}
-                      {internal.channels.sms && (
+                      {/* Test email (admin only) */}
+                      {isAdmin && (
                         <div>
-                          <p className="text-xs font-medium text-slate-600 mb-2">SMS Recipients</p>
-                          {(internal.sms_recipients || []).length > 0 && (
-                            <div className="flex flex-wrap gap-2 mb-3">
-                              {(internal.sms_recipients || []).map((phone) => (
-                                <span
-                                  key={phone}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1 text-sm text-slate-700 bg-slate-100 rounded-full"
-                                >
-                                  📱 {phone}
-                                  {isAdmin && <button
-                                    type="button"
-                                    onClick={() => removeSmsRecipient(formId, phone)}
-                                    className="text-slate-400 hover:text-red-500 transition-colors"
-                                    aria-label={`Remove ${phone}`}
-                                  >
-                                    ×
-                                  </button>}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {isAdmin && (
-                          <div className="flex gap-2">
-                            <div className="flex-1">
-                              <input
-                                type="tel"
-                                placeholder="512-555-1234"
-                                value={newPhoneInput[formId] ?? ''}
-                                onChange={(e) =>
-                                  setNewPhoneInput((prev) => ({ ...prev, [formId]: e.target.value }))
-                                }
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    addSmsRecipient(formId);
-                                  }
-                                }}
-                                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                              />
-                              {phoneErrors[formId] && (
-                                <p className="text-xs text-red-500 mt-1">{phoneErrors[formId]}</p>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => addSmsRecipient(formId)}
-                              className="shrink-0 px-3 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors"
-                            >
-                              + Add
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleTestSend(formId)}
+                            disabled={isTesting || !hasRecipients}
+                            className="px-4 py-2 text-sm font-medium text-primary-600 border border-primary-300 rounded-lg hover:bg-primary-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isTesting ? 'Sending...' : 'Send Test Email'}
+                          </button>
+                          {!hasRecipients && (
+                            <p className="text-xs text-slate-400 mt-1">
+                              {useChecklist ? 'Select a team member first.' : 'Add a recipient first.'}
+                            </p>
                           )}
                         </div>
                       )}
-
-                      {/* Test email (admin only) */}
-                      {isAdmin && <div>
-                        <button
-                          type="button"
-                          onClick={() => handleTestSend(formId)}
-                          disabled={isTesting || internal.recipients.length === 0}
-                          className="px-4 py-2 text-sm font-medium text-primary-600 border border-primary-300 rounded-lg hover:bg-primary-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isTesting ? 'Sending...' : 'Send Test Email'}
-                        </button>
-                        {internal.recipients.length === 0 && (
-                          <p className="text-xs text-slate-400 mt-1">Add a recipient first.</p>
-                        )}
-                      </div>}
                     </div>
                   )}
                 </div>
@@ -1408,16 +1736,19 @@ function RecipientsTab() {
 
                 {/* Save row (admin only) */}
                 {isAdmin && (
-                <div className="flex justify-end pt-2">
-                  <button
-                    type="button"
-                    onClick={() => handleSave(formId)}
-                    disabled={!isDirty || isSaving}
-                    className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {isSaving ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    {internal.enabled && !hasRecipients && isDirty && (
+                      <p className="text-xs text-red-600">Select at least one recipient.</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleSave(formId)}
+                      disabled={!isDirty || isSaving || (internal.enabled && !hasRecipients)}
+                      className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {isSaving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -1425,7 +1756,6 @@ function RecipientsTab() {
         })}
       </div>
 
-      {/* Global save note when multiple forms are dirty */}
       {anyDirty && (
         <p className="text-xs text-amber-600 text-right mt-3">
           Save each form individually to apply changes.
@@ -1445,6 +1775,7 @@ const TEMPLATE_VARIABLES = [
   '{email}',
   '{phone}',
   '{organization_name}',
+  '{form_title}',
   '{form_data}',
 ];
 
@@ -1462,6 +1793,25 @@ function TemplatesTab() {
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [previewData, setPreviewData] = useState<TemplatePreviewResponse | null>(null);
   const [previewLoading, setPreviewLoading] = useState<string | null>(null);
+
+  // Track last-focused template field for variable chip insertion
+  const lastFocusedRef = useRef<{ section: 'internal' | 'applicant_confirmation'; field: 'subject' | 'body_template'; el: HTMLInputElement | HTMLTextAreaElement } | null>(null);
+
+  const insertVariable = (variable: string) => {
+    const target = lastFocusedRef.current;
+    if (!target || !target.el) return;
+    const { section, field, el } = target;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? start;
+    const newValue = el.value.slice(0, start) + variable + el.value.slice(end);
+    updateField(section, field, newValue);
+    // Restore cursor after React re-render
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + variable.length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
 
   const loadTemplates = useCallback(async () => {
     setIsLoading(true);
@@ -1557,8 +1907,14 @@ function TemplatesTab() {
     setIsSendingTest(true);
     setFeedback(null);
     try {
-      await sendTestTemplate(selectedFormId);
-      setFeedback({ type: 'success', message: 'Test email sent to your account email.' });
+      const sends: Promise<unknown>[] = [sendTestTemplate(selectedFormId, 'internal')];
+      const formDraft = draft[selectedFormId];
+      if (formDraft?.notifications?.applicant_confirmation?.enabled) {
+        sends.push(sendTestTemplate(selectedFormId, 'applicant_confirmation'));
+      }
+      await Promise.all(sends);
+      const types = sends.length > 1 ? 'Internal + applicant confirmation emails' : 'Internal notification email';
+      setFeedback({ type: 'success', message: `${types} sent to your account email.` });
     } catch (err) {
       setFeedback({
         type: 'error',
@@ -1678,6 +2034,7 @@ function TemplatesTab() {
                     id={`internal-subject-${selectedFormId}`}
                     value={currentForm.notifications.internal.subject}
                     onChange={(e) => updateField('internal', 'subject', e.target.value)}
+                    onFocus={(e) => { lastFocusedRef.current = { section: 'internal', field: 'subject', el: e.target }; }}
                     readOnly={!isAdmin}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                     placeholder="New submission: {first_name} {last_name}"
@@ -1692,6 +2049,7 @@ function TemplatesTab() {
                     id={`internal-body-${selectedFormId}`}
                     value={currentForm.notifications.internal.body_template}
                     onChange={(e) => updateField('internal', 'body_template', e.target.value)}
+                    onFocus={(e) => { lastFocusedRef.current = { section: 'internal', field: 'body_template', el: e.target }; }}
                     readOnly={!isAdmin}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none min-h-[120px] resize-y"
                     placeholder="Hi Team,&#10;&#10;{form_data}&#10;&#10;Best, MyRecruiter AI"
@@ -1702,13 +2060,16 @@ function TemplatesTab() {
                   <p className="text-xs font-medium text-slate-500 mb-1.5">Available variables</p>
                   <div className="flex flex-wrap gap-1.5" role="list" aria-label="Available template variables">
                     {TEMPLATE_VARIABLES.map((v) => (
-                      <code
+                      <button
+                        type="button"
                         key={v}
                         role="listitem"
-                        className="text-xs text-slate-400 font-mono bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded"
+                        onClick={() => insertVariable(v)}
+                        className="text-xs text-slate-500 font-mono bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 cursor-pointer transition-colors"
+                        title={`Insert ${v} at cursor`}
                       >
                         {v}
-                      </code>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -1745,6 +2106,7 @@ function TemplatesTab() {
                     id={`applicant-subject-${selectedFormId}`}
                     value={currentForm.notifications.applicant_confirmation.subject}
                     onChange={(e) => updateField('applicant_confirmation', 'subject', e.target.value)}
+                    onFocus={(e) => { lastFocusedRef.current = { section: 'applicant_confirmation', field: 'subject', el: e.target }; }}
                     readOnly={!isAdmin}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                     placeholder="Thanks for applying, {first_name}!"
@@ -1759,6 +2121,7 @@ function TemplatesTab() {
                     id={`applicant-body-${selectedFormId}`}
                     value={currentForm.notifications.applicant_confirmation.body_template}
                     onChange={(e) => updateField('applicant_confirmation', 'body_template', e.target.value)}
+                    onFocus={(e) => { lastFocusedRef.current = { section: 'applicant_confirmation', field: 'body_template', el: e.target }; }}
                     readOnly={!isAdmin}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none min-h-[120px] resize-y"
                     placeholder="Hi {first_name},&#10;&#10;Thank you for your submission!&#10;&#10;Best regards"
@@ -1769,13 +2132,16 @@ function TemplatesTab() {
                   <p className="text-xs font-medium text-slate-500 mb-1.5">Available variables</p>
                   <div className="flex flex-wrap gap-1.5" role="list" aria-label="Available template variables">
                     {TEMPLATE_VARIABLES.map((v) => (
-                      <code
+                      <button
+                        type="button"
                         key={v}
                         role="listitem"
-                        className="text-xs text-slate-400 font-mono bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded"
+                        onClick={() => insertVariable(v)}
+                        className="text-xs text-slate-500 font-mono bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 cursor-pointer transition-colors"
+                        title={`Insert ${v} at cursor`}
                       >
                         {v}
-                      </code>
+                      </button>
                     ))}
                   </div>
                 </div>

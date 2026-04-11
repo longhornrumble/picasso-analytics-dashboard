@@ -37,6 +37,9 @@ import type {
   TeamMembersResponse,
   TeamInvitationsResponse,
   TeamMemberRole,
+  // Notification Preferences types (Phase 4)
+  NotificationPreferences,
+  PreferencesResponse,
 } from '../types/analytics';
 
 // API endpoint - configurable via environment variable
@@ -745,9 +748,17 @@ export async function fetchLeadQueue(
  * @param range - Time range filter (1d, 7d, 30d, 90d)
  */
 export async function fetchNotificationSummary(
-  range: string = '7d'
+  range: string = '7d',
+  dateRangeOptions?: DateRangeOptions
 ): Promise<NotificationSummary> {
-  return apiRequest<NotificationSummary>('/notifications/summary', { range });
+  const params: Record<string, string> = { range };
+  if (dateRangeOptions?.startDate) {
+    params.start_date = dateRangeOptions.startDate;
+  }
+  if (dateRangeOptions?.endDate) {
+    params.end_date = dateRangeOptions.endDate;
+  }
+  return apiRequest<NotificationSummary>('/notifications/summary', params);
 }
 
 /**
@@ -766,7 +777,10 @@ export async function fetchNotificationEvents(params: {
   limit?: number;
   channel?: string;
   status?: string;
+  email_type?: string;
   search?: string;
+  startDate?: string;
+  endDate?: string;
 }): Promise<{ events: NotificationEvent[]; total: number; page: number; has_more: boolean }> {
   const queryParams: Record<string, string> = {
     range: params.range ?? '7d',
@@ -780,8 +794,17 @@ export async function fetchNotificationEvents(params: {
   if (params.status) {
     queryParams.status = params.status;
   }
+  if (params.email_type) {
+    queryParams.email_type = params.email_type;
+  }
   if (params.search) {
     queryParams.search = params.search;
+  }
+  if (params.startDate) {
+    queryParams.start_date = params.startDate;
+  }
+  if (params.endDate) {
+    queryParams.end_date = params.endDate;
   }
 
   return apiRequest<{ events: NotificationEvent[]; total: number; page: number; has_more: boolean }>(
@@ -820,8 +843,11 @@ export async function updateNotificationSettings(
  * @param email   - Recipient email address
  * @param formId  - Form ID to use as context for the test
  */
-export async function sendTestNotification(email: string, formId: string): Promise<unknown> {
-  return apiPost<unknown>('/settings/notifications/recipients/test-send', { email, form_id: formId });
+export async function sendTestNotification(email: string, formId: string, userId?: string): Promise<unknown> {
+  return apiPost<unknown>('/settings/notifications/recipients/test-send', {
+    ...(userId ? { user_id: userId } : { email }),
+    form_id: formId,
+  });
 }
 
 /**
@@ -910,3 +936,17 @@ export async function removeTeamMember(membershipId: string): Promise<{ membersh
 }
 
 // Profile management handled by Clerk's UserButton modal — no portal API needed
+
+// =============================================================================
+// Notification Preferences API Functions (Phase 4)
+// =============================================================================
+
+export async function fetchPreferences(): Promise<PreferencesResponse> {
+  return apiRequest<PreferencesResponse>('/preferences');
+}
+
+export async function updatePreferences(
+  prefs: Partial<NotificationPreferences>
+): Promise<PreferencesResponse> {
+  return apiPatch<PreferencesResponse>('/preferences', prefs as Record<string, unknown>);
+}
