@@ -757,6 +757,29 @@ export async function updateAdminEmployee(tenantId: string, clerkUserId: string,
   return response.json();
 }
 
+export async function fetchAdminTenantInvitations(tenantId: string): Promise<{ invitation_id: string; email: string; role: string; status: string; created_at: string; tenant_id: string }[]> {
+  const url = `${API_BASE_URL}/admin/tenants/${tenantId}/invitations`;
+  const response = await fetch(url, { headers: buildAdminHeaders() });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Failed to fetch invitations: ${response.status}`);
+  }
+  const data = await response.json();
+  return data.invitations;
+}
+
+export async function revokeAdminTenantInvitation(tenantId: string, invitationId: string): Promise<void> {
+  const url = `${API_BASE_URL}/admin/tenants/${tenantId}/invitations/${invitationId}/revoke`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: buildAdminHeaders(),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Failed to revoke invitation: ${response.status}`);
+  }
+}
+
 // =============================================================================
 // Lead Workspace API Functions (High-Velocity Lead Processing)
 // =============================================================================

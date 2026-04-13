@@ -18,8 +18,10 @@ import {
   fetchAdminTenants,
   fetchAdminEmployees,
   updateAdminEmployee,
+  fetchAdminTenantInvitations,
+  revokeAdminTenantInvitation,
 } from '../../services/analyticsApi';
-import type { AdminTenant, AdminEmployee } from '../../types/analytics';
+import type { AdminTenant, AdminEmployee, AdminInvitation } from '../../types/analytics';
 import type { Column } from '../../components/shared/DataTable';
 
 // AdminEmployee extended with optional companyName from cross-tenant enrichment
@@ -34,6 +36,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function EmployeeManagement() {
   const [tenants, setTenants] = useState<AdminTenant[]>([]);
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
+  const [invitations, setInvitations] = useState<AdminInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -59,16 +62,6 @@ export default function EmployeeManagement() {
   // Data loading
   // ---------------------------------------------------------------------------
 
-  const loadTenants = useCallback(async () => {
-    try {
-      const data = await fetchAdminTenants();
-      setTenants(data);
-    } catch (err) {
-      // Non-fatal — tenant filter will be empty but employees can still load
-      console.warn('Failed to load tenants for filter:', err);
-    }
-  }, []);
-
   const loadEmployees = useCallback(async (tenantId: string, search: string) => {
     try {
       setError(null);
@@ -84,12 +77,39 @@ export default function EmployeeManagement() {
     }
   }, []);
 
-  // Initial mount — fetch tenants and employees in parallel
+  const loadInvitations = useCallback(async (tenantFilter: string, tenantsList: AdminTenant[]) => {
+    try {
+      if (tenantFilter) {
+        const invs = await fetchAdminTenantInvitations(tenantFilter);
+        setInvitations(invs);
+      } else {
+        // Fetch for all tenants in parallel
+        const results = await Promise.all(
+          tenantsList.map(t => fetchAdminTenantInvitations(t.tenantId).catch(() => [] as AdminInvitation[]))
+        );
+        setInvitations(results.flat());
+      }
+    } catch {
+      setInvitations([]);
+    }
+  }, []);
+
+  // Initial mount — fetch tenants, employees, and invitations
   useEffect(() => {
     setLoading(true);
-    loadTenants();
+    // Fetch tenants first so we have the list for the all-tenants invitation query
+    fetchAdminTenants()
+      .then((data) => {
+        setTenants(data);
+        loadInvitations('', data);
+      })
+      .catch((err) => {
+        console.warn('Failed to load tenants for filter:', err);
+        // Still attempt invitation load — will result in empty list
+        loadInvitations('', []);
+      });
     loadEmployees('', '');
-  }, [loadTenants, loadEmployees]);
+  }, [loadEmployees, loadInvitations]);
 
   // Tenant filter change — immediate refetch
   const handleTenantChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -97,6 +117,7 @@ export default function EmployeeManagement() {
     setSelectedTenantId(value);
     setLoading(true);
     loadEmployees(value, searchQuery);
+    loadInvitations(value, tenants);
   };
 
   // Search input — debounced 300ms
@@ -239,6 +260,10 @@ export default function EmployeeManagement() {
     );
   }
 
+  // Build tenant name lookup for the invitations section
+  const tenantNames: Record<string, string> = {};
+  tenants.forEach(t => { tenantNames[t.tenantId] = t.companyName; });
+
   // Tenant filter dropdown (injected into DataTable via filterComponent)
   const tenantFilter = (
     <select
@@ -361,6 +386,52 @@ export default function EmployeeManagement() {
         )}
         emptyMessage="No employees found. Adjust the tenant filter or search query."
       />
+
+      {/* Pending Invitations */}
+      <div className="mt-8 pt-6 border-t border-slate-200">
+        <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-3">
+          Pending Invitations {invitations.length > 0 && `(${invitations.length})`}
+        </h4>
+        {invitations.length > 0 ? (
+          <div className="space-y-2">
+            {invitations.map((inv) => (
+              <div
+                key={inv.invitation_id}
+                className="flex items-center justify-between px-4 py-3 bg-amber-50/50 border border-amber-100 rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">{inv.email}</p>
+                    <p className="text-xs text-slate-500">
+                      Invited as {inv.role === 'admin' ? 'Admin' : 'Member'} to {tenantNames[inv.tenant_id] || inv.tenant_id}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      await revokeAdminTenantInvitation(inv.tenant_id, inv.invitation_id);
+                      setInvitations(prev => prev.filter(i => i.invitation_id !== inv.invitation_id));
+                    } catch {
+                      // Silently swallow — no inline error surface here
+                    }
+                  }}
+                  className="text-xs text-slate-500 hover:text-red-600 font-medium transition-colors"
+                >
+                  Revoke
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400">No pending invitations.</p>
+        )}
+      </div>
 
       {/* Invite modal */}
       {showInviteModal && (

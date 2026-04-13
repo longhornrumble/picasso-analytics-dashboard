@@ -696,3 +696,16 @@ export interface TeamInvitationsResponse {
 }
 
 // Profile management handled by Clerk's UserButton modal — no portal types needed
+
+// =============================================================================
+// Admin Invitation Types
+// =============================================================================
+
+export interface AdminInvitation {
+  invitation_id: string;
+  email: string;
+  role: string;
+  status: string;
+  created_at: string;
+  tenant_id: string;
+}

@@ -12,10 +12,13 @@ import {
   updateAdminTenant,
   fetchAdminTenantBilling,
   fetchAdminTenantEmployees,
+  fetchAdminTenantInvitations,
+  revokeAdminTenantInvitation,
 } from '../../services/analyticsApi';
 import type {
   AdminTenant,
   AdminEmployee,
+  AdminInvitation,
   StripeBillingEvent,
   TenantStatus,
   SubscriptionTier,
@@ -31,6 +34,7 @@ export default function TenantDetailPanel({ tenantId, onClose, onUpdated }: Prop
   const [tenant, setTenant] = useState<AdminTenant | null>(null);
   const [employees, setEmployees] = useState<AdminEmployee[]>([]);
   const [billing, setBilling] = useState<StripeBillingEvent[]>([]);
+  const [invitations, setInvitations] = useState<AdminInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,15 +52,17 @@ export default function TenantDetailPanel({ tenantId, onClose, onUpdated }: Prop
       setLoading(true);
       setError(null);
       try {
-        const [detail, emps, bill] = await Promise.all([
+        const [detail, emps, bill, invs] = await Promise.all([
           fetchAdminTenantDetail(tenantId),
           fetchAdminTenantEmployees(tenantId).catch(() => [] as AdminEmployee[]),
           fetchAdminTenantBilling(tenantId).catch(() => [] as StripeBillingEvent[]),
+          fetchAdminTenantInvitations(tenantId).catch(() => [] as AdminInvitation[]),
         ]);
         if (cancelled) return;
         setTenant(detail);
         setEmployees(emps);
         setBilling(bill);
+        setInvitations(invs);
         setEditStatus(detail.status);
         setEditTier(detail.subscriptionTier);
         setEditNetworkId(detail.networkId || '');
@@ -292,6 +298,52 @@ export default function TenantDetailPanel({ tenantId, onClose, onUpdated }: Prop
           </ul>
         ) : (
           <p className="text-sm text-slate-400">No team members found. Run the employee backfill or invite employees from the Employee Management tab.</p>
+        )}
+      </div>
+
+      {/* Pending Invitations */}
+      <div className="mt-8 pt-6 border-t border-slate-200">
+        <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-3">
+          Pending Invitations {invitations.length > 0 && `(${invitations.length})`}
+        </h4>
+        {invitations.length > 0 ? (
+          <div className="space-y-2">
+            {invitations.map((inv) => (
+              <div
+                key={inv.invitation_id}
+                className="flex items-center justify-between px-4 py-3 bg-amber-50/50 border border-amber-100 rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">{inv.email}</p>
+                    <p className="text-xs text-slate-500">
+                      Invited as {inv.role === 'admin' ? 'Admin' : 'Member'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      await revokeAdminTenantInvitation(tenantId, inv.invitation_id);
+                      setInvitations(prev => prev.filter(i => i.invitation_id !== inv.invitation_id));
+                    } catch {
+                      // Silently swallow — inline error surfacing not wired here
+                    }
+                  }}
+                  className="text-xs text-slate-500 hover:text-red-600 font-medium transition-colors"
+                >
+                  Revoke
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400">No pending invitations.</p>
         )}
       </div>
 
