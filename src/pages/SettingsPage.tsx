@@ -8,9 +8,11 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { NotificationsDashboard } from './NotificationsDashboard';
 import { TeamManagement } from './TeamManagement';
+import { NotificationPreferences } from './NotificationPreferences';
+import AdminPanel from './AdminPanel';
 import type { DashboardFeatures } from '../types/analytics';
 
-type SettingsSubTab = 'notifications' | 'team';
+type SettingsSubTab = 'notifications' | 'team' | 'preferences' | 'admin';
 
 const DEFAULT_FEATURES: DashboardFeatures = {
   dashboard_conversations: true,
@@ -37,6 +39,16 @@ export function SettingsPage() {
       id: 'team',
       label: 'Team',
       available: true,
+    },
+    {
+      id: 'preferences',
+      label: 'Preferences',
+      available: true,
+    },
+    {
+      id: 'admin' as SettingsSubTab,
+      label: 'Admin',
+      available: user?.role === 'super_admin',
     },
   ];
 
@@ -76,6 +88,14 @@ export function SettingsPage() {
 
       {activeSubTab === 'team' && (
         <TeamManagement />
+      )}
+
+      {activeSubTab === 'preferences' && (
+        <NotificationPreferences />
+      )}
+
+      {activeSubTab === 'admin' && user?.role === 'super_admin' && (
+        <AdminPanel />
       )}
     </div>
   );

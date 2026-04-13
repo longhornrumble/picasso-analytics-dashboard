@@ -217,9 +217,12 @@ export interface NotificationEvent {
   channel: string;
   recipient: string;
   form_id: string;
+  form_title: string;
   status: string;
   message_id: string;
   detail?: Record<string, unknown>;
+  email_type: string;
+  segment_count?: number;
 }
 
 export type NotificationSubTab = 'dashboard' | 'recipients' | 'templates';
@@ -257,6 +260,48 @@ export interface TenantOption {
   tenant_id: string;
   tenant_hash: string;
   name: string;
+}
+
+// =============================================================================
+// Super Admin Portal Types
+// =============================================================================
+
+export type TenantStatus = 'active' | 'suspended' | 'churned';
+export type SubscriptionTier = 'free' | 'standard' | 'premium' | 'enterprise';
+
+export interface AdminTenant {
+  tenantId: string;
+  tenantHash: string;
+  companyName: string;
+  status: TenantStatus;
+  subscriptionTier: SubscriptionTier;
+  networkId: string | null;
+  networkName: string | null;
+  clerkOrgId?: string;
+  stripeCustomerId?: string;
+  s3ConfigPath: string;
+  onboardedAt: string;
+  updatedAt: string;
+  has_stripe: boolean;
+  has_clerk: boolean;
+}
+
+export interface AdminEmployee {
+  tenantId: string;
+  clerkUserId: string;
+  email: string;
+  name: string;
+  role: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StripeBillingEvent {
+  timestamp: string;
+  event_type: string;
+  stripe_event_type: string;
+  detail: Record<string, any>;
 }
 
 // Filter state
@@ -534,6 +579,7 @@ export interface FormNotificationSettings {
   notifications: {
     internal: {
       enabled: boolean;
+      recipient_user_ids?: string[];
       recipients: string[];
       sms_recipients?: string[];
       subject: string;
@@ -546,12 +592,17 @@ export interface FormNotificationSettings {
       subject: string;
       body_template: string;
       use_tenant_branding: boolean;
+      sms?: {
+        enabled: boolean;
+        template: string;
+      };
     };
   };
 }
 
 export interface NotificationSettingsResponse {
   forms: Record<string, FormNotificationSettings>;
+  sms_provisioned?: boolean;
 }
 
 export interface TemplatePreviewResponse {
@@ -583,6 +634,8 @@ export interface TeamMember {
   status: 'active' | 'pending';
   image_url?: string;
   joined_at: string;
+  phone?: string | null;
+  sms_opted_in?: boolean;
 }
 
 export interface TeamMembersResponse {
@@ -590,6 +643,27 @@ export interface TeamMembersResponse {
   admin_count: number;
   total: number;
   can_edit: boolean;
+}
+
+// =============================================================================
+// Notification Preferences Types (Phase 4)
+// =============================================================================
+
+export interface NotificationPreferences {
+  email: boolean;
+  sms: boolean;
+  phone: string | null;
+  sms_quiet_hours: {
+    enabled: boolean;
+    start?: string | null;   // "19:00"
+    end?: string | null;     // "07:00"
+    timezone?: string | null; // "America/Chicago"
+    fallback_to_email?: boolean;
+  };
+}
+
+export interface PreferencesResponse {
+  preferences: NotificationPreferences;
 }
 
 export interface TeamInvitation {

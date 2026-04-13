@@ -40,6 +40,10 @@ import type {
   // Notification Preferences types (Phase 4)
   NotificationPreferences,
   PreferencesResponse,
+  // Super Admin Portal types
+  AdminTenant,
+  AdminEmployee,
+  StripeBillingEvent,
 } from '../types/analytics';
 
 // API endpoint - configurable via environment variable
@@ -88,6 +92,22 @@ function buildHeaders(): Record<string, string> {
     headers['X-Tenant-Override'] = _tenantOverride;
   }
 
+  return headers;
+}
+
+/**
+ * Build headers for admin API requests — deliberately omits X-Tenant-Override
+ * so a super admin's active tenant override never bleeds into admin endpoints.
+ */
+function buildAdminHeaders(): Record<string, string> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  // Deliberately omit X-Tenant-Override for admin endpoints
   return headers;
 }
 
@@ -619,11 +639,80 @@ export async function fetchFeatures(): Promise<FeaturesResponse> {
 
 /**
  * Fetch list of tenants for super_admin tenant switching
- * Only returns data for users with super_admin role
+ * Only returns data for users with super_admin role.
+ * Maps camelCase AdminTenant response to legacy TenantOption shape for the tenant switcher.
  */
 export async function fetchTenantList(): Promise<TenantOption[]> {
-  const response = await apiRequest<{ tenants: TenantOption[] }>('/admin/tenants');
-  return response.tenants;
+  const response = await apiRequest<{ tenants: AdminTenant[] }>('/admin/tenants');
+  return response.tenants.map(t => ({
+    tenant_id: t.tenantId,
+    tenant_hash: t.tenantHash,
+    name: t.companyName,
+  }));
+}
+
+// =============================================================================
+// Admin Panel (Super Admin)
+// =============================================================================
+
+export async function fetchAdminTenants(): Promise<AdminTenant[]> {
+  const url = `${API_BASE_URL}/admin/tenants`;
+  const response = await fetch(url, { headers: buildAdminHeaders() });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Failed to fetch admin tenants: ${response.status}`);
+  }
+  const data = await response.json();
+  return data.tenants;
+}
+
+export async function fetchAdminTenantDetail(tenantId: string): Promise<AdminTenant> {
+  const url = `${API_BASE_URL}/admin/tenants/${tenantId}`;
+  const response = await fetch(url, { headers: buildAdminHeaders() });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Failed to fetch tenant detail: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function updateAdminTenant(
+  tenantId: string,
+  fields: Partial<Pick<AdminTenant, 'status' | 'subscriptionTier' | 'networkId' | 'networkName'>>
+): Promise<AdminTenant> {
+  const url = `${API_BASE_URL}/admin/tenants/${tenantId}`;
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: buildAdminHeaders(),
+    body: JSON.stringify(fields),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Failed to update tenant: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function fetchAdminTenantBilling(tenantId: string): Promise<StripeBillingEvent[]> {
+  const url = `${API_BASE_URL}/admin/tenants/${tenantId}/billing`;
+  const response = await fetch(url, { headers: buildAdminHeaders() });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Failed to fetch billing: ${response.status}`);
+  }
+  const data = await response.json();
+  return data.events;
+}
+
+export async function fetchAdminTenantEmployees(tenantId: string): Promise<AdminEmployee[]> {
+  const url = `${API_BASE_URL}/admin/tenants/${tenantId}/employees`;
+  const response = await fetch(url, { headers: buildAdminHeaders() });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Failed to fetch employees: ${response.status}`);
+  }
+  const data = await response.json();
+  return data.employees;
 }
 
 // =============================================================================

@@ -5,7 +5,9 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
+import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import {
   fetchTeamMembers,
   fetchTeamInvitations,
@@ -389,8 +391,15 @@ function InviteModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+  const [roleOpen, setRoleOpen] = useState(false);
+  const roleOptions: { value: TeamMemberRole; label: string }[] = [
+    { value: 'member', label: 'Member — View analytics, read-only settings' },
+    { value: 'admin', label: 'Admin — Full access, manage team' },
+  ];
+  const selectedLabel = roleOptions.find(o => o.value === role)?.label || '';
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
 
@@ -415,19 +424,36 @@ function InviteModal({
             />
           </div>
 
-          <div>
-            <label htmlFor="invite-role" className="block text-sm font-medium text-slate-700 mb-1">
+          <div className="relative">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Role
             </label>
-            <select
-              id="invite-role"
-              value={role}
-              onChange={(e) => setRole(e.target.value as TeamMemberRole)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            <button
+              type="button"
+              onClick={() => setRoleOpen(!roleOpen)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-left bg-white hover:bg-slate-50 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 flex items-center justify-between"
             >
-              <option value="member">Member — View analytics, read-only settings</option>
-              <option value="admin">Admin — Full access, manage team</option>
-            </select>
+              <span>{selectedLabel}</span>
+              <svg className={`w-4 h-4 text-slate-400 transition-transform ${roleOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {roleOpen && (
+              <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 overflow-hidden">
+                {roleOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => { setRole(opt.value); setRoleOpen(false); }}
+                    className={`w-full px-3 py-2.5 text-sm text-left hover:bg-slate-100 transition-colors ${
+                      role === opt.value ? 'text-primary-600 font-medium bg-primary-50' : 'text-slate-700'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-2">
@@ -448,54 +474,8 @@ function InviteModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
-
-/**
- * Confirmation Dialog
- */
-function ConfirmDialog({
-  title,
-  message,
-  confirmLabel,
-  destructive,
-  onConfirm,
-  onCancel,
-}: {
-  title: string;
-  message: string;
-  confirmLabel: string;
-  destructive?: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-        <h3 className="text-lg font-semibold text-slate-800 mb-2">{title}</h3>
-        <p className="text-sm text-slate-600 mb-6">{message}</p>
-        <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`flex-1 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${
-              destructive
-                ? 'bg-red-500 hover:bg-red-600'
-                : 'bg-primary-500 hover:bg-primary-600'
-            }`}
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}

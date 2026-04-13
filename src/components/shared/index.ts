@@ -45,3 +45,7 @@ export type { DropdownOption } from './Dropdown';
 // Date filter dropdown
 export { DateFilter } from './DateFilter';
 export type { DateFilterValue, DateFilterRange } from './DateFilter';
+
+// Confirmation dialog (portal-based, reusable across pages)
+export { ConfirmDialog } from './ConfirmDialog';
+export type { ConfirmDialogProps } from './ConfirmDialog';
