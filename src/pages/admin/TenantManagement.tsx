@@ -3,7 +3,7 @@
  * Rendered inside AdminPanel when the "tenants" section is active.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { DataTable, BadgeCell } from '../../components/shared/DataTable';
 import TenantDetailPanel from './TenantDetailPanel';
 import { fetchAdminTenants } from '../../services/analyticsApi';

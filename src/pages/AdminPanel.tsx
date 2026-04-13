@@ -4,7 +4,7 @@
  * Round 2: Employee Management
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import TenantManagement from './admin/TenantManagement';
 import EmployeeManagement from './admin/EmployeeManagement';
 

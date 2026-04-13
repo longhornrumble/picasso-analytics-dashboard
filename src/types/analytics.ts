@@ -301,7 +301,24 @@ export interface StripeBillingEvent {
   timestamp: string;
   event_type: string;
   stripe_event_type: string;
-  detail: Record<string, any>;
+  detail: {
+    stripe_event_type?: string;
+    object_id?: string;
+    status?: string;
+    currency?: string;
+    amount_due?: number;
+    amount_paid?: number;
+    subscription_id?: string;
+    product_id?: string;
+    price_id?: string;
+    interval?: string;
+    due_date?: string;
+    period_end?: string;
+    next_payment_attempt?: string;
+    period_start?: string;
+    description?: string;
+    invoice_number?: string;
+  };
 }
 
 // Filter state

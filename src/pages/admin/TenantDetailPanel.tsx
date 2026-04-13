@@ -6,7 +6,7 @@
  * Editable fields: status, subscriptionTier, networkId, networkName.
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   fetchAdminTenantDetail,
   updateAdminTenant,
@@ -263,11 +263,11 @@ export default function TenantDetailPanel({ tenantId, onClose, onUpdated }: Prop
       </div>
 
       {/* Team members */}
-      {employees.length > 0 && (
-        <div className="mt-8 pt-6 border-t border-slate-200">
-          <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-3">
-            Team Members ({employees.length})
-          </h4>
+      <div className="mt-8 pt-6 border-t border-slate-200">
+        <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-3">
+          Team Members {employees.length > 0 && `(${employees.length})`}
+        </h4>
+        {employees.length > 0 ? (
           <ul className="space-y-2">
             {employees.map(emp => (
               <li
@@ -290,32 +290,86 @@ export default function TenantDetailPanel({ tenantId, onClose, onUpdated }: Prop
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        ) : (
+          <p className="text-sm text-slate-400">No team members found. Run the employee backfill or invite employees from the Employee Management tab.</p>
+        )}
+      </div>
 
       {/* Billing events */}
-      {billing.length > 0 && (
-        <div className="mt-8 pt-6 border-t border-slate-200">
-          <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-3">
-            Recent Billing Events
-          </h4>
-          <ul className="space-y-2">
-            {billing.map((evt, i) => (
-              <li
-                key={i}
-                className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-lg text-sm"
-              >
-                <span className="font-mono text-slate-600">
-                  {evt.stripe_event_type || evt.event_type}
-                </span>
-                <span className="text-slate-400">
-                  {evt.timestamp ? new Date(evt.timestamp).toLocaleString() : '\u2014'}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <div className="mt-8 pt-6 border-t border-slate-200">
+        <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-3">
+          Recent Billing Events
+        </h4>
+        {billing.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-500 border-b border-slate-200">
+                  <th className="pb-2 pr-4 font-medium">Event</th>
+                  <th className="pb-2 pr-4 font-medium">Amount</th>
+                  <th className="pb-2 pr-4 font-medium">Status</th>
+                  <th className="pb-2 pr-4 font-medium">Date</th>
+                  <th className="pb-2 font-medium">Next</th>
+                </tr>
+              </thead>
+              <tbody>
+                {billing.map((evt, i) => {
+                  const d = evt.detail;
+                  const amount = d.amount_paid || d.amount_due;
+                  const currency = (d.currency || 'usd').toUpperCase();
+                  const statusColors: Record<string, string> = {
+                    paid: 'bg-emerald-100 text-emerald-700',
+                    active: 'bg-emerald-100 text-emerald-700',
+                    open: 'bg-blue-100 text-blue-700',
+                    draft: 'bg-slate-100 text-slate-600',
+                    past_due: 'bg-red-100 text-red-700',
+                    canceled: 'bg-red-100 text-red-700',
+                    uncollectible: 'bg-red-100 text-red-700',
+                  };
+                  const eventLabels: Record<string, string> = {
+                    'invoice.paid': 'Invoice Paid',
+                    'invoice.payment_succeeded': 'Payment Succeeded',
+                    'invoice.payment_failed': 'Payment Failed',
+                    'invoice.finalized': 'Invoice Finalized',
+                    'invoice.upcoming': 'Upcoming Invoice',
+                    'customer.subscription.created': 'Subscription Created',
+                    'customer.subscription.updated': 'Subscription Updated',
+                    'customer.subscription.deleted': 'Subscription Canceled',
+                  };
+                  const label = eventLabels[evt.stripe_event_type] || evt.stripe_event_type;
+                  const nextDate = d.next_payment_attempt || d.period_end || d.due_date;
+
+                  return (
+                    <tr key={i} className="border-b border-slate-100 last:border-0">
+                      <td className="py-2.5 pr-4 text-slate-700">{label}</td>
+                      <td className="py-2.5 pr-4 font-medium text-slate-700">
+                        {amount != null
+                          ? `${currency === 'USD' ? '$' : currency + ' '}${(amount / 100).toFixed(2)}`
+                          : '\u2014'}
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        {d.status ? (
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[d.status] || 'bg-slate-100 text-slate-600'}`}>
+                            {d.status}
+                          </span>
+                        ) : '\u2014'}
+                      </td>
+                      <td className="py-2.5 pr-4 text-slate-500">
+                        {evt.timestamp ? new Date(evt.timestamp).toLocaleDateString() : '\u2014'}
+                      </td>
+                      <td className="py-2.5 text-slate-500">
+                        {nextDate ? new Date(nextDate).toLocaleDateString() : '\u2014'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400">No Stripe events recorded yet.</p>
+        )}
+      </div>
     </div>
   );
 }
