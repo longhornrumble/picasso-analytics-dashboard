@@ -715,6 +715,48 @@ export async function fetchAdminTenantEmployees(tenantId: string): Promise<Admin
   return data.employees;
 }
 
+export async function fetchAdminEmployees(params?: { tenant_id?: string; search?: string }): Promise<{ employees: AdminEmployee[]; total: number }> {
+  const searchParams = new URLSearchParams();
+  if (params?.tenant_id) searchParams.set('tenant_id', params.tenant_id);
+  if (params?.search) searchParams.set('search', params.search);
+  const qs = searchParams.toString();
+  const url = `${API_BASE_URL}/admin/employees${qs ? `?${qs}` : ''}`;
+  const response = await fetch(url, { headers: buildAdminHeaders() });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Failed to fetch employees: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function inviteAdminEmployee(tenantId: string, email: string, role: string): Promise<{ invitation_id: string; email: string; role: string; status: string }> {
+  const url = `${API_BASE_URL}/admin/employees/invite`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: buildAdminHeaders(),
+    body: JSON.stringify({ tenant_id: tenantId, email, role }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Failed to invite employee: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function updateAdminEmployee(tenantId: string, clerkUserId: string, fields: { role?: string; status?: string }): Promise<unknown> {
+  const url = `${API_BASE_URL}/admin/employees/${tenantId}/${clerkUserId}`;
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: buildAdminHeaders(),
+    body: JSON.stringify(fields),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Failed to update employee: ${response.status}`);
+  }
+  return response.json();
+}
+
 // =============================================================================
 // Lead Workspace API Functions (High-Velocity Lead Processing)
 // =============================================================================
