@@ -41,7 +41,7 @@ const MyRecruiterLogo = () => (
 // Default features - secure defaults when API unavailable
 const DEFAULT_FEATURES: DashboardFeatures = {
   dashboard_conversations: true,
-  dashboard_forms: true, // Unlocked for demo
+  dashboard_forms: false,
   dashboard_attribution: false,
   dashboard_notifications: false,
   dashboard_settings: true,
@@ -499,103 +499,10 @@ function AppContent() {
   if (!isAuthenticated) {
     return (
       <>
-        {/* Clerk signed-out: show sign-in CTA */}
+        {/* Clerk signed-out: full-page sign-in */}
         <Show when="signed-out">
-          <div className="min-h-screen flex">
-            {/* Left panel — hero image + copy (hidden on mobile) */}
-            <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-600 to-primary-800 relative overflow-hidden">
-              {/* Decorative circles */}
-              <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-primary-500/20" />
-              <div className="absolute -bottom-32 -right-32 w-[500px] h-[500px] rounded-full bg-primary-400/10" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full bg-primary-500/10" />
-
-              {/* Content */}
-              <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16 text-white max-w-lg mx-auto">
-                <img
-                  src="/myrecruiter-logo.png"
-                  alt="MyRecruiter"
-                  className="h-14 w-auto mb-8 brightness-0 invert"
-                />
-                <h1 className="text-3xl xl:text-4xl font-bold leading-tight mb-4">
-                  Mission Intelligence Portal
-                </h1>
-                <p className="text-primary-100 text-lg leading-relaxed mb-8">
-                  Real-time analytics, notification delivery tracking, and self-service tools for your nonprofit — all in one place.
-                </p>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <span className="text-sm text-primary-50">Conversation and form analytics</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <span className="text-sm text-primary-50">Email delivery tracking and notifications</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <span className="text-sm text-primary-50">Recipient and template management</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right panel — auth (always visible) */}
-            <div className="w-full lg:w-1/2 bg-gradient-to-br from-slate-50 via-white to-primary-50/30 flex items-center justify-center px-4 py-12">
-              <div className="w-full max-w-sm space-y-6">
-                {/* Mobile-only logo + heading (hidden on desktop where left panel shows it) */}
-                <div className="lg:hidden text-center space-y-2">
-                  <div className="flex justify-center">
-                    <img
-                      src="/myrecruiter-logo.png"
-                      alt="MyRecruiter"
-                      className="h-12 w-auto"
-                    />
-                  </div>
-                  <h1 className="text-xl font-bold text-slate-800">Mission Intelligence Portal</h1>
-                </div>
-
-                {/* Embedded Clerk sign-in */}
-                <div className="flex justify-center">
-                  <SignIn
-                    routing="hash"
-                    appearance={{
-                      elements: {
-                        rootBox: 'w-full',
-                        card: 'shadow-xl border border-slate-100 w-full',
-                        footer: 'hidden',
-                      },
-                    }}
-                  />
-                </div>
-
-                {/* Get started link */}
-                <div className="text-center">
-                  <a
-                    href="https://www.myrecruiter.ai/#pricing"
-                    className="text-sm text-slate-500 hover:text-primary-600 transition-colors"
-                  >
-                    Don't have an account? <span className="font-semibold text-primary-500">Get started</span>
-                  </a>
-                </div>
-
-                {/* Footer */}
-                <p className="text-center text-xs text-slate-400">
-                  Powered by MyRecruiter AI
-                </p>
-              </div>
-            </div>
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+            <SignIn routing="hash" />
           </div>
         </Show>
 

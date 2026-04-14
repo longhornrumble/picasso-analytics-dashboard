@@ -16,7 +16,7 @@ type SettingsSubTab = 'notifications' | 'team' | 'preferences' | 'admin';
 
 const DEFAULT_FEATURES: DashboardFeatures = {
   dashboard_conversations: true,
-  dashboard_forms: true,
+  dashboard_forms: false,
   dashboard_attribution: false,
   dashboard_notifications: false,
   dashboard_settings: true,
