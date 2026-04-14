@@ -591,6 +591,8 @@ function InviteModal({
   onInvited: () => void;
   onError: (msg: string) => void;
 }) {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<TeamMemberRole>('member');
   const [sending, setSending] = useState(false);
@@ -601,7 +603,7 @@ function InviteModal({
 
     setSending(true);
     try {
-      await inviteTeamMember(email.trim(), role);
+      await inviteTeamMember(email.trim(), role, firstName.trim(), lastName.trim());
       onInvited();
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Failed to send invitation');
@@ -627,6 +629,36 @@ function InviteModal({
         <h3 className="text-lg font-semibold text-slate-800 mb-4">Invite Team Member</h3>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="invite-first-name" className="block text-sm font-medium text-slate-700 mb-1">
+                First Name
+              </label>
+              <input
+                id="invite-first-name"
+                type="text"
+                value={firstName}
+                onChange={e => setFirstName(e.target.value)}
+                placeholder="Jane"
+                autoFocus
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="invite-last-name" className="block text-sm font-medium text-slate-700 mb-1">
+                Last Name
+              </label>
+              <input
+                id="invite-last-name"
+                type="text"
+                value={lastName}
+                onChange={e => setLastName(e.target.value)}
+                placeholder="Doe"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+
           <div>
             <label htmlFor="invite-email" className="block text-sm font-medium text-slate-700 mb-1">
               Email Address
@@ -639,7 +671,6 @@ function InviteModal({
               placeholder="colleague@company.com"
               required
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              autoFocus
             />
           </div>
 

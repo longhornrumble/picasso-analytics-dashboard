@@ -729,12 +729,24 @@ export async function fetchAdminEmployees(params?: { tenant_id?: string; search?
   return response.json();
 }
 
-export async function inviteAdminEmployee(tenantId: string, email: string, role: string): Promise<{ invitation_id: string; email: string; role: string; status: string }> {
+export async function inviteAdminEmployee(
+  tenantId: string,
+  email: string,
+  role: string,
+  firstName?: string,
+  lastName?: string,
+): Promise<{ invitation_id: string; email: string; role: string; status: string }> {
   const url = `${API_BASE_URL}/admin/employees/invite`;
   const response = await fetch(url, {
     method: 'POST',
     headers: buildAdminHeaders(),
-    body: JSON.stringify({ tenant_id: tenantId, email, role }),
+    body: JSON.stringify({
+      tenant_id: tenantId,
+      email,
+      role,
+      first_name: firstName || undefined,
+      last_name: lastName || undefined,
+    }),
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
@@ -1087,8 +1099,18 @@ export async function fetchTeamMembers(): Promise<TeamMembersResponse> {
   return apiRequest<TeamMembersResponse>('/team/members');
 }
 
-export async function inviteTeamMember(email: string, role: TeamMemberRole): Promise<{ invitation_id: string; email: string; role: string; status: string }> {
-  return apiPost<{ invitation_id: string; email: string; role: string; status: string }>('/team/invite', { email, role });
+export async function inviteTeamMember(
+  email: string,
+  role: TeamMemberRole,
+  firstName?: string,
+  lastName?: string,
+): Promise<{ invitation_id: string; email: string; role: string; status: string }> {
+  return apiPost<{ invitation_id: string; email: string; role: string; status: string }>('/team/invite', {
+    email,
+    role,
+    first_name: firstName || undefined,
+    last_name: lastName || undefined,
+  });
 }
 
 export async function fetchTeamInvitations(): Promise<TeamInvitationsResponse> {

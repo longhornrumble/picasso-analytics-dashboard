@@ -21,6 +21,8 @@ interface Props {
 
 export default function InviteEmployeeModal({ tenants, onClose, onInvited }: Props) {
   const [tenantId, setTenantId] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'admin' | 'member'>('member');
   const [sending, setSending] = useState(false);
@@ -48,7 +50,7 @@ export default function InviteEmployeeModal({ tenants, onClose, onInvited }: Pro
     setSending(true);
     setError(null);
     try {
-      await inviteAdminEmployee(tenantId, email.trim(), role);
+      await inviteAdminEmployee(tenantId, email.trim(), role, firstName.trim(), lastName.trim());
       onInvited();
       onClose();
     } catch (err) {
@@ -119,6 +121,36 @@ export default function InviteEmployeeModal({ tenants, onClose, onInvited }: Pro
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Name fields */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="invite-first-name" className="block text-sm font-medium text-slate-700 mb-1">
+                First Name
+              </label>
+              <input
+                id="invite-first-name"
+                type="text"
+                value={firstName}
+                onChange={e => setFirstName(e.target.value)}
+                placeholder="Jane"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="invite-last-name" className="block text-sm font-medium text-slate-700 mb-1">
+                Last Name
+              </label>
+              <input
+                id="invite-last-name"
+                type="text"
+                value={lastName}
+                onChange={e => setLastName(e.target.value)}
+                placeholder="Doe"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
           </div>
 
           {/* Email */}
