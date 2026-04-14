@@ -611,6 +611,7 @@ export interface FormNotificationSettings {
     internal: {
       enabled: boolean;
       recipient_user_ids?: string[];
+      recipient_employee_ids?: string[];
       recipients: string[];
       sms_recipients?: string[];
       subject: string;

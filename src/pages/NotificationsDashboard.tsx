@@ -29,6 +29,7 @@ import {
   sendTestTemplate,
   fetchNotificationEventDetail,
   fetchTeamMembers,
+  fetchAdminTenantEmployees,
 } from '../services/analyticsApi';
 import type {
   NotificationEvent,
@@ -38,6 +39,7 @@ import type {
   TemplatePreviewResponse,
   NotificationEventLifecycle,
   TeamMember,
+  AdminEmployee,
 } from '../types/analytics';
 
 // ---------------------------------------------------------------------------
@@ -247,6 +249,7 @@ function StatusBadge({ status }: { status: string }) {
     click: 'bg-indigo-100 text-indigo-700',
     sent: 'bg-blue-100 text-blue-700',
     failed: 'bg-red-100 text-red-700',
+    suppressed: 'bg-slate-100 text-slate-600',
   };
 
   const labels: Record<string, string> = {
@@ -258,6 +261,7 @@ function StatusBadge({ status }: { status: string }) {
     click: 'Clicked',
     sent: 'Sent',
     failed: 'Failed',
+    suppressed: 'Suppressed',
   };
 
   return (
@@ -541,6 +545,11 @@ const eventColumns: Column<NotificationEvent>[] = [
     render: (row) => (
       <span className="block text-left text-xs uppercase tracking-wider text-slate-500">
         {row.channel}
+        {row.channel === 'sms' && row.segment_count != null && row.segment_count > 0 && (
+          <span className="ml-1 normal-case text-slate-400">
+            ({row.segment_count} seg{row.segment_count !== 1 ? 's' : ''})
+          </span>
+        )}
       </span>
     ),
   },
@@ -580,6 +589,7 @@ const STATUS_OPTIONS = [
   { id: 'bounce', name: 'Bounced' },
   { id: 'open', name: 'Opened' },
   { id: 'click', name: 'Clicked' },
+  { id: 'suppressed', name: 'Suppressed' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -675,9 +685,16 @@ function EventDetailModal({
           )}
           {lifecycle && lifecycle.events.length > 0 && (
             <div className="space-y-3">
-              <p className="text-xs text-slate-400 font-mono mb-3 truncate" title={lifecycle.message_id}>
-                ID: {lifecycle.message_id}
-              </p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-slate-400 font-mono truncate flex-1" title={lifecycle.message_id}>
+                  ID: {lifecycle.message_id}
+                </p>
+                {(lifecycle as unknown as Record<string, unknown>).segment_count != null && (
+                  <span className="text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200 ml-2 whitespace-nowrap">
+                    {String((lifecycle as unknown as Record<string, unknown>).segment_count)} segment{Number((lifecycle as unknown as Record<string, unknown>).segment_count) !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
               {lifecycle.events.map((evt: NotificationEventLifecycle['events'][number], i: number) => {
                 const detail = (evt.detail || {}) as Record<string, string>;
                 const colorClass = eventTypeColors[evt.event_type] || 'bg-slate-100 text-slate-700';
@@ -1093,8 +1110,10 @@ function RecipientsTab() {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [savingForms, setSavingForms] = useState<Set<string>>(new Set());
   const [testingForms, setTestingForms] = useState<Set<string>>(new Set());
-  // Team members for checklist UI (null = legacy fallback mode)
-  const [teamMembers, setTeamMembers] = useState<TeamMember[] | null>(null);
+  const [smsProvisioned, setSmsProvisioned] = useState(false);
+  // Registry employees for checklist UI (null = legacy fallback mode)
+  // Uses AdminEmployee[] to include local_only contacts without Clerk accounts
+  const [teamMembers, setTeamMembers] = useState<AdminEmployee[] | null>(null);
   // Legacy text input state (only used in fallback mode)
   const [newEmailInput, setNewEmailInput] = useState<Record<string, string>>({});
   const [emailErrors, setEmailErrors] = useState<Record<string, string>>({});
@@ -1105,9 +1124,10 @@ function RecipientsTab() {
     setIsLoading(true);
     setError(null);
     try {
-      const [settingsResult, teamResult] = await Promise.allSettled([
-        shouldUseMock(user?.tenant_id) ? Promise.resolve(MOCK_SETTINGS) : fetchNotificationSettings(),
-        fetchTeamMembers(),
+      const tenantId = user?.tenant_id;
+      const [settingsResult, employeesResult] = await Promise.allSettled([
+        shouldUseMock(tenantId) ? Promise.resolve(MOCK_SETTINGS) : fetchNotificationSettings(),
+        tenantId ? fetchAdminTenantEmployees(tenantId) : Promise.reject(new Error('No tenant ID')),
       ]);
 
       if (settingsResult.status === 'rejected') {
@@ -1115,17 +1135,44 @@ function RecipientsTab() {
       }
       const data = settingsResult.value;
       setSettings(data);
+      setSmsProvisioned(data.sms_provisioned === true);
       const initialDraft: Record<string, FormNotificationSettings> = {};
       for (const [id, s] of Object.entries(data.forms)) {
         initialDraft[id] = cloneSettings(s);
       }
       setDraft(initialDraft);
 
-      // Team members: null signals legacy fallback
-      if (teamResult.status === 'fulfilled' && teamResult.value.members.length > 0) {
-        setTeamMembers(teamResult.value.members);
+      // Registry employees: null signals legacy fallback
+      // fetchAdminTenantEmployees returns AdminEmployee[] directly (not wrapped)
+      if (employeesResult.status === 'fulfilled' && employeesResult.value.length > 0) {
+        setTeamMembers(employeesResult.value);
       } else {
-        setTeamMembers(null);
+        // Fall back to Clerk team members if registry is unavailable
+        try {
+          const legacyTeam = await fetchTeamMembers();
+          if (legacyTeam.members.length > 0) {
+            // Convert TeamMember to AdminEmployee shape for unified rendering
+            const converted: AdminEmployee[] = legacyTeam.members.map(m => ({
+              tenantId: tenantId || '',
+              employeeId: m.user_id,
+              clerkUserId: m.user_id,
+              email: m.email,
+              name: m.name,
+              role: m.role,
+              type: 'clerk_user' as const,
+              status: m.status,
+              createdAt: m.joined_at,
+              updatedAt: m.joined_at,
+              phone: m.phone,
+              notificationPrefs: { email: true, sms: m.sms_opted_in ?? false },
+            }));
+            setTeamMembers(converted);
+          } else {
+            setTeamMembers(null);
+          }
+        } catch {
+          setTeamMembers(null);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load notification settings');
@@ -1189,27 +1236,28 @@ function RecipientsTab() {
     markDirty(formId);
   };
 
-  // --- Toggle recipient user (member checklist mode) ---
-  const toggleRecipientUser = (formId: string, userId: string) => {
+  // --- Toggle recipient employee (registry checklist mode) ---
+  // Writes to recipient_employee_ids (UUID); leaves recipient_user_ids untouched for backward compat
+  const toggleRecipientUser = (formId: string, employeeId: string) => {
     setDraft((prev) => {
       const next = { ...prev };
       next[formId] = cloneSettings(next[formId]);
-      const current = next[formId].notifications.internal.recipient_user_ids || [];
-      next[formId].notifications.internal.recipient_user_ids = current.includes(userId)
-        ? current.filter(id => id !== userId)
-        : [...current, userId];
+      const current = next[formId].notifications.internal.recipient_employee_ids || [];
+      next[formId].notifications.internal.recipient_employee_ids = current.includes(employeeId)
+        ? current.filter(id => id !== employeeId)
+        : [...current, employeeId];
       return next;
     });
     markDirty(formId);
   };
 
-  // --- Remove stale user_id ---
-  const removeStaleUserId = (formId: string, userId: string) => {
+  // --- Remove stale employee_id ---
+  const removeStaleUserId = (formId: string, employeeId: string) => {
     setDraft((prev) => {
       const next = { ...prev };
       next[formId] = cloneSettings(next[formId]);
-      next[formId].notifications.internal.recipient_user_ids =
-        (next[formId].notifications.internal.recipient_user_ids || []).filter(id => id !== userId);
+      next[formId].notifications.internal.recipient_employee_ids =
+        (next[formId].notifications.internal.recipient_employee_ids || []).filter(id => id !== employeeId);
       return next;
     });
     markDirty(formId);
@@ -1293,9 +1341,9 @@ function RecipientsTab() {
   const handleSave = async (formId: string) => {
     const formDraft = draft[formId];
     const internal = formDraft.notifications.internal;
-    const hasUserIds = teamMembers && (internal.recipient_user_ids || []).length > 0;
+    const hasEmployeeIds = teamMembers && (internal.recipient_employee_ids || []).length > 0;
     const hasLegacy = internal.recipients.length > 0;
-    if (internal.enabled && !hasUserIds && !hasLegacy) {
+    if (internal.enabled && !hasEmployeeIds && !hasLegacy) {
       setFeedback({ type: 'error', message: 'Select at least one recipient before saving. Internal notifications are enabled but no recipients are configured.' });
       return;
     }
@@ -1326,12 +1374,12 @@ function RecipientsTab() {
   // --- Send test email ---
   const handleTestSend = async (formId: string) => {
     const internal = draft[formId].notifications.internal;
-    const userIds = internal.recipient_user_ids || [];
+    const employeeIds = internal.recipient_employee_ids || [];
     const legacyRecipients = internal.recipients;
 
-    // Prefer user_id if available (member checklist mode)
-    const hasUserIds = teamMembers && userIds.length > 0;
-    if (!hasUserIds && legacyRecipients.length === 0) {
+    // Prefer employee_id if available (registry checklist mode)
+    const hasEmployeeIds = teamMembers && employeeIds.length > 0;
+    if (!hasEmployeeIds && legacyRecipients.length === 0) {
       setFeedback({ type: 'error', message: 'Add at least one recipient before sending a test.' });
       return;
     }
@@ -1339,11 +1387,11 @@ function RecipientsTab() {
     setTestingForms((prev) => new Set(prev).add(formId));
     setFeedback(null);
     try {
-      if (hasUserIds) {
-        const firstUserId = userIds[0];
-        const member = teamMembers?.find(m => m.user_id === firstUserId);
-        await sendTestNotification(member?.email || '', formId, firstUserId);
-        setFeedback({ type: 'success', message: `Test email sent to ${member?.name || firstUserId}.` });
+      if (hasEmployeeIds) {
+        const firstEmployeeId = employeeIds[0];
+        const emp = teamMembers?.find(e => e.employeeId === firstEmployeeId);
+        await sendTestNotification(emp?.email || '', formId, emp?.clerkUserId);
+        setFeedback({ type: 'success', message: `Test email sent to ${emp?.name || firstEmployeeId}.` });
       } else {
         await sendTestNotification(legacyRecipients[0], formId);
         setFeedback({ type: 'success', message: `Test email sent to ${legacyRecipients[0]}.` });
@@ -1365,42 +1413,69 @@ function RecipientsTab() {
   // ----- Render helpers -----
 
   const renderMemberChecklist = (formId: string, internal: FormNotificationSettings['notifications']['internal']) => {
-    const selectedIds = internal.recipient_user_ids || [];
-    const memberIds = new Set(teamMembers!.map(m => m.user_id));
-    const staleIds = selectedIds.filter(id => !memberIds.has(id));
+    // Primary: registry employee UUIDs. Backward compat: also check legacy Clerk user IDs if no employee IDs set yet.
+    const selectedIds = internal.recipient_employee_ids || [];
+    const employeeIds = new Set(teamMembers!.map(e => e.employeeId));
+    const staleIds = selectedIds.filter(id => !employeeIds.has(id));
 
     return (
       <div>
         <p className="text-xs font-medium text-slate-600 mb-2">Team Members</p>
         <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden">
-          {teamMembers!.map((member) => {
-            const isSelected = selectedIds.includes(member.user_id);
+          {teamMembers!.map((emp) => {
+            const isSelected = selectedIds.includes(emp.employeeId);
+            const isLocalOnly = emp.type === 'local_only';
+            // Generate initials avatar for local_only contacts (no Clerk profile image)
+            const initials = emp.name
+              .split(' ')
+              .map(w => w[0])
+              .filter(Boolean)
+              .slice(0, 2)
+              .join('')
+              .toUpperCase();
+            const smsOptedIn = emp.notificationPrefs?.sms === true;
             return (
               <label
-                key={member.user_id}
-                className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors ${
-                  !isAdmin ? 'cursor-default' : ''
+                key={emp.employeeId}
+                className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                  isAdmin ? 'cursor-pointer hover:bg-slate-50' : 'cursor-default'
                 }`}
               >
                 <input
                   type="checkbox"
                   checked={isSelected}
-                  onChange={() => toggleRecipientUser(formId, member.user_id)}
+                  onChange={() => toggleRecipientUser(formId, emp.employeeId)}
                   disabled={!isAdmin}
                   className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500 shrink-0"
+                  aria-label={`Select ${emp.name} as recipient`}
                 />
-                {member.image_url && (
-                  <img src={member.image_url} alt="" className="w-7 h-7 rounded-full shrink-0" />
-                )}
+                {/* Avatar: initials for local_only, no image shown (AdminEmployee has no imageUrl) */}
+                <div
+                  className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-semibold select-none"
+                  aria-hidden="true"
+                  style={{
+                    background: isLocalOnly ? '#e2e8f0' : '#d1fae5',
+                    color: isLocalOnly ? '#64748b' : '#065f46',
+                  }}
+                >
+                  {initials}
+                </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800 truncate">{member.name}</p>
-                  <p className="text-xs text-slate-500 truncate">{member.email}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-sm font-medium text-slate-800 truncate">{emp.name}</p>
+                    {isLocalOnly && (
+                      <span className="inline-block px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-500 rounded">
+                        Contact
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 truncate">{emp.email}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-xs text-slate-500">
-                    {member.phone ? formatPhoneDisplay(member.phone) : '\u2014'}
+                    {emp.phone ? formatPhoneDisplay(emp.phone) : '\u2014'}
                   </p>
-                  {member.sms_opted_in ? (
+                  {smsOptedIn ? (
                     <span className="text-[10px] text-emerald-600 font-medium">SMS opted in</span>
                   ) : (
                     <span className="text-[10px] text-slate-400">Email only</span>
@@ -1410,21 +1485,22 @@ function RecipientsTab() {
             );
           })}
 
-          {/* Stale user_ids — in config but not in current team */}
-          {staleIds.map((userId) => (
-            <div key={userId} className="flex items-center gap-3 px-4 py-3 bg-amber-50">
-              <svg className="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {/* Stale employee_ids — in config but not in current registry */}
+          {staleIds.map((employeeId) => (
+            <div key={employeeId} className="flex items-center gap-3 px-4 py-3 bg-amber-50">
+              <svg className="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-amber-800 font-medium">Former team member</p>
-                <p className="text-xs text-amber-600 truncate">{userId}</p>
+                <p className="text-xs text-amber-600 truncate font-mono">{employeeId}</p>
               </div>
               {isAdmin && (
                 <button
                   type="button"
-                  onClick={() => removeStaleUserId(formId, userId)}
+                  onClick={() => removeStaleUserId(formId, employeeId)}
                   className="text-xs text-amber-700 hover:text-red-600 font-medium transition-colors"
+                  aria-label={`Remove stale recipient ${employeeId}`}
                 >
                   Remove
                 </button>
@@ -1434,7 +1510,7 @@ function RecipientsTab() {
         </div>
 
         {selectedIds.length === 0 && (
-          <p className="text-xs text-slate-400 mt-2 italic">No team members selected. Check the boxes above to add recipients.</p>
+          <p className="text-xs text-slate-400 mt-2 italic">No recipients selected. Check the boxes above to add recipients.</p>
         )}
       </div>
     );
@@ -1568,7 +1644,7 @@ function RecipientsTab() {
           const isSaving = savingForms.has(formId);
           const isTesting = testingForms.has(formId);
           const hasRecipients = useChecklist
-            ? (internal.recipient_user_ids || []).length > 0
+            ? (internal.recipient_employee_ids || []).length > 0
             : internal.recipients.length > 0;
 
           return (
@@ -1659,8 +1735,8 @@ function RecipientsTab() {
                             Email
                           </label>
                           <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-700">
-                            <input type="checkbox" checked={internal.channels.sms} onChange={() => toggleChannel(formId, 'sms')} disabled={!isAdmin} className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500" />
-                            SMS
+                            <input type="checkbox" checked={smsProvisioned && internal.channels.sms} onChange={() => toggleChannel(formId, 'sms')} disabled={!isAdmin || !smsProvisioned} className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500 disabled:opacity-40" />
+                            SMS {!smsProvisioned && <span className="text-xs text-slate-400 ml-1">(Contact us to enable)</span>}
                           </label>
                         </div>
                       </fieldset>
@@ -1721,16 +1797,40 @@ function RecipientsTab() {
                   </div>
 
                   {applicant.enabled && (
-                    <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={applicant.use_tenant_branding}
-                        onChange={() => toggleApplicantBranding(formId)}
-                        disabled={!isAdmin}
-                        className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500"
-                      />
-                      Use tenant branding
-                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={applicant.use_tenant_branding}
+                          onChange={() => toggleApplicantBranding(formId)}
+                          disabled={!isAdmin}
+                          className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500"
+                        />
+                        Use tenant branding
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={smsProvisioned && (applicant.sms?.enabled ?? false)}
+                          onChange={() => {
+                            setDraft((prev) => {
+                              const next = { ...prev };
+                              next[formId] = cloneSettings(next[formId]);
+                              const ac = next[formId].notifications.applicant_confirmation;
+                              ac.sms = {
+                                enabled: !(ac.sms?.enabled ?? false),
+                                template: ac.sms?.template ?? '',
+                              };
+                              return next;
+                            });
+                            markDirty(formId);
+                          }}
+                          disabled={!isAdmin || !smsProvisioned}
+                          className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500 disabled:opacity-40"
+                        />
+                        Send SMS confirmation {!smsProvisioned && <span className="text-xs text-slate-400 ml-1">(Contact us to enable)</span>}
+                      </label>
+                    </div>
                   )}
                 </div>
 
@@ -1793,6 +1893,7 @@ function TemplatesTab() {
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [previewData, setPreviewData] = useState<TemplatePreviewResponse | null>(null);
   const [previewLoading, setPreviewLoading] = useState<string | null>(null);
+  const [smsProvisioned, setSmsProvisioned] = useState(false);
 
   // Track last-focused template field for variable chip insertion
   const lastFocusedRef = useRef<{ section: 'internal' | 'applicant_confirmation'; field: 'subject' | 'body_template'; el: HTMLInputElement | HTMLTextAreaElement } | null>(null);
@@ -1819,6 +1920,7 @@ function TemplatesTab() {
     try {
       const data = shouldUseMock(user?.tenant_id) ? MOCK_SETTINGS : await fetchNotificationSettings();
       setTemplates(data);
+      setSmsProvisioned(data.sms_provisioned === true);
       const initialDraft: Record<string, FormNotificationSettings> = {};
       for (const [id, s] of Object.entries(data.forms)) {
         initialDraft[id] = cloneSettings(s);
@@ -2176,6 +2278,93 @@ function TemplatesTab() {
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* Divider */}
+            <hr className="border-slate-100" />
+
+            {/* Applicant SMS Template */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-semibold text-slate-700 uppercase tracking-wider">
+                  Applicant SMS Confirmation
+                </p>
+                {smsProvisioned ? (
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={currentForm.notifications.applicant_confirmation.sms?.enabled ?? false}
+                      onChange={() => {
+                        setDraft((prev) => {
+                          const next = { ...prev };
+                          next[selectedFormId] = cloneSettings(next[selectedFormId]);
+                          const ac = next[selectedFormId].notifications.applicant_confirmation;
+                          ac.sms = {
+                            enabled: !(ac.sms?.enabled ?? false),
+                            template: ac.sms?.template ?? '',
+                          };
+                          return next;
+                        });
+                        markDirty();
+                      }}
+                      disabled={!isAdmin}
+                      className="w-4 h-4 text-primary-500 border-slate-300 rounded focus:ring-primary-500"
+                    />
+                    Enabled
+                  </label>
+                ) : (
+                  <span className="text-xs text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200">
+                    Contact us to enable SMS
+                  </span>
+                )}
+              </div>
+
+              {smsProvisioned && (currentForm.notifications.applicant_confirmation.sms?.enabled ?? false) && (
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label htmlFor={`applicant-sms-${selectedFormId}`} className="text-xs font-medium text-slate-600">
+                        SMS Body
+                      </label>
+                      {(() => {
+                        const text = currentForm.notifications.applicant_confirmation.sms?.template ?? '';
+                        const len = text.length;
+                        const segments = len === 0 ? 0 : len <= 160 ? 1 : Math.ceil(len / 153);
+                        const isLong = segments > 1;
+                        return (
+                          <span className={`text-xs font-mono ${isLong ? 'text-amber-600' : 'text-slate-400'}`}>
+                            {len} chars · {segments} segment{segments !== 1 ? 's' : ''}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    <textarea
+                      id={`applicant-sms-${selectedFormId}`}
+                      value={currentForm.notifications.applicant_confirmation.sms?.template ?? ''}
+                      onChange={(e) => {
+                        setDraft((prev) => {
+                          const next = { ...prev };
+                          next[selectedFormId] = cloneSettings(next[selectedFormId]);
+                          const ac = next[selectedFormId].notifications.applicant_confirmation;
+                          ac.sms = {
+                            enabled: ac.sms?.enabled ?? false,
+                            template: e.target.value,
+                          };
+                          return next;
+                        });
+                        markDirty();
+                      }}
+                      readOnly={!isAdmin}
+                      maxLength={306}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none min-h-[80px] resize-y font-mono"
+                      placeholder="{organization_name}: We received your submission! Check your email for details. Reply HELP for assistance."
+                    />
+                    <p className="text-xs text-slate-400 mt-1">
+                      Keep under 160 characters for a single SMS segment. Variables: {'{first_name}'}, {'{organization_name}'}, {'{submission_id}'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Action row (admin only) */}
