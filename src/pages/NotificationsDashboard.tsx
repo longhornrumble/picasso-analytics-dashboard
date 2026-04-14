@@ -1162,7 +1162,8 @@ function RecipientsTab() {
       // Registry employees: null signals legacy fallback
       // fetchAdminTenantEmployees returns AdminEmployee[] directly (not wrapped)
       if (employeesResult.status === 'fulfilled' && employeesResult.value.length > 0) {
-        setTeamMembers(employeesResult.value);
+        // Only show active employees in the recipient picker
+        setTeamMembers(employeesResult.value.filter(e => e.status === 'active'));
       } else {
         // Fall back to Clerk team members if registry is unavailable
         try {
