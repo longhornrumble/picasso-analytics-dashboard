@@ -38,7 +38,6 @@ import type {
   FormNotificationSettings,
   TemplatePreviewResponse,
   NotificationEventLifecycle,
-  TeamMember,
   AdminEmployee,
 } from '../types/analytics';
 
@@ -1154,8 +1153,8 @@ function RecipientsTab() {
             // Convert TeamMember to AdminEmployee shape for unified rendering
             const converted: AdminEmployee[] = legacyTeam.members.map(m => ({
               tenantId: tenantId || '',
-              employeeId: m.user_id,
-              clerkUserId: m.user_id,
+              employeeId: m.employee_id || m.user_id || m.email,
+              clerkUserId: m.user_id || undefined,
               email: m.email,
               name: m.name,
               role: m.role,
@@ -1163,7 +1162,7 @@ function RecipientsTab() {
               status: m.status,
               createdAt: m.joined_at,
               updatedAt: m.joined_at,
-              phone: m.phone,
+              phone: m.phone || undefined,
               notificationPrefs: { email: true, sms: m.sms_opted_in ?? false },
             }));
             setTeamMembers(converted);
