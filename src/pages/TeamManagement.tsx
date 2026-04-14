@@ -16,6 +16,7 @@ import {
   updateTeamMemberRole,
   removeTeamMember,
   addTeamContact,
+  removeTeamContact,
 } from '../services/analyticsApi';
 import type {
   TeamMember,
@@ -41,8 +42,9 @@ export function TeamManagement() {
 
   // Confirmation dialog state
   const [confirmAction, setConfirmAction] = useState<{
-    type: 'role_change' | 'remove';
+    type: 'role_change' | 'remove' | 'remove_contact';
     membershipId: string;
+    employeeId?: string;
     memberName: string;
     newRole?: TeamMemberRole;
   } | null>(null);
@@ -113,6 +115,18 @@ export function TeamManagement() {
       await loadMembers();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove member');
+    }
+    setConfirmAction(null);
+  };
+
+  const handleRemoveContact = async (employeeId: string) => {
+    clearMessages();
+    try {
+      await removeTeamContact(employeeId);
+      setSuccessMsg('Contact removed');
+      await loadMembers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove contact');
     }
     setConfirmAction(null);
   };
@@ -340,9 +354,13 @@ export function TeamManagement() {
                           )
                         ) : (
                           <button
-                            disabled
-                            title="Remove via Admin panel"
-                            className="text-xs text-red-400 font-medium opacity-40 cursor-not-allowed"
+                            onClick={() => setConfirmAction({
+                              type: 'remove_contact',
+                              membershipId: '',
+                              employeeId: member.employee_id,
+                              memberName: member.name || member.email,
+                            })}
+                            className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
                           >
                             Remove
                           </button>
@@ -419,16 +437,20 @@ export function TeamManagement() {
       {/* Confirmation Dialog */}
       {confirmAction && (
         <ConfirmDialog
-          title={confirmAction.type === 'remove' ? 'Remove Member' : 'Change Role'}
+          title={confirmAction.type === 'remove_contact' ? 'Remove Contact' : confirmAction.type === 'remove' ? 'Remove Member' : 'Change Role'}
           message={
-            confirmAction.type === 'remove'
+            confirmAction.type === 'remove_contact'
+              ? `Are you sure you want to remove ${confirmAction.memberName}? They will no longer receive notifications.`
+              : confirmAction.type === 'remove'
               ? `Are you sure you want to remove ${confirmAction.memberName} from the team? They will lose access to the portal.`
               : `Change ${confirmAction.memberName}'s role to ${confirmAction.newRole}?`
           }
-          confirmLabel={confirmAction.type === 'remove' ? 'Remove' : 'Change Role'}
-          destructive={confirmAction.type === 'remove'}
+          confirmLabel={confirmAction.type === 'remove_contact' || confirmAction.type === 'remove' ? 'Remove' : 'Change Role'}
+          destructive={confirmAction.type === 'remove' || confirmAction.type === 'remove_contact'}
           onConfirm={() => {
-            if (confirmAction.type === 'remove') {
+            if (confirmAction.type === 'remove_contact' && confirmAction.employeeId) {
+              handleRemoveContact(confirmAction.employeeId);
+            } else if (confirmAction.type === 'remove') {
               handleRemove(confirmAction.membershipId);
             } else if (confirmAction.newRole) {
               handleRoleChange(confirmAction.membershipId, confirmAction.newRole);

@@ -783,6 +783,10 @@ export async function addTeamContact(data: { name: string; email: string; role?:
   return apiPost<{ employee_id: string; email: string; name: string; type: string }>('/team/contacts', data);
 }
 
+export async function removeTeamContact(employeeId: string): Promise<{ employee_id: string; removed: boolean }> {
+  return apiDelete<{ employee_id: string; removed: boolean }>(`/team/contacts/${encodeURIComponent(employeeId)}`);
+}
+
 export async function fetchAdminTenantInvitations(tenantId: string): Promise<{ invitation_id: string; email: string; role: string; status: string; created_at: string; tenant_id: string }[]> {
   const url = `${API_BASE_URL}/admin/tenants/${tenantId}/invitations`;
   const response = await fetch(url, { headers: buildAdminHeaders() });
