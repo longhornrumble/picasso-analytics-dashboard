@@ -277,17 +277,22 @@ export default function TenantDetailPanel({ tenantId, onClose, onUpdated }: Prop
           <ul className="space-y-2">
             {employees.map(emp => (
               <li
-                key={emp.clerkUserId}
+                key={emp.employeeId}
                 className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-lg text-sm"
               >
-                <div>
+                <div className="flex items-center gap-2 min-w-0">
                   <span className="font-medium text-slate-700">{emp.name || emp.email}</span>
                   {emp.name && (
-                    <span className="text-slate-400 ml-2">{emp.email}</span>
+                    <span className="text-slate-400">{emp.email}</span>
+                  )}
+                  {emp.type === 'local_only' && (
+                    <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-slate-200 text-slate-600">
+                      Contact
+                    </span>
                   )}
                 </div>
                 <span
-                  className={`px-2 py-0.5 rounded text-xs font-medium ${
+                  className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 ${
                     emp.role === 'admin' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'
                   }`}
                 >

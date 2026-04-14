@@ -743,8 +743,8 @@ export async function inviteAdminEmployee(tenantId: string, email: string, role:
   return response.json();
 }
 
-export async function updateAdminEmployee(tenantId: string, clerkUserId: string, fields: { role?: string; status?: string }): Promise<unknown> {
-  const url = `${API_BASE_URL}/admin/employees/${tenantId}/${clerkUserId}`;
+export async function updateAdminEmployee(tenantId: string, employeeId: string, fields: { role?: string; status?: string }): Promise<unknown> {
+  const url = `${API_BASE_URL}/admin/employees/${tenantId}/${employeeId}`;
   const response = await fetch(url, {
     method: 'PATCH',
     headers: buildAdminHeaders(),
@@ -755,6 +755,24 @@ export async function updateAdminEmployee(tenantId: string, clerkUserId: string,
     throw new Error((err as { error?: string }).error || `Failed to update employee: ${response.status}`);
   }
   return response.json();
+}
+
+export async function addAdminEmployee(tenantId: string, data: { name: string; email: string; role: string; phone?: string; notificationPrefs?: AdminEmployee['notificationPrefs'] }): Promise<{ employee_id: string; email: string; name: string; type: string }> {
+  const url = `${API_BASE_URL}/admin/employees/add`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: buildAdminHeaders(),
+    body: JSON.stringify({ tenant_id: tenantId, ...data }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Failed to add contact: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function addTeamContact(data: { name: string; email: string; role?: string; phone?: string; notificationPrefs?: AdminEmployee['notificationPrefs'] }): Promise<{ employee_id: string; email: string; name: string; type: string }> {
+  return apiPost<{ employee_id: string; email: string; name: string; type: string }>('/team/contacts', data);
 }
 
 export async function fetchAdminTenantInvitations(tenantId: string): Promise<{ invitation_id: string; email: string; role: string; status: string; created_at: string; tenant_id: string }[]> {

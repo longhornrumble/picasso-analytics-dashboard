@@ -18,6 +18,7 @@ import {
   fetchAdminTenants,
   fetchAdminEmployees,
   updateAdminEmployee,
+  addAdminEmployee,
   fetchAdminTenantInvitations,
   revokeAdminTenantInvitation,
 } from '../../services/analyticsApi';
@@ -47,6 +48,7 @@ export default function EmployeeManagement() {
 
   // UI state
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
 
   // Confirmation dialog state
   const [confirmAction, setConfirmAction] = useState<{
@@ -149,7 +151,7 @@ export default function EmployeeManagement() {
 
   const handleRoleChange = async (employee: EmployeeRow, newRole: string) => {
     try {
-      await updateAdminEmployee(employee.tenantId, employee.clerkUserId, { role: newRole });
+      await updateAdminEmployee(employee.tenantId, employee.employeeId, { role: newRole });
       showSuccess(`Updated ${employee.name || employee.email} to ${newRole}`);
       loadEmployees(selectedTenantId, searchQuery);
     } catch (err) {
@@ -161,13 +163,28 @@ export default function EmployeeManagement() {
 
   const handleDeactivate = async (employee: EmployeeRow) => {
     try {
-      await updateAdminEmployee(employee.tenantId, employee.clerkUserId, { status: 'inactive' });
+      await updateAdminEmployee(employee.tenantId, employee.employeeId, { status: 'inactive' });
       showSuccess(`Deactivated ${employee.name || employee.email}`);
       loadEmployees(selectedTenantId, searchQuery);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to deactivate employee');
     } finally {
       setConfirmAction(null);
+    }
+  };
+
+  const handleAddContact = async (data: { name: string; email: string; role: string; phone?: string; notificationPrefs?: { email?: boolean; sms?: boolean } }) => {
+    if (!selectedTenantId) {
+      setError('Select a tenant before adding a contact');
+      return;
+    }
+    try {
+      await addAdminEmployee(selectedTenantId, data);
+      showSuccess(`Contact ${data.email} added`);
+      setShowAddContactModal(false);
+      loadEmployees(selectedTenantId, searchQuery);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add contact');
     }
   };
 
@@ -188,6 +205,21 @@ export default function EmployeeManagement() {
       ),
     },
     {
+      key: 'type',
+      header: 'Type',
+      render: (row) => (
+        row.type === 'local_only' ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+            Contact
+          </span>
+        ) : (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+            Portal User
+          </span>
+        )
+      ),
+    },
+    {
       key: 'companyName',
       header: 'Tenant',
       sortable: true,
@@ -201,21 +233,25 @@ export default function EmployeeManagement() {
       key: 'role',
       header: 'Role',
       render: (row) => (
-        <select
-          value={row.role}
-          onChange={(e) => {
-            const newRole = e.target.value;
-            if (newRole !== row.role) {
-              setConfirmAction({ type: 'role_change', employee: row, newRole });
-            }
-          }}
-          onClick={(e) => e.stopPropagation()}
-          aria-label={`Change role for ${row.name || row.email}`}
-          className="text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 bg-white hover:border-slate-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-        >
-          <option value="admin">Admin</option>
-          <option value="member">Member</option>
-        </select>
+        row.type === 'local_only' ? (
+          <span className="text-sm text-slate-400">{'\u2014'}</span>
+        ) : (
+          <select
+            value={row.role}
+            onChange={(e) => {
+              const newRole = e.target.value;
+              if (newRole !== row.role) {
+                setConfirmAction({ type: 'role_change', employee: row, newRole });
+              }
+            }}
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Change role for ${row.name || row.email}`}
+            className="text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 bg-white hover:border-slate-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          >
+            <option value="admin">Admin</option>
+            <option value="member">Member</option>
+          </select>
+        )
       ),
     },
     {
@@ -281,17 +317,27 @@ export default function EmployeeManagement() {
     </select>
   );
 
-  // Invite button injected into DataTable header
-  const inviteButton = (
-    <button
-      onClick={() => { setError(null); setShowInviteModal(true); }}
-      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors"
-    >
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-      </svg>
-      Invite Employee
-    </button>
+  // Header action buttons
+  const headerButtons = (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => { setError(null); setShowAddContactModal(true); }}
+        disabled={!selectedTenantId}
+        title={!selectedTenantId ? 'Select a tenant first' : 'Add a contact who receives notifications but does not log in'}
+        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 border border-slate-200 bg-white hover:bg-slate-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        Add Contact
+      </button>
+      <button
+        onClick={() => { setError(null); setShowInviteModal(true); }}
+        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        Invite Employee
+      </button>
+    </div>
   );
 
   return (
@@ -354,8 +400,8 @@ export default function EmployeeManagement() {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Invite button */}
-        {inviteButton}
+        {/* Action buttons */}
+        {headerButtons}
       </div>
 
       <DataTable<EmployeeRow>
@@ -363,7 +409,7 @@ export default function EmployeeManagement() {
         subtitle={`${employees.length} employee${employees.length !== 1 ? 's' : ''}`}
         columns={columns}
         data={employees}
-        rowKey="clerkUserId"
+        rowKey="employeeId"
         totalCount={employees.length}
         page={1}
         pageSize={employees.length || 1}
@@ -372,17 +418,29 @@ export default function EmployeeManagement() {
         showFilter={false}
         showActions
         renderActions={(row) => (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setConfirmAction({ type: 'deactivate', employee: row });
-            }}
-            disabled={row.status === 'inactive'}
-            aria-label={`Deactivate ${row.name || row.email}`}
-            className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Deactivate
-          </button>
+          row.type === 'local_only' ? (
+            <button
+              onClick={(e) => e.stopPropagation()}
+              disabled
+              title="Remove via Admin panel — contact removal not available here"
+              aria-label={`Remove ${row.name || row.email} — use Admin panel`}
+              className="text-xs text-red-400 font-medium opacity-40 cursor-not-allowed"
+            >
+              Remove
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setConfirmAction({ type: 'deactivate', employee: row });
+              }}
+              disabled={row.status === 'inactive'}
+              aria-label={`Deactivate ${row.name || row.email}`}
+              className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Deactivate
+            </button>
+          )
         )}
         emptyMessage="No employees found. Adjust the tenant filter or search query."
       />
@@ -445,6 +503,15 @@ export default function EmployeeManagement() {
         />
       )}
 
+      {/* Add Contact modal */}
+      {showAddContactModal && (
+        <AddContactModal
+          tenantName={tenants.find(t => t.tenantId === selectedTenantId)?.companyName || selectedTenantId}
+          onClose={() => setShowAddContactModal(false)}
+          onAdd={handleAddContact}
+        />
+      )}
+
       {/* Confirmation dialog — role change */}
       {confirmAction?.type === 'role_change' && (
         <ConfirmDialog
@@ -468,5 +535,138 @@ export default function EmployeeManagement() {
         />
       )}
     </div>
+  );
+}
+
+// =============================================================================
+// Add Contact Modal — admin variant (tenant-scoped)
+// =============================================================================
+import { createPortal } from 'react-dom';
+
+interface AddContactModalProps {
+  tenantName: string;
+  onClose: () => void;
+  onAdd: (data: { name: string; email: string; role: string; phone?: string; notificationPrefs?: { email?: boolean; sms?: boolean } }) => Promise<void>;
+}
+
+function AddContactModal({ tenantName, onClose, onAdd }: AddContactModalProps) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [emailNotif, setEmailNotif] = useState(true);
+  const [smsNotif, setSmsNotif] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim()) return;
+    setSubmitting(true);
+    setLocalError(null);
+    try {
+      await onAdd({
+        name: name.trim(),
+        email: email.trim(),
+        role: 'member',
+        phone: phone.trim() || undefined,
+        notificationPrefs: { email: emailNotif, sms: smsNotif },
+      });
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Failed to add contact');
+      setSubmitting(false);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="add-contact-modal-title">
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+        <h3 id="add-contact-modal-title" className="text-lg font-semibold text-slate-800 mb-1">Add Contact</h3>
+        <p className="text-sm text-slate-500 mb-4">For {tenantName}. Contacts receive notifications but do not log in.</p>
+
+        {localError && (
+          <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm" role="alert">
+            {localError}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="ac-name" className="block text-sm font-medium text-slate-700 mb-1">Name <span aria-hidden="true">*</span></label>
+            <input
+              id="ac-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoFocus
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+          <div>
+            <label htmlFor="ac-email" className="block text-sm font-medium text-slate-700 mb-1">Email <span aria-hidden="true">*</span></label>
+            <input
+              id="ac-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+          <div>
+            <label htmlFor="ac-phone" className="block text-sm font-medium text-slate-700 mb-1">Phone <span className="text-slate-400 font-normal">(optional)</span></label>
+            <input
+              id="ac-phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+15125551234"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+          <fieldset>
+            <legend className="text-sm font-medium text-slate-700 mb-2">Notification Preferences</legend>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={emailNotif}
+                  onChange={(e) => setEmailNotif(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-primary-500 focus:ring-primary-500"
+                />
+                <span className="text-sm text-slate-700">Email notifications</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={smsNotif}
+                  onChange={(e) => setSmsNotif(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-primary-500 focus:ring-primary-500"
+                />
+                <span className="text-sm text-slate-700">SMS notifications</span>
+              </label>
+            </div>
+          </fieldset>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || !name.trim() || !email.trim()}
+              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? 'Adding...' : 'Add Contact'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
   );
 }

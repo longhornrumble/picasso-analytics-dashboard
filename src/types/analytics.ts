@@ -288,13 +288,27 @@ export interface AdminTenant {
 
 export interface AdminEmployee {
   tenantId: string;
-  clerkUserId: string;
+  employeeId: string;       // New primary key — UUID, always present
+  clerkUserId?: string;     // Optional — present for clerk_user type, absent for local_only
   email: string;
   name: string;
   role: string;
+  type: 'clerk_user' | 'local_only';  // New field
   status: string;
   createdAt: string;
   updatedAt: string;
+  phone?: string;           // For notifications
+  notificationPrefs?: {     // For notifications
+    email?: boolean;
+    sms?: boolean;
+    sms_quiet_hours?: {
+      enabled?: boolean;
+      start?: string;
+      end?: string;
+      timezone?: string;
+      fallback_to_email?: boolean;
+    };
+  };
 }
 
 export interface StripeBillingEvent {
@@ -643,11 +657,13 @@ export interface NotificationEventLifecycle {
 export type TeamMemberRole = 'admin' | 'member';
 
 export interface TeamMember {
-  membership_id: string;
-  user_id: string;
+  employee_id: string;          // New — registry UUID
+  membership_id: string | null; // Now nullable for local_only contacts
+  user_id: string | null;       // Now nullable for local_only contacts
   name: string;
   email: string;
   role: TeamMemberRole;
+  type: 'clerk_user' | 'local_only';  // New field
   status: 'active' | 'pending';
   image_url?: string;
   joined_at: string;

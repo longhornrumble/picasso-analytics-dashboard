@@ -15,6 +15,7 @@ import {
   revokeTeamInvitation,
   updateTeamMemberRole,
   removeTeamMember,
+  addTeamContact,
 } from '../services/analyticsApi';
 import type {
   TeamMember,
@@ -35,6 +36,7 @@ export function TeamManagement() {
 
   // Invite modal state
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
 
   // Confirmation dialog state
   const [confirmAction, setConfirmAction] = useState<{
@@ -48,7 +50,11 @@ export function TeamManagement() {
     try {
       const data: TeamMembersResponse = await fetchTeamMembers();
       setMembers(data.members);
-      setAdminCount(data.admin_count);
+      // Count only clerk_user admins — contacts don't count toward admin quorum
+      const clerkAdminCount = data.members.filter(
+        m => m.type === 'clerk_user' && m.role === 'admin'
+      ).length;
+      setAdminCount(clerkAdminCount);
       setCanEdit(data.can_edit);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load team members');
@@ -113,6 +119,18 @@ export function TeamManagement() {
     }
   };
 
+  const handleAddContact = async (data: { name: string; email: string; phone?: string; notificationPrefs?: { email?: boolean; sms?: boolean } }) => {
+    clearMessages();
+    try {
+      await addTeamContact(data);
+      setSuccessMsg(`Contact ${data.email} added`);
+      setShowAddContactModal(false);
+      await loadMembers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add contact');
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -142,15 +160,34 @@ export function TeamManagement() {
           </p>
         </div>
         {canEdit && (
-          <button
-            onClick={() => { clearMessages(); setShowInviteModal(true); }}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Invite Member
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => { clearMessages(); setShowInviteModal(true); }}
+              title="Invite a team member who will log into the portal"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Invite Member
+            </button>
+            <button
+              onClick={() => { clearMessages(); setShowAddContactModal(true); }}
+              title="Add someone who receives notifications but doesn't log in"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 border border-slate-200 bg-white hover:bg-slate-50 rounded-lg transition-colors"
+            >
+              Add Contact
+            </button>
+            {/* Info tooltip */}
+            <div className="relative group">
+              <svg className="w-4 h-4 text-slate-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="absolute right-0 top-6 w-64 bg-slate-800 text-white text-xs rounded-lg p-3 hidden group-hover:block z-50 shadow-lg" role="tooltip">
+                Portal Users log into the dashboard and manage settings. Contacts only receive notifications — they don't have portal access.
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
@@ -183,6 +220,7 @@ export function TeamManagement() {
             <thead>
               <tr className="border-b border-slate-100">
                 <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-6 py-3">Member</th>
+                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-6 py-3">Type</th>
                 <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-6 py-3">Role</th>
                 <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-6 py-3 hidden sm:table-cell">Joined</th>
                 {canEdit && (
@@ -192,14 +230,15 @@ export function TeamManagement() {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {members.map((member) => {
-                const isLastAdmin = member.role === 'admin' && adminCount <= 1;
+                const isClerkUser = member.type === 'clerk_user';
+                const isLastAdmin = isClerkUser && member.role === 'admin' && adminCount <= 1;
                 const isSelf = member.user_id === user?.tenant_id; // approximate — backend enforces real guard
                 const initials = member.name
                   ? member.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
                   : member.email[0].toUpperCase();
 
                 return (
-                  <tr key={member.membership_id} className="hover:bg-slate-50/50">
+                  <tr key={member.employee_id} className="hover:bg-slate-50/50">
                     {/* Name + Email */}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -217,14 +256,29 @@ export function TeamManagement() {
                       </div>
                     </td>
 
+                    {/* Type */}
+                    <td className="px-6 py-4">
+                      {isClerkUser ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                          Portal User
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                          Contact
+                        </span>
+                      )}
+                    </td>
+
                     {/* Role */}
                     <td className="px-6 py-4">
-                      {canEdit && !isLastAdmin ? (
+                      {!isClerkUser ? (
+                        <span className="text-sm text-slate-400">{'\u2014'}</span>
+                      ) : canEdit && !isLastAdmin ? (
                         <select
                           value={member.role}
                           onChange={(e) => {
                             const newRole = e.target.value as TeamMemberRole;
-                            if (newRole !== member.role) {
+                            if (newRole !== member.role && member.membership_id) {
                               setConfirmAction({
                                 type: 'role_change',
                                 membershipId: member.membership_id,
@@ -255,21 +309,31 @@ export function TeamManagement() {
                     {/* Joined date */}
                     <td className="px-6 py-4 hidden sm:table-cell">
                       <span className="text-sm text-slate-500">
-                        {member.joined_at ? new Date(typeof member.joined_at === 'number' ? member.joined_at : member.joined_at).toLocaleDateString() : '—'}
+                        {member.joined_at ? new Date(member.joined_at).toLocaleDateString() : '—'}
                       </span>
                     </td>
 
                     {/* Actions */}
                     {canEdit && (
                       <td className="px-6 py-4 text-right">
-                        {!isLastAdmin && !isSelf && (
+                        {isClerkUser ? (
+                          !isLastAdmin && !isSelf && (
+                            <button
+                              onClick={() => setConfirmAction({
+                                type: 'remove',
+                                membershipId: member.membership_id!,
+                                memberName: member.name || member.email,
+                              })}
+                              className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+                            >
+                              Remove
+                            </button>
+                          )
+                        ) : (
                           <button
-                            onClick={() => setConfirmAction({
-                              type: 'remove',
-                              membershipId: member.membership_id,
-                              memberName: member.name || member.email,
-                            })}
-                            className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+                            disabled
+                            title="Remove via Admin panel"
+                            className="text-xs text-red-400 font-medium opacity-40 cursor-not-allowed"
                           >
                             Remove
                           </button>
@@ -334,6 +398,14 @@ export function TeamManagement() {
         />
       )}
 
+      {/* Add Contact Modal */}
+      {showAddContactModal && (
+        <AddContactModal
+          onClose={() => setShowAddContactModal(false)}
+          onAdd={handleAddContact}
+        />
+      )}
+
       {/* Confirmation Dialog */}
       {confirmAction && (
         <ConfirmDialog
@@ -356,6 +428,153 @@ export function TeamManagement() {
         />
       )}
     </div>
+  );
+}
+
+
+/**
+ * Add Contact Modal
+ * For contacts who receive notifications but do not log into the portal.
+ */
+function AddContactModal({
+  onClose,
+  onAdd,
+}: {
+  onClose: () => void;
+  onAdd: (data: { name: string; email: string; phone?: string; notificationPrefs?: { email?: boolean; sms?: boolean } }) => Promise<void>;
+}) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [emailNotif, setEmailNotif] = useState(true);
+  const [smsNotif, setSmsNotif] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim()) return;
+    setSubmitting(true);
+    setLocalError(null);
+    try {
+      await onAdd({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        notificationPrefs: { email: emailNotif, sms: smsNotif },
+      });
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Failed to add contact');
+      setSubmitting(false);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="add-contact-title">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+        <h3 id="add-contact-title" className="text-lg font-semibold text-slate-800 mb-1">Add Contact</h3>
+        <p className="text-sm text-slate-500 mb-4">
+          Contacts receive notifications but don't have portal access.
+        </p>
+
+        {localError && (
+          <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm" role="alert">
+            {localError}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="contact-name" className="block text-sm font-medium text-slate-700 mb-1">
+              Name <span aria-hidden="true">*</span>
+            </label>
+            <input
+              id="contact-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoFocus
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="contact-email" className="block text-sm font-medium text-slate-700 mb-1">
+              Email <span aria-hidden="true">*</span>
+            </label>
+            <input
+              id="contact-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="contact-phone" className="block text-sm font-medium text-slate-700 mb-1">
+              Phone <span className="text-slate-400 font-normal">(optional)</span>
+            </label>
+            <input
+              id="contact-phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+15125551234"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+
+          <fieldset>
+            <legend className="text-sm font-medium text-slate-700 mb-2">Notification Preferences</legend>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={emailNotif}
+                  onChange={(e) => setEmailNotif(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-primary-500 focus:ring-primary-500"
+                />
+                <span className="text-sm text-slate-700">Email notifications</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={smsNotif}
+                  onChange={(e) => setSmsNotif(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-primary-500 focus:ring-primary-500"
+                />
+                <span className="text-sm text-slate-700">SMS notifications</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || !name.trim() || !email.trim()}
+              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? 'Adding...' : 'Add Contact'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
   );
 }
 
