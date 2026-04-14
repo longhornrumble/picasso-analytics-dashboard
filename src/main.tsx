@@ -9,9 +9,12 @@ createRoot(document.getElementById('root')!).render(
     <ClerkProvider
       publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}
       afterSignOutUrl="/"
+      signUpUrl="/sign-up"
+      signUpFallbackRedirectUrl="/"
+      signInFallbackRedirectUrl="/"
       appearance={{
         layout: {
-          logoImageUrl: 'https://chat.myrecruiter.ai/collateral/MyRecruiterLogo.png',
+          logoImageUrl: 'https://chat.myrecruiter.ai/collateral/MyRecruiterLogo-hires.png',
           socialButtonsVariant: 'blockButton',
         },
         variables: {

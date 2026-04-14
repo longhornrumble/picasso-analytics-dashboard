@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Show, SignIn, UserButton, useAuth as useClerkAuth } from '@clerk/react';
+import { Show, SignIn, SignUp, UserButton, useAuth as useClerkAuth } from '@clerk/react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Dashboard } from './pages/Dashboard';
 import { ConversationsDashboard } from './pages/ConversationsDashboard';
@@ -391,6 +391,24 @@ function NavigationBar({
 function AppContent() {
   const { isAuthenticated, loading, user, logout, login } = useAuth();
   const { isSignedIn, getToken: getClerkToken } = useClerkAuth();
+
+  // Capture sign-up name params and persist in sessionStorage (survives Clerk page navigations)
+  const signUpNameRef = useRef<{ firstName: string; lastName: string }>({ firstName: '', lastName: '' });
+  if (!signUpNameRef.current.firstName) {
+    const params = new URLSearchParams(window.location.search);
+    const fn = decodeURIComponent(params.get('first_name') || '');
+    const ln = decodeURIComponent(params.get('last_name') || '');
+    if (fn) {
+      sessionStorage.setItem('signup_first_name', fn);
+      sessionStorage.setItem('signup_last_name', ln);
+      signUpNameRef.current = { firstName: fn, lastName: ln };
+    } else {
+      signUpNameRef.current = {
+        firstName: sessionStorage.getItem('signup_first_name') || '',
+        lastName: sessionStorage.getItem('signup_last_name') || '',
+      };
+    }
+  }
   const [activeTab, setActiveTab] = useState<DashboardTab>('conversations');
   const [lockedTab, setLockedTab] = useState<DashboardTab | null>(null);
 
@@ -499,11 +517,65 @@ function AppContent() {
   if (!isAuthenticated) {
     return (
       <>
-        {/* Clerk signed-out: full-page sign-in */}
+        {/* Clerk signed-out: sign-up page or sign-in */}
         <Show when="signed-out">
-          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-            <SignIn routing="hash" />
-          </div>
+          {window.location.pathname.startsWith('/sign-up') || window.location.search.includes('__clerk_ticket') ? (() => {
+            const { firstName, lastName } = signUpNameRef.current!;
+            return (
+            <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex items-center justify-center p-8">
+              <div className="flex gap-12 max-w-[960px] w-full items-start">
+                {/* Left panel — branding + steps */}
+                <div className="flex-1 max-w-[400px] pt-4 hidden md:block">
+                  <img src="https://chat.myrecruiter.ai/collateral/MyRecruiterLogo-hires.png" alt="MyRecruiter" className="h-14 mb-6" />
+                  <h1 className="text-2xl font-bold text-slate-800 leading-tight mb-2">
+                    {firstName
+                      ? `Welcome to the Mission Intelligence Portal, ${firstName}!`
+                      : 'Welcome to the Mission Intelligence Portal'}
+                  </h1>
+                  <p className="text-sm text-slate-500 leading-relaxed mb-8">Your organization has invited you to join their workspace. Here's what to expect:</p>
+                  <ol className="space-y-6">
+                    <li className="flex gap-4">
+                      <span className="shrink-0 w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center text-sm font-bold">1</span>
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-800 mb-0.5">Create your account</h3>
+                        <p className="text-xs text-slate-500 leading-relaxed">Set up your login with Google or a password. It only takes a moment.</p>
+                      </div>
+                    </li>
+                    <li className="flex gap-4">
+                      <span className="shrink-0 w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center text-sm font-bold">2</span>
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-800 mb-0.5">Land on your dashboard</h3>
+                        <p className="text-xs text-slate-500 leading-relaxed">See conversation analytics, review form submissions, manage leads, and set your notification preferences.</p>
+                      </div>
+                    </li>
+                    <li className="flex gap-4">
+                      <span className="shrink-0 w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center text-sm font-bold">3</span>
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-800 mb-0.5">Come back anytime</h3>
+                        <p className="text-xs text-slate-500 leading-relaxed">Your dashboard is always available at <strong>login.myrecruiter.ai</strong> whenever you need insights.</p>
+                      </div>
+                    </li>
+                  </ol>
+                </div>
+                {/* Right panel — Clerk sign-up widget */}
+                <div className="flex-1 max-w-[420px]">
+                  <SignUp
+                    path="/sign-up"
+                    fallbackRedirectUrl="/"
+                    initialValues={{
+                      firstName: firstName || undefined,
+                      lastName: lastName || undefined,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+            );
+          })() : (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+              <SignIn routing="hash" />
+            </div>
+          )}
         </Show>
 
         {/* Clerk signed-in but internal JWT not yet issued: show bridge spinner or error */}
