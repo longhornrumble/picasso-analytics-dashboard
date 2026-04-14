@@ -45,6 +45,7 @@ export default function EmployeeManagement() {
   // Filter state
   const [selectedTenantId, setSelectedTenantId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
 
   // UI state
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -394,6 +395,18 @@ export default function EmployeeManagement() {
           </svg>
         </div>
 
+        {/* Status filter */}
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as 'active' | 'inactive' | 'all')}
+          aria-label="Filter by status"
+          className="pl-3 pr-8 py-2 border border-gray-200 rounded-lg text-sm text-slate-700 bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22%2364748b%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5.23%207.21a.75.75%200%20011.06.02L10%2011.168l3.71-3.938a.75.75%200%20111.08%201.04l-4.25%204.5a.75.75%200%2001-1.08%200l-4.25-4.5a.75.75%200%2001.02-1.06z%22%20clip-rule%3D%22evenodd%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.5rem_center] bg-no-repeat"
+        >
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="all">All</option>
+        </select>
+
         {/* Tenant filter */}
         {tenantFilter}
 
@@ -404,15 +417,19 @@ export default function EmployeeManagement() {
         {headerButtons}
       </div>
 
-      <DataTable<EmployeeRow>
+      {(() => {
+        const filteredEmployees = statusFilter === 'all'
+          ? employees
+          : employees.filter(e => e.status === statusFilter);
+        return (<DataTable<EmployeeRow>
         title="Employees"
-        subtitle={`${employees.length} employee${employees.length !== 1 ? 's' : ''}`}
+        subtitle={`${filteredEmployees.length} employee${filteredEmployees.length !== 1 ? 's' : ''}${statusFilter !== 'all' ? ` (${statusFilter})` : ''}`}
         columns={columns}
-        data={employees}
+        data={filteredEmployees}
         rowKey="employeeId"
-        totalCount={employees.length}
+        totalCount={filteredEmployees.length}
         page={1}
-        pageSize={employees.length || 1}
+        pageSize={filteredEmployees.length || 1}
         onPageChange={() => {}}
         showSearch={false}
         showFilter={false}
@@ -443,7 +460,8 @@ export default function EmployeeManagement() {
           )
         )}
         emptyMessage="No employees found. Adjust the tenant filter or search query."
-      />
+      />);
+      })()}
 
       {/* Pending Invitations */}
       <div className="mt-8 pt-6 border-t border-slate-200">

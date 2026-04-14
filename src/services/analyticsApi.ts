@@ -643,12 +643,8 @@ export async function fetchFeatures(): Promise<FeaturesResponse> {
  * Maps camelCase AdminTenant response to legacy TenantOption shape for the tenant switcher.
  */
 export async function fetchTenantList(): Promise<TenantOption[]> {
-  const response = await apiRequest<{ tenants: AdminTenant[] }>('/admin/tenants');
-  return response.tenants.map(t => ({
-    tenant_id: t.tenantId,
-    tenant_hash: t.tenantHash,
-    name: t.companyName,
-  }));
+  const response = await apiRequest<{ tenants: TenantOption[] }>('/admin/tenant-switcher');
+  return response.tenants;
 }
 
 // =============================================================================

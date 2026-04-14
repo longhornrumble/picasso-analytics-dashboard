@@ -890,6 +890,23 @@ function NotificationDashboardTab() {
   };
 
   if (error) {
+    // Friendly empty state for tenants without notifications enabled
+    if (error.toLowerCase().includes('feature not available') || error.toLowerCase().includes('not available')) {
+      return (
+        <div className="max-w-md mx-auto px-4 py-16 text-center">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-slate-100 flex items-center justify-center">
+            <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-slate-800 mb-2">Notifications Coming Soon</h3>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            Notifications are enabled automatically when conversational forms are configured for this tenant. Once forms are active, you'll be able to manage delivery settings, recipients, and templates here.
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 text-center">
         <p className="text-red-600 font-medium">{error}</p>
@@ -2408,6 +2425,27 @@ function TemplatesTab() {
 
 export function NotificationsDashboard() {
   const [subTab, setSubTab] = useState<NotificationSubTab>('dashboard');
+  const { user } = useAuth();
+  const features = user?.features;
+
+  const isSuperAdmin = user?.role === 'super_admin';
+
+  // Non-super-admin users without notifications: show empty state (no sub-tabs)
+  if (!isSuperAdmin && features && !features.dashboard_notifications) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-16 text-center">
+        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-slate-100 flex items-center justify-center">
+          <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-slate-800 mb-2">Notifications</h3>
+        <p className="text-sm text-slate-500 leading-relaxed">
+          Notifications are enabled when conversational forms are configured for your organization. Once forms are active, you'll be able to manage delivery settings, recipients, and templates here.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
