@@ -567,18 +567,55 @@ interface AddContactModalProps {
   onAdd: (data: { name: string; email: string; role: string; phone?: string; notificationPrefs?: { email?: boolean; sms?: boolean } }) => Promise<void>;
 }
 
+// Phone formatting utilities
+function normalizePhone(raw: string): string {
+  const digits = raw.replace(/[\s\-().+]/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('1') && digits.length === 11) return `+${digits}`;
+  if (digits.length === 10) return `+1${digits}`;
+  return `+${digits}`;
+}
+
+function formatPhoneInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 0) return '';
+  const local = digits.startsWith('1') && digits.length > 10 ? digits.slice(1) : digits;
+  if (local.length <= 3) return `(${local}`;
+  if (local.length <= 6) return `(${local.slice(0, 3)}) ${local.slice(3)}`;
+  return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6, 10)}`;
+}
+
+function validatePhone(value: string): string | null {
+  if (!value.trim()) return null;
+  const normalized = normalizePhone(value);
+  if (!/^\+1\d{10}$/.test(normalized)) return 'Enter a valid US phone number (e.g. 512-555-1234)';
+  return null;
+}
+
 function AddContactModal({ tenantName, onClose, onAdd }: AddContactModalProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [emailNotif, setEmailNotif] = useState(true);
   const [smsNotif, setSmsNotif] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhone(formatPhoneInput(e.target.value));
+    setPhoneError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
+
+    if (phone.trim()) {
+      const err = validatePhone(phone);
+      if (err) { setPhoneError(err); return; }
+    }
+
     setSubmitting(true);
     setLocalError(null);
     try {
@@ -586,7 +623,7 @@ function AddContactModal({ tenantName, onClose, onAdd }: AddContactModalProps) {
         name: name.trim(),
         email: email.trim(),
         role: 'member',
-        phone: phone.trim() || undefined,
+        phone: phone.trim() ? normalizePhone(phone) : undefined,
         notificationPrefs: { email: emailNotif, sms: smsNotif },
       });
     } catch (err) {
@@ -638,10 +675,11 @@ function AddContactModal({ tenantName, onClose, onAdd }: AddContactModalProps) {
               id="ac-phone"
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+15125551234"
+              onChange={handlePhoneChange}
+              placeholder="(512) 555-1234"
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             />
+            {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
           </div>
           <fieldset>
             <legend className="text-sm font-medium text-slate-700 mb-2">Notification Preferences</legend>

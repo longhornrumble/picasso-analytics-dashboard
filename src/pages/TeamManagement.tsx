@@ -37,6 +37,7 @@ export function TeamManagement() {
   // Invite modal state
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [smsProvisioned, setSmsProvisioned] = useState(false);
 
   // Confirmation dialog state
   const [confirmAction, setConfirmAction] = useState<{
@@ -75,6 +76,14 @@ export function TeamManagement() {
       setLoading(true);
       await loadMembers();
       await loadInvitations();
+      // Check SMS provisioning for Add Contact modal
+      try {
+        const { fetchNotificationSettings } = await import('../services/analyticsApi');
+        const settings = await fetchNotificationSettings();
+        setSmsProvisioned(settings.sms_provisioned === true);
+      } catch {
+        // Non-critical — default to not provisioned
+      }
       setLoading(false);
     })();
   }, [loadMembers, loadInvitations]);
@@ -403,6 +412,7 @@ export function TeamManagement() {
         <AddContactModal
           onClose={() => setShowAddContactModal(false)}
           onAdd={handleAddContact}
+          smsProvisioned={smsProvisioned}
         />
       )}
 
@@ -436,32 +446,76 @@ export function TeamManagement() {
  * Add Contact Modal
  * For contacts who receive notifications but do not log into the portal.
  */
+// Phone formatting utilities
+function normalizePhone(raw: string): string {
+  const digits = raw.replace(/[\s\-().+]/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('1') && digits.length === 11) return `+${digits}`;
+  if (digits.length === 10) return `+1${digits}`;
+  return `+${digits}`;
+}
+
+function formatPhoneInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 0) return '';
+  // Strip leading 1 for display
+  const local = digits.startsWith('1') && digits.length > 10 ? digits.slice(1) : digits;
+  if (local.length <= 3) return `(${local}`;
+  if (local.length <= 6) return `(${local.slice(0, 3)}) ${local.slice(3)}`;
+  return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6, 10)}`;
+}
+
+function validatePhone(value: string): string | null {
+  if (!value.trim()) return null; // optional
+  const normalized = normalizePhone(value);
+  if (!/^\+1\d{10}$/.test(normalized)) {
+    return 'Enter a valid US phone number (e.g. 512-555-1234)';
+  }
+  return null;
+}
+
 function AddContactModal({
   onClose,
   onAdd,
+  smsProvisioned,
 }: {
   onClose: () => void;
   onAdd: (data: { name: string; email: string; phone?: string; notificationPrefs?: { email?: boolean; sms?: boolean } }) => Promise<void>;
+  smsProvisioned: boolean;
 }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [emailNotif, setEmailNotif] = useState(true);
   const [smsNotif, setSmsNotif] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setPhone(formatPhoneInput(raw));
+    setPhoneError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
+
+    // Validate phone if provided
+    if (phone.trim()) {
+      const err = validatePhone(phone);
+      if (err) { setPhoneError(err); return; }
+    }
+
     setSubmitting(true);
     setLocalError(null);
     try {
       await onAdd({
         name: name.trim(),
         email: email.trim(),
-        phone: phone.trim() || undefined,
-        notificationPrefs: { email: emailNotif, sms: smsNotif },
+        phone: phone.trim() ? normalizePhone(phone) : undefined,
+        notificationPrefs: { email: emailNotif, sms: smsProvisioned && smsNotif },
       });
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to add contact');
@@ -525,10 +579,11 @@ function AddContactModal({
               id="contact-phone"
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+15125551234"
+              onChange={handlePhoneChange}
+              placeholder="(512) 555-1234"
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             />
+            {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
           </div>
 
           <fieldset>
@@ -543,14 +598,18 @@ function AddContactModal({
                 />
                 <span className="text-sm text-slate-700">Email notifications</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className={`flex items-center gap-2 ${smsProvisioned ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
                 <input
                   type="checkbox"
-                  checked={smsNotif}
+                  checked={smsProvisioned && smsNotif}
                   onChange={(e) => setSmsNotif(e.target.checked)}
+                  disabled={!smsProvisioned}
                   className="w-4 h-4 rounded border-slate-300 text-primary-500 focus:ring-primary-500"
                 />
-                <span className="text-sm text-slate-700">SMS notifications</span>
+                <span className="text-sm text-slate-700">
+                  SMS notifications
+                  {!smsProvisioned && <span className="text-xs text-slate-400 ml-1">(Contact us to enable)</span>}
+                </span>
               </label>
             </div>
           </fieldset>

@@ -30,6 +30,7 @@ import {
   fetchNotificationEventDetail,
   fetchTeamMembers,
   fetchAdminTenantEmployees,
+  getTenantOverride,
 } from '../services/analyticsApi';
 import type {
   NotificationEvent,
@@ -1140,7 +1141,7 @@ function RecipientsTab() {
     setIsLoading(true);
     setError(null);
     try {
-      const tenantId = user?.tenant_id;
+      const tenantId = getTenantOverride() || user?.tenant_id;
       const [settingsResult, employeesResult] = await Promise.allSettled([
         shouldUseMock(tenantId) ? Promise.resolve(MOCK_SETTINGS) : fetchNotificationSettings(),
         tenantId ? fetchAdminTenantEmployees(tenantId) : Promise.reject(new Error('No tenant ID')),
