@@ -430,7 +430,7 @@ function PreviewModal({
           <iframe
             title="Template preview"
             srcDoc={preview.body_html}
-            sandbox="allow-same-origin"
+            sandbox=""
             className="w-full min-h-[300px] border border-slate-200 rounded-lg"
           />
         </div>
