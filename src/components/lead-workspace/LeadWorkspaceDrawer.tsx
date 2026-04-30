@@ -687,8 +687,11 @@ export function LeadWorkspaceDrawer({
               isArchived={isArchived}
             />
 
-            {/* Phase 6: InternalNotesSection Component */}
+            {/* Phase 6: InternalNotesSection Component
+                `key` forces remount when switching leads so internal note
+                state starts clean from `notes` — no setState-in-effect mirror. */}
             <InternalNotesSection
+              key={leadData?.submission_id ?? 'no-lead'}
               notes={leadData?.internal_notes || ''}
               onNotesChange={handleNotesChange}
               isSaving={isSavingNotes}

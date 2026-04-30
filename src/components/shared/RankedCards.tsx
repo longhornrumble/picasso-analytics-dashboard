@@ -190,16 +190,5 @@ export function RankedCards<T extends RankedItem>({
   );
 }
 
-/**
- * Helper: Convert FormStats trend to generic TrendType
- */
-export function mapTrend(trend: 'trending' | 'stable' | 'low'): TrendType {
-  switch (trend) {
-    case 'trending':
-      return 'up';
-    case 'low':
-      return 'down';
-    default:
-      return 'stable';
-  }
-}
+// `mapTrend` lives in ./rankedCardsHelpers.ts to keep this file
+// component-only (react-refresh/only-export-components).

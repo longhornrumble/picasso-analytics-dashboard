@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { StatCard } from '../components/StatCard';
 import {
   PageHeader,
@@ -604,20 +604,19 @@ function EventDetailModal({
   onClose: () => void;
 }) {
   const [lifecycle, setLifecycle] = useState<NotificationEventLifecycle | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  // Parent passes `key={messageId}` — fresh mount per ID. Initial isLoading
+  // mirrors whether a fetch is about to fire, so no sync setState in effect.
+  const [isLoading, setIsLoading] = useState(messageId !== null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!messageId) {
-      setLifecycle(null);
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
+    if (!messageId) return;
+    let cancelled = false;
     fetchNotificationEventDetail(messageId)
-      .then(setLifecycle)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load event detail'))
-      .finally(() => setIsLoading(false));
+      .then((data) => { if (!cancelled) setLifecycle(data); })
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load event detail'); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
   }, [messageId]);
 
   // Close on Escape
@@ -1086,8 +1085,11 @@ function NotificationDashboardTab() {
         )}
       </section>
 
-      {/* Event detail modal */}
+      {/* Event detail modal — `key` forces a fresh mount on each messageId
+          change so internal state (lifecycle, loading, error) starts clean
+          without an in-effect setState. */}
       <EventDetailModal
+        key={selectedMessageId ?? 'closed'}
         messageId={selectedMessageId}
         onClose={() => setSelectedMessageId(null)}
       />
@@ -1952,7 +1954,7 @@ function TemplatesTab() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user?.tenant_id]);
 
   useEffect(() => {
     loadTemplates();

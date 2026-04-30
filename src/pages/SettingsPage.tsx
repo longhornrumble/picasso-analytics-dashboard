@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { NotificationsDashboard } from './NotificationsDashboard';
 import { TeamManagement } from './TeamManagement';
 import { NotificationPreferences } from './NotificationPreferences';

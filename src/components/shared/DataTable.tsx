@@ -5,7 +5,7 @@
  * Used by: Forms Dashboard, Conversations Dashboard, Attribution Dashboard
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 
 export type SortDirection = 'asc' | 'desc' | null;
 
@@ -113,33 +113,31 @@ export function DataTable<T extends object>({
   headerAction,
   isArchiveView = false,
 }: DataTableProps<T>) {
-  const [searchQuery, setSearchQuery] = useState(searchValue || '');
+  // Hybrid controlled/uncontrolled search input. When `searchValue` is
+  // provided, the parent controls the value; otherwise we keep local
+  // state. `displaySearch` is what the input renders — derived in render
+  // (no setState-in-effect mirroring needed).
+  const [internalSearch, setInternalSearch] = useState('');
+  const isSearchControlled = searchValue !== undefined;
+  const displaySearch = isSearchControlled ? searchValue : internalSearch;
   const totalPages = Math.ceil(totalCount / pageSize);
-
-  // Sync internal search state with controlled value
-  useEffect(() => {
-    if (searchValue !== undefined) {
-      setSearchQuery(searchValue);
-    }
-  }, [searchValue]);
   const startIndex = (page - 1) * pageSize + 1;
   const endIndex = Math.min(page * pageSize, totalCount);
 
-  // Column reordering state
-  const [columnOrder, setColumnOrder] = useState<string[]>(() => columns.map(c => c.key));
+  // Column reordering: track only the user's manual reorder (null until first drag).
+  // The displayed order is derived in render — no setState-in-effect mirroring.
+  const [userColumnOrder, setUserColumnOrder] = useState<string[] | null>(null);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
-  // Sync column order when columns prop changes
-  useEffect(() => {
+  const columnOrder = useMemo(() => {
     const newKeys = columns.map(c => c.key);
-    setColumnOrder(prev => {
-      // Keep existing order for columns that still exist, add new ones at the end
-      const existingOrder = prev.filter(key => newKeys.includes(key));
-      const newColumns = newKeys.filter(key => !prev.includes(key));
-      return [...existingOrder, ...newColumns];
-    });
-  }, [columns]);
+    if (!userColumnOrder) return newKeys;
+    // Keep existing user order for columns that still exist; append any new ones.
+    const existingOrder = userColumnOrder.filter(key => newKeys.includes(key));
+    const newColumns = newKeys.filter(key => !userColumnOrder.includes(key));
+    return [...existingOrder, ...newColumns];
+  }, [columns, userColumnOrder]);
 
   // Get ordered columns based on current order
   const orderedColumns = columnOrder
@@ -147,7 +145,7 @@ export function DataTable<T extends object>({
     .filter((c): c is Column<T> => c !== undefined);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
+    if (!isSearchControlled) setInternalSearch(e.target.value);
     onSearch?.(e.target.value);
   };
 
@@ -196,27 +194,21 @@ export function DataTable<T extends object>({
     const sourceKey = e.dataTransfer.getData('text/plain');
 
     if (sourceKey && sourceKey !== targetKey) {
-      setColumnOrder(prev => {
-        const newOrder = [...prev];
-        const sourceIndex = newOrder.indexOf(sourceKey);
-        const targetIndex = newOrder.indexOf(targetKey);
+      const newOrder = [...columnOrder];
+      const sourceIndex = newOrder.indexOf(sourceKey);
+      const targetIndex = newOrder.indexOf(targetKey);
 
-        if (sourceIndex !== -1 && targetIndex !== -1) {
-          // Remove source and insert at target position
-          newOrder.splice(sourceIndex, 1);
-          newOrder.splice(targetIndex, 0, sourceKey);
-
-          // Notify parent
-          onColumnReorder?.(newOrder);
-        }
-
-        return newOrder;
-      });
+      if (sourceIndex !== -1 && targetIndex !== -1) {
+        newOrder.splice(sourceIndex, 1);
+        newOrder.splice(targetIndex, 0, sourceKey);
+        setUserColumnOrder(newOrder);
+        onColumnReorder?.(newOrder);
+      }
     }
 
     setDraggedColumn(null);
     setDragOverColumn(null);
-  }, [onColumnReorder]);
+  }, [columnOrder, onColumnReorder]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100">
@@ -242,7 +234,7 @@ export function DataTable<T extends object>({
                   <input
                     type="text"
                     placeholder="Search..."
-                    value={searchQuery}
+                    value={displaySearch}
                     onChange={handleSearch}
                     className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
@@ -335,22 +327,10 @@ export function DataTable<T extends object>({
                       )}
                       {column.header}
                       {column.sortable && (
-                        <span className="inline-flex flex-col ml-1">
-                          <svg
-                            className={`w-3 h-3 -mb-1 ${isAsc ? 'text-primary-600' : 'text-gray-300'}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M10 5l5 5H5l5-5z" />
-                          </svg>
-                          <svg
-                            className={`w-3 h-3 -mt-1 ${isDesc ? 'text-primary-600' : 'text-gray-300'}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M10 15l-5-5h10l-5 5z" />
-                          </svg>
-                        </span>
+                        <svg className="ml-1.5 shrink-0" width="10" height="14" viewBox="0 0 10 14" fill="none">
+                          <path d="M5 0L10 5.5H0L5 0Z" fill={isAsc ? 'var(--color-primary-600, #059669)' : '#d1d5db'} />
+                          <path d="M5 14L0 8.5H10L5 14Z" fill={isDesc ? 'var(--color-primary-600, #059669)' : '#d1d5db'} />
+                        </svg>
                       )}
                     </span>
                   </th>

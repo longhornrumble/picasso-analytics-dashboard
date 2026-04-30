@@ -5,7 +5,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Show, SignIn, SignUp, UserButton, useAuth as useClerkAuth } from '@clerk/react';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/useAuth';
 import { Dashboard } from './pages/Dashboard';
 import { ConversationsDashboard } from './pages/ConversationsDashboard';
 import { SettingsPage } from './pages/SettingsPage';

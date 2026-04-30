@@ -23,8 +23,9 @@ export { DataTable, BadgeCell, TwoLineCell, TruncatedCell } from './DataTable';
 export type { Column, SortDirection } from './DataTable';
 
 // Ranked items grid
-export { RankedCards, mapTrend } from './RankedCards';
+export { RankedCards } from './RankedCards';
 export type { RankedItem, TrendType } from './RankedCards';
+export { mapTrend } from './rankedCardsHelpers';
 
 // Trend chart (time-series)
 export { TrendChart, SimpleTrendChart } from './TrendChart';

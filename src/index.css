@@ -1,5 +1,6 @@
-/* Shared Picasso design tokens - single source of truth */
-@import '../../picasso-shared-styles/src/tokens.css';
+/* Picasso design tokens — inlined from picasso-shared-styles to keep CI
+   self-contained. Long-term: see docs/roadmap/CSS_DESIGN_SYSTEM_UNIFICATION.md */
+@import './styles/tokens.css';
 
 /* Google Fonts - Plus Jakarta Sans (Premium SaaS typography) */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');

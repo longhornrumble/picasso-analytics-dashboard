@@ -1,0 +1,308 @@
+/* Picasso Design Tokens - Shared across all dashboards */
+/* This file is the single source of truth for brand consistency */
+
+:root {
+  /* ========================================
+     BRAND COLORS
+     ======================================== */
+
+  /* Primary - Emerald Green (success, positive metrics, CTAs) */
+  /* Aligned with MyRecruiter Marketing Style Guide */
+  /* Base brand color: #50C878 (Emerald 500) */
+  --color-primary-50: #ecfdf5;
+  --color-primary-100: #d1fae5;
+  --color-primary-200: #a7f3d0;
+  --color-primary-300: #6ee7b7;
+  --color-primary-400: #34d399;   /* Hover states, secondary accents */
+  --color-primary-500: #50C878;   /* Primary brand color, CTAs */
+  --color-primary-600: #059669;   /* Eyebrow text, icons on light */
+  --color-primary-700: #047857;   /* Setup step numbers, icon strokes */
+  --color-primary-800: #065f46;   /* Premium card background */
+  --color-primary-900: #064e3b;
+
+  /* Primary Alpha Variants (for shadows, overlays, backgrounds) */
+  /* RGB values for 50C878: 80, 200, 120 */
+  --color-primary-alpha-03: rgba(80, 200, 120, 0.03);
+  --color-primary-alpha-10: rgba(80, 200, 120, 0.10);
+  --color-primary-alpha-12: rgba(80, 200, 120, 0.12);
+  --color-primary-alpha-15: rgba(80, 200, 120, 0.15);
+  --color-primary-alpha-25: rgba(80, 200, 120, 0.25);
+  --color-primary-alpha-30: rgba(80, 200, 120, 0.30);
+  --color-primary-alpha-35: rgba(80, 200, 120, 0.35);
+  --color-primary-alpha-50: rgba(80, 200, 120, 0.50);
+
+  /* Marketing Style Guide - Callout Alpha Variants */
+  /* Emerald-50 (#ecfdf5) at various opacities */
+  --color-primary-50-alpha-30: rgba(236, 253, 245, 0.30);
+  /* Emerald-200 (#a7f3d0) at various opacities */
+  --color-primary-200-alpha-40: rgba(167, 243, 208, 0.40);
+
+  /* Danger - Red (errors, abandon rates, warnings) */
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-200: #fecaca;
+  --color-danger-300: #fca5a5;
+  --color-danger-400: #f87171;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+  --color-danger-800: #991b1b;
+  --color-danger-900: #7f1d1d;
+
+  /* Neutral - Gray (text, borders, backgrounds) */
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+
+  /* Slate - Marketing neutral palette (dark sections, premium UI) */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+
+  /* Slate Alpha Variants */
+  /* RGB values for 94a3b8: 148, 163, 184 */
+  --color-slate-alpha-12: rgba(148, 163, 184, 0.12);
+
+  /* Info - Blue (links, informational) */
+  --color-info-50: #eff6ff;
+  --color-info-100: #dbeafe;
+  --color-info-200: #bfdbfe;
+  --color-info-300: #93c5fd;
+  --color-info-400: #60a5fa;
+  --color-info-500: #3b82f6;
+  --color-info-600: #2563eb;
+  --color-info-700: #1d4ed8;
+  --color-info-800: #1e40af;
+  --color-info-900: #1e3a8a;
+
+  /* Info Alpha Variants */
+  /* RGB values for 3b82f6: 59, 130, 246 */
+  --color-info-alpha-12: rgba(59, 130, 246, 0.12);
+
+  /* Warning - Amber */
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-900: #78350f;
+
+  /* ========================================
+     SEMANTIC COLORS
+     ======================================== */
+
+  /* Text */
+  --text-primary: var(--color-gray-900);
+  --text-secondary: var(--color-gray-600);
+  --text-muted: var(--color-gray-400);
+  --text-inverse: #ffffff;
+
+  /* Backgrounds */
+  --bg-primary: #ffffff;
+  --bg-secondary: var(--color-gray-50);
+  --bg-tertiary: var(--color-gray-100);
+
+  /* Borders */
+  --border-default: var(--color-gray-200);
+  --border-light: var(--color-gray-100);
+  --border-dark: var(--color-gray-300);
+
+  /* ========================================
+     TYPOGRAPHY
+     ======================================== */
+
+  --font-family-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+
+  /* Font Sizes */
+  --text-xs: 0.75rem;     /* 12px */
+  --text-sm: 0.875rem;    /* 14px */
+  --text-base: 1rem;      /* 16px */
+  --text-lg: 1.125rem;    /* 18px */
+  --text-xl: 1.25rem;     /* 20px */
+  --text-2xl: 1.5rem;     /* 24px */
+  --text-3xl: 1.875rem;   /* 30px */
+  --text-4xl: 2.25rem;    /* 36px */
+
+  /* Font Weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* Line Heights */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.75;
+
+  /* ========================================
+     SPACING
+     ======================================== */
+
+  --space-0: 0;
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+  --space-16: 4rem;     /* 64px */
+
+  /* ========================================
+     BORDER RADIUS
+     ======================================== */
+
+  --radius-none: 0;
+  --radius-sm: 0.25rem;   /* 4px */
+  --radius-md: 0.375rem;  /* 6px */
+  --radius-lg: 0.5rem;    /* 8px */
+  --radius-xl: 0.75rem;   /* 12px */
+  --radius-2xl: 1rem;     /* 16px */
+  --radius-full: 9999px;
+
+  /* ========================================
+     SHADOWS
+     ======================================== */
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  /* Marketing Style Guide - Component Shadows */
+  --shadow-card-elevated: 0 6px 20px rgba(0, 0, 0, 0.08);
+  --shadow-card-premium: 0 10px 28px rgba(0, 0, 0, 0.18), 0 6px 14px rgba(6, 95, 70, 0.22);
+  --shadow-btn-primary: 0 4px 14px var(--color-primary-alpha-25);
+  --shadow-btn-primary-hover: 0 6px 20px var(--color-primary-alpha-35);
+
+  /* ========================================
+     TRANSITIONS
+     ======================================== */
+
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
+
+  /* ========================================
+     ELEVATION SYSTEM (Card Visual Hierarchy)
+     ======================================== */
+
+  /* Tier 1: Hero KPI Cards - prominent, elevated */
+  --elevation-hero: 0 4px 20px -2px rgb(0 0 0 / 0.12), 0 2px 8px -2px rgb(0 0 0 / 0.08);
+
+  /* Tier 2: Analytical Cards - standard working cards */
+  --elevation-card: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+
+  /* Tier 3: Utility - minimal, recessive */
+  --elevation-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+
+  /* ========================================
+     DASHBOARD SPACING SCALE (8px base)
+     ======================================== */
+
+  --spacing-xs: 0.5rem;     /* 8px */
+  --spacing-sm: 1rem;       /* 16px */
+  --spacing-md: 1.5rem;     /* 24px */
+  --spacing-lg: 2rem;       /* 32px */
+  --spacing-xl: 3rem;       /* 48px */
+  --spacing-section: 2rem;  /* 32px - between dashboard sections */
+
+  /* ========================================
+     TYPOGRAPHY REFINEMENTS
+     ======================================== */
+
+  /* Tighter line-height for large KPI numbers */
+  --leading-kpi: 1.1;
+
+  /* ========================================
+     CHART STYLING
+     ======================================== */
+
+  --chart-grid-color: rgba(229, 231, 235, 0.5);   /* 50% opacity gray-200 */
+  --chart-axis-color: rgba(156, 163, 175, 0.6);   /* 60% opacity gray-400 */
+
+  /* ========================================
+     TABLE STYLING
+     ======================================== */
+
+  --table-stripe-color: rgba(249, 250, 251, 0.7); /* gray-50 at 70% */
+  --table-hover-color: rgba(243, 244, 246, 0.8);  /* gray-100 at 80% */
+
+  /* ========================================
+     INTERACTIVE TRANSFORMS (Micro-interactions)
+     Per PRD: hover:scale-[1.02], active:scale-[0.98]
+     ======================================== */
+
+  --scale-hover: 1.02;          /* Subtle lift on hover */
+  --scale-active: 0.98;         /* Press feedback */
+  --scale-hover-subtle: 1.01;   /* Very subtle for large elements */
+
+  /* ========================================
+     FOCUS RING SYSTEM
+     WCAG 2.1 AA compliant focus indicators
+     ======================================== */
+
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --focus-ring-color: var(--color-primary-500);
+  --focus-ring-color-danger: var(--color-danger-500);
+  --focus-ring: var(--focus-ring-width) solid var(--focus-ring-color);
+  --focus-ring-shadow: 0 0 0 var(--focus-ring-offset) var(--bg-primary), 0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--focus-ring-color);
+
+  /* ========================================
+     TOUCH TARGET SIZING
+     WCAG 2.5.5: Minimum 44x44px for mobile
+     ======================================== */
+
+  --touch-target-min: 44px;
+  --touch-target-comfortable: 48px;
+
+  /* ========================================
+     DRAWER & OVERLAY SYSTEM
+     Centralized control for slide-in panels
+     ======================================== */
+
+  --drawer-width: 576px;              /* max-w-xl equivalent */
+  --drawer-width-mobile: 90vw;        /* Mobile responsive */
+  --drawer-backdrop-blur: 4px;        /* Subtle blur */
+  --drawer-backdrop-opacity: 0.2;     /* 20% black overlay */
+  --drawer-shadow: -8px 0 32px rgba(0, 0, 0, 0.15);
+  --drawer-transition: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ========================================
+     ANIMATION TIMING
+     Consistent motion design tokens
+     ======================================== */
+
+  --duration-instant: 100ms;
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+
+  --easing-default: ease;
+  --easing-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --easing-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}

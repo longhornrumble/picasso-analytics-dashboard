@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { StatCard } from '../components/StatCard';
 import { FieldBottlenecks } from '../components/FieldBottlenecks';
 import { LeadWorkspaceDrawer } from '../components/lead-workspace';

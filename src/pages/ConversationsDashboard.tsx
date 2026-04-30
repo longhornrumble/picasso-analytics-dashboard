@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { StatCard } from '../components/StatCard';
 import { ConversationHeatMap } from '../components/ConversationHeatMap';
 import { TopQuestions } from '../components/TopQuestions';

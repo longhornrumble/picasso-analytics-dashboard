@@ -49,7 +49,6 @@ import {
   fetchNotificationSettings,
   updateNotificationSettings,
   sendTestNotification,
-  fetchNotificationTemplates,
   updateNotificationTemplate,
   previewTemplate,
   sendTestTemplate,
