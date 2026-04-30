@@ -1,23 +1,19 @@
 name: Deploy Analytics Dashboard
 
+# Production deploy. Triggered by push to main (typically a merged PR).
+# Staging is handled by pr-checks.yml during the PR — when this fires,
+# the change has already been validated on staging.
+
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
-    inputs:
-      skip_staging:
-        description: 'Skip staging and deploy directly to production (hotfix only)'
-        required: false
-        type: boolean
-        default: false
+  workflow_dispatch: {}
 
 env:
   NODE_VERSION: '22'
   AWS_REGION: 'us-east-1'
-  S3_BUCKET_STAGING: 'picasso-analytics-portal-staging'
   S3_BUCKET_PRODUCTION: 'app-myrecruiter-ai'
-  CLOUDFRONT_STAGING_ID: 'E2R9VHBON5PHMK'
   CLOUDFRONT_PRODUCTION_ID: 'EJ0Y6ZUIUBSAT'
 
 jobs:
@@ -56,7 +52,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type check and build
+      - name: Type check and build (production mode)
+        # Default `vite build` is production mode → loads .env.production
+        # which is committed to the repo (publishable values only).
         run: npm run build
 
       - name: Upload build artifacts
@@ -85,40 +83,14 @@ jobs:
       - name: Run npm audit
         run: npm audit --omit=dev --audit-level=high
 
-  deploy-staging:
-    name: Deploy to Staging
-    needs: [lint, typecheck-and-build, security]
-    if: ${{ !inputs.skip_staging }}
-    runs-on: ubuntu-latest
-    environment: staging
-    steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dashboard-build
-          path: dist/
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Deploy to staging S3
-        run: aws s3 sync dist/ s3://${{ env.S3_BUCKET_STAGING }}/ --delete
-
-      - name: Invalidate staging CloudFront
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ env.CLOUDFRONT_STAGING_ID }} \
-            --paths "/*"
-
   deploy-production:
     name: Deploy to Production
-    needs: [deploy-staging]
-    if: ${{ always() && (needs.deploy-staging.result == 'success' || inputs.skip_staging) }}
+    needs: [lint, typecheck-and-build, security]
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
