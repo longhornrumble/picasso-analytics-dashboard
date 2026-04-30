@@ -3,7 +3,7 @@
  * Contains title, time filters, dropdowns, and export button
  */
 
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import type { TimeRange } from '../types/analytics';
 
 interface DashboardHeaderProps {

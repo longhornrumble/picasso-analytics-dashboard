@@ -98,13 +98,6 @@ export function ExportDropdown({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close dropdown when export starts
-  useEffect(() => {
-    if (isExporting) {
-      setIsOpen(false);
-    }
-  }, [isExporting]);
-
   const handleExport = (format: ExportFormat) => {
     setIsOpen(false);
     onExport(format);

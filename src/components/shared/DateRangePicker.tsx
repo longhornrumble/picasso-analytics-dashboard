@@ -53,13 +53,10 @@ export function DateRangePicker({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Update local state when prop changes
-  useEffect(() => {
-    if (dateRange) {
-      setStartDate(dateRange.startDate);
-      setEndDate(dateRange.endDate);
-    }
-  }, [dateRange]);
+  // Displayed values prefer the controlled prop when provided, falling
+  // back to local state. Replaces the previous setState-in-effect mirror.
+  const displayStart = dateRange?.startDate ?? startDate;
+  const displayEnd = dateRange?.endDate ?? endDate;
 
   const handlePresetClick = (days: number) => {
     const end = endOfDay(new Date());
@@ -71,10 +68,10 @@ export function DateRangePicker({
   };
 
   const handleApply = () => {
-    if (startDate && endDate) {
+    if (displayStart && displayEnd) {
       onDateRangeChange({
-        startDate: startOfDay(startDate),
-        endDate: endOfDay(endDate),
+        startDate: startOfDay(displayStart),
+        endDate: endOfDay(displayEnd),
       });
       setIsOpen(false);
     }
@@ -139,12 +136,12 @@ export function DateRangePicker({
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Start Date</label>
               <DatePicker
-                selected={startDate}
+                selected={displayStart}
                 onChange={(date: Date | null) => setStartDate(date)}
                 selectsStart
-                startDate={startDate}
-                endDate={endDate}
-                maxDate={endDate || new Date()}
+                startDate={displayStart}
+                endDate={displayEnd}
+                maxDate={displayEnd || new Date()}
                 dateFormat="MMM d, yyyy"
                 className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 placeholderText="Start date"
@@ -153,12 +150,12 @@ export function DateRangePicker({
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">End Date</label>
               <DatePicker
-                selected={endDate}
+                selected={displayEnd}
                 onChange={(date: Date | null) => setEndDate(date)}
                 selectsEnd
-                startDate={startDate}
-                endDate={endDate}
-                minDate={startDate || undefined}
+                startDate={displayStart}
+                endDate={displayEnd}
+                minDate={displayStart || undefined}
                 maxDate={new Date()}
                 dateFormat="MMM d, yyyy"
                 className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -184,7 +181,7 @@ export function DateRangePicker({
               </button>
               <button
                 onClick={handleApply}
-                disabled={!startDate || !endDate}
+                disabled={!displayStart || !displayEnd}
                 className="px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Apply

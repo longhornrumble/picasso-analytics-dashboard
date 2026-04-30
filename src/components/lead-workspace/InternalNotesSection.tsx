@@ -124,17 +124,12 @@ export function InternalNotesSection({
   isLoading = false,
   disabled = false,
 }: InternalNotesSectionProps) {
+  // Initial state seeds from `notes` prop. Parent passes `key={leadId}`
+  // so a fresh mount happens on lead switch — no setState-in-effect mirror.
   const [localNotes, setLocalNotes] = useState(notes);
   const [hasChanges, setHasChanges] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Sync local notes with prop when it changes externally
-  useEffect(() => {
-    if (!hasChanges) {
-      setLocalNotes(notes);
-    }
-  }, [notes, hasChanges]);
 
   // Auto-save logic
   const triggerSave = useCallback(() => {

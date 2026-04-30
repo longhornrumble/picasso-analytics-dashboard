@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { fetchPreferences, updatePreferences, fetchNotificationSettings } from '../services/analyticsApi';
 import type { NotificationPreferences as NotificationPreferencesType } from '../types/analytics';
 

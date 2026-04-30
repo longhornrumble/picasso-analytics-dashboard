@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import {
   fetchTeamMembers,

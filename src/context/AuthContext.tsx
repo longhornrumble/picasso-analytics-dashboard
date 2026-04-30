@@ -3,17 +3,10 @@
  * Handles Bubble SSO integration and token management
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { AuthState, User, DashboardFeatures, UserRole } from '../types/analytics';
 import { fetchFeatures } from '../services/analyticsApi';
-
-interface AuthContextType extends AuthState {
-  login: (token: string) => void;
-  logout: () => void;
-  refreshToken: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { AuthContext } from './useAuth';
 
 // Bubble SSO configuration
 const BUBBLE_AUTH_URL = import.meta.env.VITE_BUBBLE_AUTH_URL || '';
@@ -93,70 +86,63 @@ function extractUserFromToken(token: string): User | null {
   };
 }
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({
+// Compute the initial auth state from URL and localStorage. Pure with
+// respect to React state (returns the snapshot), but performs storage and
+// URL side effects which are necessary parts of bootstrap.
+function readInitialAuthState(): AuthState {
+  // Check for token in URL (Bubble SSO callback)
+  const urlParams = new URLSearchParams(window.location.search);
+  const tokenFromUrl = urlParams.get('token');
+
+  if (tokenFromUrl) {
+    // Clear token from URL regardless of validity
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (!isTokenExpired(tokenFromUrl)) {
+      const user = extractUserFromToken(tokenFromUrl);
+      localStorage.setItem(TOKEN_KEY, tokenFromUrl);
+      if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+      return {
+        isAuthenticated: true,
+        user,
+        token: tokenFromUrl,
+        loading: false,
+        error: null,
+      };
+    }
+  }
+
+  // Fall back to stored token
+  const storedToken = localStorage.getItem(TOKEN_KEY);
+  const storedUser = localStorage.getItem(USER_KEY);
+
+  if (storedToken && !isTokenExpired(storedToken)) {
+    const user = storedUser ? JSON.parse(storedUser) : extractUserFromToken(storedToken);
+    return {
+      isAuthenticated: true,
+      user,
+      token: storedToken,
+      loading: false,
+      error: null,
+    };
+  }
+
+  // Stored token missing or expired
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  return {
     isAuthenticated: false,
     user: null,
     token: null,
-    loading: true,
+    loading: false,
     error: null,
-  });
+  };
+}
 
-  // Initialize auth state from storage
-  useEffect(() => {
-    const initAuth = () => {
-      const storedToken = localStorage.getItem(TOKEN_KEY);
-      const storedUser = localStorage.getItem(USER_KEY);
-
-      if (storedToken && !isTokenExpired(storedToken)) {
-        const user = storedUser ? JSON.parse(storedUser) : extractUserFromToken(storedToken);
-        setState({
-          isAuthenticated: true,
-          user,
-          token: storedToken,
-          loading: false,
-          error: null,
-        });
-      } else {
-        // Clear expired token
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
-        setState({
-          isAuthenticated: false,
-          user: null,
-          token: null,
-          loading: false,
-          error: null,
-        });
-      }
-    };
-
-    // Check for token in URL (Bubble SSO callback)
-    const urlParams = new URLSearchParams(window.location.search);
-    const tokenFromUrl = urlParams.get('token');
-
-    if (tokenFromUrl) {
-      // Clear token from URL
-      window.history.replaceState({}, '', window.location.pathname);
-
-      if (!isTokenExpired(tokenFromUrl)) {
-        const user = extractUserFromToken(tokenFromUrl);
-        localStorage.setItem(TOKEN_KEY, tokenFromUrl);
-        if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
-
-        setState({
-          isAuthenticated: true,
-          user,
-          token: tokenFromUrl,
-          loading: false,
-          error: null,
-        });
-        return;
-      }
-    }
-
-    initAuth();
-  }, []);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  // Lazy initializer runs once during mount. Replaces a setState-in-effect
+  // bootstrap so the first render already has the resolved auth state.
+  const [state, setState] = useState<AuthState>(readInitialAuthState);
 
   // Auto-redirect to Bubble login when not authenticated
   useEffect(() => {
@@ -247,10 +233,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
+// useAuth + AuthContext live in ./useAuth.ts to satisfy
+// react-refresh/only-export-components — this file exports only the
+// AuthProvider component.
