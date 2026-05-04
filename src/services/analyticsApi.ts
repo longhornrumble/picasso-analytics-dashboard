@@ -46,9 +46,9 @@ import type {
   StripeBillingEvent,
 } from '../types/analytics';
 
-// API endpoint - configurable via environment variable
-const API_BASE_URL = import.meta.env.VITE_ANALYTICS_API_URL ||
-  'https://uniywvlgstv2ymc46uyqs3z3du0vucst.lambda-url.us-east-1.on.aws';
+// API endpoint - configurable via environment variable.
+// Default '/api' assumes CloudFront fronts the Lambda at /api/* (same-origin).
+const API_BASE_URL = import.meta.env.VITE_ANALYTICS_API_URL || '/api';
 
 // Tenant override for super admin tenant switching
 let _tenantOverride: string | null = null;
