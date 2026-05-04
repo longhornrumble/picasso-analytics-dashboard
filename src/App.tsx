@@ -15,9 +15,8 @@ import { fetchTenantList, setTenantOverride } from './services/analyticsApi';
 import type { DashboardFeatures, User, TenantOption } from './types/analytics';
 
 // Reuse the same base URL as analyticsApi.ts — avoids duplicating the default.
-const AUTH_API_BASE_URL =
-  import.meta.env.VITE_ANALYTICS_API_URL ||
-  'https://uniywvlgstv2ymc46uyqs3z3du0vucst.lambda-url.us-east-1.on.aws';
+// Default '/api' assumes CloudFront fronts the Lambda at /api/* (same-origin).
+const AUTH_API_BASE_URL = import.meta.env.VITE_ANALYTICS_API_URL || '/api';
 
 type DashboardTab = 'conversations' | 'forms' | 'attribution' | 'settings';
 
