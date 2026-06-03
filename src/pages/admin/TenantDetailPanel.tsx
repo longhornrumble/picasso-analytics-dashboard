@@ -14,6 +14,8 @@ import {
   fetchAdminTenantEmployees,
   fetchAdminTenantInvitations,
   revokeAdminTenantInvitation,
+  purgeTenant,
+  type TenantPurgeResult,
 } from '../../services/analyticsApi';
 import type {
   AdminTenant,
@@ -106,6 +108,46 @@ export default function TenantDetailPanel({ tenantId, onClose, onUpdated }: Prop
       setError(err instanceof Error ? err.message : 'Failed to save');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ── Danger Zone: tenant data purge (preview → typed-confirm → delete) ────────
+  const [purgePreview, setPurgePreview] = useState<TenantPurgeResult | null>(null);
+  const [purgeResult, setPurgeResult] = useState<TenantPurgeResult | null>(null);
+  const [purgeBusy, setPurgeBusy] = useState(false);
+  const [purgeError, setPurgeError] = useState<string | null>(null);
+  const [purgeConfirmText, setPurgeConfirmText] = useState('');
+
+  const resetPurge = () => {
+    setPurgePreview(null);
+    setPurgeResult(null);
+    setPurgeError(null);
+    setPurgeConfirmText('');
+  };
+
+  const handlePurgePreview = async () => {
+    setPurgeBusy(true);
+    setPurgeError(null);
+    try {
+      setPurgePreview(await purgeTenant(tenantId, { dryRun: true }));
+    } catch (err: unknown) {
+      setPurgeError(err instanceof Error ? err.message : 'Preview failed');
+    } finally {
+      setPurgeBusy(false);
+    }
+  };
+
+  const handlePurgeConfirm = async () => {
+    if (purgeConfirmText !== tenantId) return;
+    setPurgeBusy(true);
+    setPurgeError(null);
+    try {
+      setPurgeResult(await purgeTenant(tenantId, { dryRun: false, graceConfirmed: true }));
+      setPurgePreview(null);
+    } catch (err: unknown) {
+      setPurgeError(err instanceof Error ? err.message : 'Purge failed');
+    } finally {
+      setPurgeBusy(false);
     }
   };
 
@@ -425,6 +467,81 @@ export default function TenantDetailPanel({ tenantId, onClose, onUpdated }: Prop
           </div>
         ) : (
           <p className="text-sm text-slate-400">No Stripe events recorded yet.</p>
+        )}
+      </div>
+
+      {/* ── Danger Zone: tenant data purge (preview → typed-confirm → delete) ── */}
+      <div className="mt-6 rounded-lg border border-red-200 bg-red-50/40 p-4">
+        <h3 className="text-sm font-semibold text-red-700">Danger Zone — Delete tenant data</h3>
+        <p className="mt-1 text-xs text-red-600/80">
+          Permanently deletes this tenant&apos;s conversational PII (form submissions,
+          notifications, subject index, SMS usage). Consent/opt-out proof, email
+          suppression, and audit records are retained. This cannot be undone.
+        </p>
+
+        {purgeError && <p className="mt-2 text-xs font-medium text-red-700">{purgeError}</p>}
+
+        {purgeResult ? (
+          <div className="mt-3 text-xs text-slate-700">
+            <p className="font-medium text-red-700">
+              {purgeResult.deleted ? 'Deleted.' : 'Completed (no deletion).'} purge_id:{' '}
+              <span className="font-mono">{purgeResult.purge_id}</span>
+            </p>
+            <ul className="ml-4 mt-1 list-disc">
+              {Object.entries(purgeResult.rows_touched).map(([k, v]) => (
+                <li key={k}>{k}: <span className="font-medium">{v}</span></li>
+              ))}
+            </ul>
+            {purgeResult.manual_followups.length > 0 && (
+              <ul className="ml-4 mt-1 list-disc text-amber-700">
+                {purgeResult.manual_followups.map((f, i) => <li key={i}>{f}</li>)}
+              </ul>
+            )}
+            <button onClick={resetPurge} className="mt-2 text-xs text-slate-500 underline">Done</button>
+          </div>
+        ) : purgePreview ? (
+          <div className="mt-3">
+            <p className="text-xs font-medium text-slate-700">This will delete:</p>
+            <ul className="ml-4 mt-1 list-disc text-xs text-slate-600">
+              {Object.entries(purgePreview.rows_touched).map(([k, v]) => (
+                <li key={k}>{k}: <span className="font-medium">{v}</span></li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs font-medium text-slate-700">Retained (never deleted):</p>
+            <ul className="ml-4 mt-1 list-disc text-xs text-slate-500">
+              {purgePreview.carve_outs_retained.map((c, i) => <li key={i}>{c}</li>)}
+            </ul>
+            <label className="mt-3 block text-xs text-slate-600">
+              Type <span className="font-mono font-semibold text-red-700">{tenantId}</span> to confirm:
+              <input
+                type="text"
+                value={purgeConfirmText}
+                onChange={e => setPurgeConfirmText(e.target.value)}
+                className="mt-1 block w-full rounded border border-red-300 px-2 py-1 text-sm"
+                placeholder={tenantId}
+              />
+            </label>
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={handlePurgeConfirm}
+                disabled={purgeBusy || purgeConfirmText !== tenantId}
+                className="rounded bg-red-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+              >
+                {purgeBusy ? 'Deleting…' : 'Permanently delete'}
+              </button>
+              <button onClick={resetPurge} disabled={purgeBusy} className="rounded px-3 py-1.5 text-xs text-slate-600">
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={handlePurgePreview}
+            disabled={purgeBusy}
+            className="mt-3 rounded border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 disabled:opacity-40"
+          >
+            {purgeBusy ? 'Loading preview…' : 'Delete tenant data…'}
+          </button>
         )}
       </div>
     </div>

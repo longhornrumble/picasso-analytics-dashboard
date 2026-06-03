@@ -689,6 +689,48 @@ export async function updateAdminTenant(
   return response.json();
 }
 
+/**
+ * Result of a tenant-purge invocation (the picasso-pii-tenant-purge Lambda's
+ * response, forwarded by the dashboard endpoint). For a dry-run, `deleted` is
+ * false and `rows_touched` is what WOULD be deleted.
+ */
+export interface TenantPurgeResult {
+  purge_id: string;
+  tenant_id: string;
+  status: string;
+  deleted: boolean;
+  rows_touched: Record<string, number>;
+  carve_outs_retained: string[];
+  manual_followups: string[];
+  audit_row_pks: string[];
+}
+
+/**
+ * POST /admin/tenants/{id}/purge — super-admin tenant data purge.
+ * Preview with { dryRun: true } (deletes nothing); execute with
+ * { dryRun: false, graceConfirmed: true } (the dual gate). `operator` +
+ * `purge_id` are stamped server-side from the auth token — never sent here.
+ */
+export async function purgeTenant(
+  tenantId: string,
+  opts: { dryRun: boolean; graceConfirmed?: boolean }
+): Promise<TenantPurgeResult> {
+  const url = `${API_BASE_URL}/admin/tenants/${tenantId}/purge`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: buildAdminHeaders(),
+    body: JSON.stringify({
+      dry_run: opts.dryRun,
+      grace_confirmed: opts.graceConfirmed ?? false,
+    }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Tenant purge failed: ${response.status}`);
+  }
+  return response.json();
+}
+
 export async function fetchAdminTenantBilling(tenantId: string): Promise<StripeBillingEvent[]> {
   const url = `${API_BASE_URL}/admin/tenants/${tenantId}/billing`;
   const response = await fetch(url, { headers: buildAdminHeaders() });
