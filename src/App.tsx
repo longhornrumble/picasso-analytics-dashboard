@@ -390,7 +390,7 @@ function NavigationBar({
 
 function AppContent() {
   const { isAuthenticated, loading, user, logout, login } = useAuth();
-  const { isSignedIn, getToken: getClerkToken } = useClerkAuth();
+  const { isLoaded: isClerkLoaded, isSignedIn, getToken: getClerkToken } = useClerkAuth();
 
   // Capture sign-up name params and persist in sessionStorage (survives Clerk page navigations)
   const signUpNameRef = useRef<{ firstName: string; lastName: string }>({ firstName: '', lastName: '' });
@@ -458,13 +458,17 @@ function AppContent() {
     })();
   }, [isSignedIn, isAuthenticated, getClerkToken, login]);
 
-  // When Clerk signs out, clear the internal JWT too
+  // When Clerk signs out, clear the internal JWT too.
+  // Gate on isClerkLoaded: during Clerk's async init `isSignedIn` is briefly
+  // false even for a signed-in user, which would otherwise spuriously log out
+  // (wiping the restored token mid-mount → dashboard fetches throw
+  // "Not authenticated" → forced re-bridge on every reload).
   useEffect(() => {
-    if (!isSignedIn && isAuthenticated) {
+    if (isClerkLoaded && !isSignedIn && isAuthenticated) {
       logout();
       bridgingRef.current = false;
     }
-  }, [isSignedIn, isAuthenticated, logout]);
+  }, [isClerkLoaded, isSignedIn, isAuthenticated, logout]);
 
   // Cross-tab navigation: search query to pass to Forms dashboard
   const [formsSearchQuery, setFormsSearchQuery] = useState<string | null>(null);
