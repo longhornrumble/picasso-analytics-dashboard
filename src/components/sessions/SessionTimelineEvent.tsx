@@ -128,11 +128,13 @@ function PayloadDetails({ eventType, payload }: { eventType: string; payload: Re
         </div>
       ) : null;
 
-    case 'MESSAGE_SENT':
-      return payload.content_preview ? (
+    case 'MESSAGE_SENT': {
+      // §E5 Chain 2: prefer the English-equivalent preview, fall back to the original.
+      const preview = payload.content_preview_en ?? payload.content_preview;
+      return preview ? (
         <div className="mt-1">
           <p className="text-sm text-gray-700 bg-blue-50 rounded-lg px-3 py-2 border-l-2 border-blue-400 max-h-32 overflow-y-auto">
-            "{String(payload.content_preview)}"
+            "{String(preview)}"
           </p>
           {typeof payload.content_length === 'number' && payload.content_length > 100 && (
             <span className="text-xs text-gray-400 mt-1">
@@ -141,12 +143,15 @@ function PayloadDetails({ eventType, payload }: { eventType: string; payload: Re
           )}
         </div>
       ) : null;
+    }
 
-    case 'MESSAGE_RECEIVED':
-      return payload.content_preview ? (
+    case 'MESSAGE_RECEIVED': {
+      // §E5 Chain 2: prefer the English-equivalent preview, fall back to the original.
+      const preview = payload.content_preview_en ?? payload.content_preview;
+      return preview ? (
         <div className="mt-1">
           <p className="text-sm text-gray-700 bg-purple-50 rounded-lg px-3 py-2 border-l-2 border-purple-400 max-h-32 overflow-y-auto">
-            "{String(payload.content_preview)}"
+            "{String(preview)}"
           </p>
           {typeof payload.response_time_ms === 'number' && (
             <span className="text-xs text-gray-400 mt-1 block">
@@ -155,6 +160,7 @@ function PayloadDetails({ eventType, payload }: { eventType: string; payload: Re
           )}
         </div>
       ) : null;
+    }
 
     case 'CTA_CLICKED':
       return (
