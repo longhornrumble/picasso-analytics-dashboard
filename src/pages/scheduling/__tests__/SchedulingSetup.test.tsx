@@ -10,6 +10,7 @@ const api = {
   updateAppointmentType: vi.fn(),
   createRoutingPolicy: vi.fn(),
   fetchTagVocabulary: vi.fn(),
+  fetchNotificationTemplates: vi.fn(),
 };
 vi.mock('../../../services/schedulingApi', async () => {
   const actual = await vi.importActual<typeof import('../../../services/schedulingApi')>(
@@ -23,6 +24,7 @@ vi.mock('../../../services/schedulingApi', async () => {
     updateAppointmentType: (...a: unknown[]) => api.updateAppointmentType(...a),
     createRoutingPolicy: (...a: unknown[]) => api.createRoutingPolicy(...a),
     fetchTagVocabulary: () => api.fetchTagVocabulary(),
+    fetchNotificationTemplates: () => api.fetchNotificationTemplates(),
   };
 });
 
@@ -54,6 +56,7 @@ beforeEach(() => {
   api.fetchAppointmentTypes.mockResolvedValue([APPT]);
   api.fetchRoutingPolicies.mockResolvedValue([POLICY]);
   api.fetchTagVocabulary.mockResolvedValue(['volunteer_coordinators']);
+  api.fetchNotificationTemplates.mockResolvedValue({ moments: {}, stop_footer_note: '' });
 });
 afterEach(() => {
   cleanup();

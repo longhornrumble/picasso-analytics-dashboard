@@ -309,3 +309,57 @@ export async function updateEmployeeScheduling(
     fields,
   );
 }
+
+// ===========================================================================
+// §E14 — scheduling notification-template overrides (lambda#261, G2). ADMIN-only.
+// NOTE: built to the DEPLOYED shape — `available_variables` is PER-MOMENT (the §E14
+// doc prose says top-level; the endpoint returns it inside each moment). Flagged to integrator.
+// ===========================================================================
+
+/** The 3 v1 lifecycle moments that dispatch a full subject+body (§E14). */
+export type NotificationMoment = 'reschedule_link' | 'reoffer' | 'cancel_notice';
+
+/** The editable copy fields. */
+export interface TemplateCopy {
+  subject: string;
+  body_text: string;
+  body_html: string;
+}
+
+export interface MomentTemplate extends TemplateCopy {
+  /** True when this tenant has overridden any field (else the platform default shows). */
+  is_override: boolean;
+  /** The reset target — platform default copy. */
+  default: TemplateCopy;
+  modified_at?: ModifiedAt;
+  /** Variables usable in THIS moment, e.g. {{firstName}}, {{actionUrl}} (per-moment). */
+  available_variables: string[];
+}
+
+export interface NotificationTemplatesResponse {
+  moments: Record<string, MomentTemplate>;
+  /** Read-only compliance note — STOP/unsubscribe is appended automatically, not editable. */
+  stop_footer_note: string;
+}
+
+export async function fetchNotificationTemplates(): Promise<NotificationTemplatesResponse> {
+  const data = await schedulingGet<NotificationTemplatesResponse>(
+    '/scheduling/notification-templates',
+  );
+  return { moments: data.moments ?? {}, stop_footer_note: data.stop_footer_note ?? '' };
+}
+
+/**
+ * Upsert-merge one moment's copy. Send any subset of {subject, body_text, body_html};
+ * an empty-string field CLEARS that override back to the platform default. Unknown moment → 404.
+ */
+export async function updateNotificationTemplate(
+  moment: NotificationMoment,
+  body: Partial<TemplateCopy>,
+): Promise<{ moment: string; template: MomentTemplate }> {
+  return schedulingWrite(
+    'PATCH',
+    `/scheduling/notification-templates/${encodeURIComponent(moment)}`,
+    body,
+  );
+}
