@@ -454,8 +454,9 @@ export type SessionOutcome =
  */
 export type SessionEventPayload =
   | { type: 'WIDGET_OPENED'; trigger?: 'button' | 'auto' }
-  | { type: 'MESSAGE_SENT'; content_preview: string; content_length?: number }
-  | { type: 'MESSAGE_RECEIVED'; content_preview?: string; content_length?: number }
+  // content_preview_en (§E5 Chain 2): English-equivalent preview; absent in v1 (widget producer is a v2 task) → readers fall back to content_preview.
+  | { type: 'MESSAGE_SENT'; content_preview: string; content_preview_en?: string; content_length?: number }
+  | { type: 'MESSAGE_RECEIVED'; content_preview?: string; content_preview_en?: string; content_length?: number }
   | { type: 'CTA_CLICKED'; cta_id: string; cta_label: string; cta_action: string; triggers_form?: boolean }
   | { type: 'LINK_CLICKED'; url: string; link_text: string; link_domain: string; category: 'email' | 'phone' | 'web' }
   | { type: 'ACTION_CHIP_CLICKED'; chip_label: string; chip_value: string }
