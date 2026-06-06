@@ -191,6 +191,7 @@ export interface DashboardFeatures {
   dashboard_attribution: boolean;
   dashboard_notifications: boolean;
   dashboard_settings: boolean;  // Phase 3 placeholder
+  dashboard_scheduling: boolean;  // Scheduling entitlement (D1 Flag A) — default false
 }
 
 // =============================================================================

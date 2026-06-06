@@ -20,6 +20,7 @@ const DEFAULT_FEATURES: DashboardFeatures = {
   dashboard_attribution: false,
   dashboard_notifications: false,
   dashboard_settings: true,
+  dashboard_scheduling: false,
 };
 
 export function SettingsPage() {
