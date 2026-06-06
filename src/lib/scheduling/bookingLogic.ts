@@ -203,6 +203,87 @@ export function staffDebtBreakdown(bookings: Booking[], now: number): StaffDebtR
 }
 
 // ---------------------------------------------------------------------------
+// Surface 8 — historical metrics (ui_plan §8 v1-must: booking volume + no-show rate)
+// ---------------------------------------------------------------------------
+
+/**
+ * Tenant/staff booking metrics, derived PURELY from the §E7 Booking[] the dashboard
+ * already fetches — no separate metrics endpoint (mirrors the operational-debt panel).
+ *
+ * Rate denominators are explicit (and `null` when the denominator is 0, so the UI shows
+ * "—" rather than a misleading 0%):
+ *  - noShowRate / completionRate denominator = `dispositioned` (bookings that reached a
+ *    terminal attendance outcome: completed | no_show | coordinator_no_show). Bookings
+ *    still `booked` or `canceled` never reached disposition, so they're excluded.
+ *  - cancellationRate denominator = `total` (fraction of all bookings that were canceled).
+ *
+ * Scope note: time-to-book and reschedule-rate (ui_plan §8 "should") are intentionally
+ * NOT here — they need the Analytics_Aggregator (intent timestamps / reschedule linkage),
+ * not derivable from the Booking projection. Tracked for the aggregator read-path.
+ */
+export interface BookingMetrics {
+  /** All bookings in the (already scope-filtered) set. */
+  total: number;
+  /** status === 'booked' AND start_at >= now. */
+  upcoming: number;
+  /** start_at within [now - 30d, now] — a simple recent-volume signal. */
+  last30d: number;
+  byStatus: Record<BookingStatus, number>;
+  dispositioned: number;
+  noShowRate: number | null;
+  completionRate: number | null;
+  cancellationRate: number | null;
+}
+
+export function computeBookingMetrics(
+  bookings: Booking[],
+  now: number,
+): BookingMetrics {
+  const byStatus: Record<BookingStatus, number> = {
+    booked: 0,
+    canceled: 0,
+    completed: 0,
+    no_show: 0,
+    coordinator_no_show: 0,
+  };
+  let upcoming = 0;
+  let last30d = 0;
+  const thirtyDaysAgo = now - 30 * DAY_MS;
+
+  for (const b of bookings) {
+    if (b.status in byStatus) byStatus[b.status] += 1;
+    const t = Date.parse(b.start_at);
+    if (!Number.isNaN(t)) {
+      if (b.status === 'booked' && t >= now) upcoming += 1;
+      if (t >= thirtyDaysAgo && t <= now) last30d += 1;
+    }
+  }
+
+  const total = bookings.length;
+  const dispositioned =
+    byStatus.completed + byStatus.no_show + byStatus.coordinator_no_show;
+  const ratio = (num: number, den: number): number | null =>
+    den === 0 ? null : num / den;
+
+  return {
+    total,
+    upcoming,
+    last30d,
+    byStatus,
+    dispositioned,
+    noShowRate: ratio(byStatus.no_show, dispositioned),
+    completionRate: ratio(byStatus.completed, dispositioned),
+    cancellationRate: ratio(byStatus.canceled, total),
+  };
+}
+
+/** Format a 0..1 rate (or null) as a display percent, e.g. 0.25 → "25%", null → "—". */
+export function formatRate(rate: number | null): string {
+  if (rate === null) return '—';
+  return `${Math.round(rate * 100)}%`;
+}
+
+// ---------------------------------------------------------------------------
 // Display helpers
 // ---------------------------------------------------------------------------
 
