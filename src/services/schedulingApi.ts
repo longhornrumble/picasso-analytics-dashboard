@@ -273,3 +273,39 @@ export async function updateRoutingPolicy(
 export function ifMatchToken(row: { modified_at?: ModifiedAt }): string {
   return row.modified_at?.at ?? '*';
 }
+
+// ===========================================================================
+// §E13c — per-staff scheduling settings write + tag-vocabulary read (lambda#259, G1/G4).
+// NOTE: deliberately NO optimistic lock (the registry has no commit-owned state — §E13c).
+// ===========================================================================
+
+/** Closed scheduling-tag vocabulary (config S3); ADMIN-only read. Dropdown source. */
+export async function fetchTagVocabulary(): Promise<string[]> {
+  const data = await schedulingGet<{ scheduling_tag_vocabulary?: string[] }>(
+    '/scheduling/tag-vocabulary',
+  );
+  return data.scheduling_tag_vocabulary ?? [];
+}
+
+/**
+ * Per-staff scheduling-settings PATCH. Tenant comes from the auth session (NOT the path).
+ * Send any subset (>=1): `scheduling_tags`/`bookable_override` are ADMIN-only;
+ * `calendar_email_override` is self-or-admin. Per-field auth is server-enforced BEFORE write
+ * (a member smuggling an admin field → 403, no write). 422 carries `unknownTags`.
+ */
+export interface EmployeeSchedulingWrite {
+  scheduling_tags?: string[];
+  bookable_override?: 'off' | null;
+  calendar_email_override?: string | null;
+}
+
+export async function updateEmployeeScheduling(
+  employeeId: string,
+  fields: EmployeeSchedulingWrite,
+): Promise<{ employee_id: string } & EmployeeSchedulingWrite> {
+  return schedulingWrite(
+    'PATCH',
+    `/scheduling/employees/${encodeURIComponent(employeeId)}`,
+    fields,
+  );
+}
