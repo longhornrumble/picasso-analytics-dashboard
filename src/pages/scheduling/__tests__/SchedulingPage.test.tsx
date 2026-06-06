@@ -9,6 +9,13 @@ vi.mock('../../../context/useAuth', () => ({
   useAuth: () => ({ user: mockUser() }),
 }));
 
+// SCHEDULING_STUB is now false (the §E7 endpoint is live), so the page's real fetch
+// path runs — mock it to serve the fixture so these render tests stay deterministic.
+vi.mock('../../../services/schedulingApi', async () => {
+  const fix = await import('../../../test/fixtures/schedulingFixture');
+  return { fetchBookings: () => Promise.resolve(fix.allBookings) };
+});
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();

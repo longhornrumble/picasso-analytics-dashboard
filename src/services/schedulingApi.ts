@@ -18,21 +18,23 @@ import { allBookings } from '../test/fixtures/schedulingFixture';
 
 const API_BASE_URL = import.meta.env.VITE_ANALYTICS_API_URL || '/api';
 
-/** Flip to false when the §E7 endpoint is live (the one-line swap). */
-export const SCHEDULING_STUB = true;
+/**
+ * The §E7 endpoint is LIVE (lambda#255, merged to main 2026-06-06). The real fetch
+ * path is active. ⚠ MERGE-LAST: this dashboard PR must only be merged to prod AFTER
+ * the prod Analytics_Dashboard_API is redeployed with the §E7 route + the dynamodb:Query
+ * IAM grant + BOOKING_TABLE env are in place — otherwise the tab errors. See the deploy
+ * runbook.
+ */
+export const SCHEDULING_STUB = false;
 
 /** ui_plan §8 audience split: a staff member sees own; an admin sees the tenant. */
 export type BookingScope = 'staff_self' | 'tenant_aggregate';
 
-/** §E7 response envelope (mirrors the existing Analytics_Dashboard_API readers). */
+/** §E7 response envelope — matches the shipped endpoint exactly: { bookings, nextCursor? }. */
 export interface SchedulingBookingsResponse {
-  tenant_id: string;
   bookings: Booking[];
-  pagination?: {
-    total_count: number;
-    next_cursor: string | null;
-    has_more: boolean;
-  };
+  /** Opaque base64 cursor for the next page; absent when there are no more. */
+  nextCursor?: string;
 }
 
 /**
