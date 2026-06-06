@@ -12,6 +12,7 @@
  * staging config is read-only — a new team's tag is typed and validated fail-closed on save).
  */
 import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from '../../context/useAuth';
 import {
   fetchAppointmentTypes,
   fetchRoutingPolicies,
@@ -24,6 +25,7 @@ import {
   type RoutingPolicy,
   type AppointmentTypeWrite,
 } from '../../services/schedulingApi';
+import { StaffSchedulingSection } from '../../components/scheduling/StaffSchedulingSection';
 
 /** A routing policy's team label = its first tag value, or "Everyone (solo)" when unconditioned. */
 function teamLabel(p: RoutingPolicy): string {
@@ -52,6 +54,8 @@ const blankAppt: AppointmentTypeWrite = {
 };
 
 export function SchedulingSetup() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [appts, setAppts] = useState<AppointmentType[]>([]);
   const [policies, setPolicies] = useState<RoutingPolicy[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +71,12 @@ export function SchedulingSetup() {
   const [teamForm, setTeamForm] = useState<{ tag: string; tie_breaker: 'round_robin' | 'first_available' } | null>(null);
 
   const load = useCallback(async (isActive: () => boolean) => {
+    // Teams + Appointment Types are admin-only endpoints; members skip them and see
+    // only the per-staff self-card (StaffSchedulingSection) rendered below.
+    if (!isAdmin) {
+      if (isActive()) setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadError(null);
     try {
@@ -79,7 +89,7 @@ export function SchedulingSetup() {
     } finally {
       if (isActive()) setLoading(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     let active = true;
@@ -127,6 +137,15 @@ export function SchedulingSetup() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // Members see only their own per-staff card — no admin Teams / Appointment Types config.
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col gap-8">
+        <StaffSchedulingSection />
+      </div>
+    );
   }
 
   if (loading) {
@@ -320,6 +339,9 @@ export function SchedulingSetup() {
           </div>
         )}
       </section>
+
+      {/* ---- Staff (per-staff scheduling settings, E13) ---- */}
+      <StaffSchedulingSection />
     </div>
   );
 }

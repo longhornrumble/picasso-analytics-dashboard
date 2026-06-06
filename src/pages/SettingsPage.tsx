@@ -50,11 +50,10 @@ export function SettingsPage() {
     {
       id: 'scheduling',
       label: 'Scheduling',
-      // Entitled tenants only (D1 Flag A), and routing config is admin-only (the §E13b
-      // write endpoints enforce ADMIN server-side too).
-      available:
-        features.dashboard_scheduling &&
-        (user?.role === 'admin' || user?.role === 'super_admin'),
+      // Entitled tenants only (D1 Flag A). Visible to ALL entitled users: admins get the
+      // Teams/Appointment-Types config + staff roster; members get only their own calendar-
+      // email self-edit (E13c §8 matrix). Per-field auth is server-enforced regardless.
+      available: features.dashboard_scheduling,
     },
     {
       id: 'admin' as SettingsSubTab,
@@ -105,9 +104,7 @@ export function SettingsPage() {
         <NotificationPreferences />
       )}
 
-      {activeSubTab === 'scheduling' &&
-        features.dashboard_scheduling &&
-        (user?.role === 'admin' || user?.role === 'super_admin') && (
+      {activeSubTab === 'scheduling' && features.dashboard_scheduling && (
         <SchedulingSetup />
       )}
 

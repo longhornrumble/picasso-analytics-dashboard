@@ -672,6 +672,12 @@ export interface TeamMember {
   joined_at: string;
   phone?: string | null;
   sms_opted_in?: boolean;
+  // §E13c per-staff scheduling settings (additive; GET /team/members projection).
+  // scheduling_tags / bookable_override are operational (visible to all members).
+  // calendar_email_override is PII, READ-GATED admin-or-self → null for everyone else.
+  scheduling_tags?: string[];
+  bookable_override?: 'off' | null;
+  calendar_email_override?: string | null;
 }
 
 export interface TeamMembersResponse {

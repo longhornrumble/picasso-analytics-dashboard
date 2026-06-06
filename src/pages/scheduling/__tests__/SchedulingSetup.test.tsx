@@ -9,6 +9,7 @@ const api = {
   createAppointmentType: vi.fn(),
   updateAppointmentType: vi.fn(),
   createRoutingPolicy: vi.fn(),
+  fetchTagVocabulary: vi.fn(),
 };
 vi.mock('../../../services/schedulingApi', async () => {
   const actual = await vi.importActual<typeof import('../../../services/schedulingApi')>(
@@ -21,8 +22,17 @@ vi.mock('../../../services/schedulingApi', async () => {
     createAppointmentType: (...a: unknown[]) => api.createAppointmentType(...a),
     updateAppointmentType: (...a: unknown[]) => api.updateAppointmentType(...a),
     createRoutingPolicy: (...a: unknown[]) => api.createRoutingPolicy(...a),
+    fetchTagVocabulary: () => api.fetchTagVocabulary(),
   };
 });
+
+// Admin viewer + an empty roster so the nested StaffSchedulingSection renders inertly.
+vi.mock('../../../context/useAuth', () => ({
+  useAuth: () => ({ user: { role: 'admin', email: 'admin@example.invalid' } }),
+}));
+vi.mock('../../../services/analyticsApi', () => ({
+  fetchTeamMembers: () => Promise.resolve({ members: [], admin_count: 0, total: 0, can_edit: true }),
+}));
 
 import { SchedulingSetup } from '../SchedulingSetup';
 
@@ -43,6 +53,7 @@ const APPT = {
 beforeEach(() => {
   api.fetchAppointmentTypes.mockResolvedValue([APPT]);
   api.fetchRoutingPolicies.mockResolvedValue([POLICY]);
+  api.fetchTagVocabulary.mockResolvedValue(['volunteer_coordinators']);
 });
 afterEach(() => {
   cleanup();
