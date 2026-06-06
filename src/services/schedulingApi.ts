@@ -66,3 +66,210 @@ export async function fetchBookings(
   const data: SchedulingBookingsResponse = await response.json();
   return data.bookings ?? [];
 }
+
+// ===========================================================================
+// §E13b — AppointmentType / RoutingPolicy write API (LOCKED 2026-06-06; lambda#258).
+// The integrator owns these Analytics_Dashboard_API endpoints (ADMIN-only); this client
+// is consumed by the E13 Settings sub-tab. Shapes ground-truthed against the deployed code.
+// ===========================================================================
+
+/** Last-edit stamp + optimistic-lock token (microsecond ISO8601Z). */
+export interface ModifiedAt {
+  at: string;
+  by: string;
+}
+
+export type TagOperator = 'in_any' | 'equals';
+
+/** Runtime tag-condition shape routing.js reads — `{operator, values[]}`, NOT `{tag}`. */
+export interface TagCondition {
+  operator: TagOperator;
+  values: string[];
+}
+
+/** Stored AppointmentType row (picasso-appointment-type-{env}). */
+export interface AppointmentType {
+  tenantId?: string;
+  appointment_type_id: string;
+  name: string;
+  duration_minutes: number;
+  buffer_before_minutes?: number;
+  buffer_after_minutes?: number;
+  lead_time_minutes?: number;
+  /** FK → RoutingPolicy; the router THROWS without it. */
+  routing_policy_id: string;
+  modified_at?: ModifiedAt; // absent on legacy/fixture rows
+}
+
+/** Stored RoutingPolicy row (picasso-routing-policy-{env}); presented as a "Team". */
+export interface RoutingPolicy {
+  tenantId?: string;
+  routing_policy_id: string;
+  tie_breaker?: 'round_robin' | 'first_available';
+  /** AND across conditions; [] = solo (everyone eligible). */
+  tag_conditions?: TagCondition[];
+  modified_at?: ModifiedAt;
+}
+
+/** POST/PATCH body for an AppointmentType (server mints id on create if absent). */
+export interface AppointmentTypeWrite {
+  appointment_type_id?: string;
+  name: string;
+  duration_minutes: number;
+  buffer_before_minutes?: number;
+  buffer_after_minutes?: number;
+  lead_time_minutes?: number;
+  routing_policy_id: string;
+}
+
+/** POST/PATCH body for a RoutingPolicy. */
+export interface RoutingPolicyWrite {
+  routing_policy_id?: string;
+  tie_breaker?: 'round_robin' | 'first_available';
+  tag_conditions?: TagCondition[];
+}
+
+/**
+ * Typed scheduling-write error so the UI can branch on the §E13b status codes:
+ *   422 vocab fail-closed → `unknownTags`; 422 FK → message; 409 stale/dup; 428 missing If-Match.
+ */
+export class SchedulingApiError extends Error {
+  status: number;
+  unknownTags?: string[];
+  constructor(status: number, message: string, unknownTags?: string[]) {
+    super(message);
+    this.name = 'SchedulingApiError';
+    this.status = status;
+    this.unknownTags = unknownTags;
+  }
+}
+
+type WriteMethod = 'POST' | 'PATCH';
+
+/**
+ * Authed write against an Analytics_Dashboard_API scheduling endpoint. On a non-2xx,
+ * throws SchedulingApiError carrying the deployed body shape ({error, unknownTags?}).
+ * `ifMatch` (the row's modified_at.at, or '*' to first-stamp a legacy row) is sent as the
+ * `If-Match` header on PATCH (the endpoint also accepts a body `expected_modified_at`).
+ */
+async function schedulingWrite<T>(
+  method: WriteMethod,
+  path: string,
+  body: unknown,
+  ifMatch?: string,
+): Promise<T> {
+  const token = localStorage.getItem('analytics_token');
+  if (!token) throw new SchedulingApiError(401, 'Not authenticated');
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+  const override = getTenantOverride();
+  if (override) headers['X-Tenant-Override'] = override;
+  if (ifMatch) headers['If-Match'] = ifMatch;
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new SchedulingApiError(
+      response.status,
+      data.error || `API error: ${response.status}`,
+      Array.isArray(data.unknownTags) ? data.unknownTags : undefined,
+    );
+  }
+  return data as T;
+}
+
+async function schedulingGet<T>(path: string): Promise<T> {
+  const token = localStorage.getItem('analytics_token');
+  if (!token) throw new SchedulingApiError(401, 'Not authenticated');
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  const override = getTenantOverride();
+  if (override) headers['X-Tenant-Override'] = override;
+
+  const response = await fetch(`${API_BASE_URL}${path}`, { method: 'GET', headers });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new SchedulingApiError(response.status, data.error || `API error: ${response.status}`);
+  }
+  return data as T;
+}
+
+// --- Appointment Types -----------------------------------------------------
+
+export async function fetchAppointmentTypes(): Promise<AppointmentType[]> {
+  const data = await schedulingGet<{ appointment_types?: AppointmentType[] }>(
+    '/scheduling/appointment-types',
+  );
+  return data.appointment_types ?? [];
+}
+
+export async function createAppointmentType(
+  body: AppointmentTypeWrite,
+): Promise<AppointmentType> {
+  const data = await schedulingWrite<{ appointment_type: AppointmentType }>(
+    'POST',
+    '/scheduling/appointment-types',
+    body,
+  );
+  return data.appointment_type;
+}
+
+export async function updateAppointmentType(
+  appointmentTypeId: string,
+  body: AppointmentTypeWrite,
+  ifMatch: string,
+): Promise<AppointmentType> {
+  const data = await schedulingWrite<{ appointment_type: AppointmentType }>(
+    'PATCH',
+    `/scheduling/appointment-types/${encodeURIComponent(appointmentTypeId)}`,
+    body,
+    ifMatch,
+  );
+  return data.appointment_type;
+}
+
+// --- Routing Policies (presented as "Teams") -------------------------------
+
+export async function fetchRoutingPolicies(): Promise<RoutingPolicy[]> {
+  const data = await schedulingGet<{ routing_policies?: RoutingPolicy[] }>(
+    '/scheduling/routing-policies',
+  );
+  return data.routing_policies ?? [];
+}
+
+export async function createRoutingPolicy(
+  body: RoutingPolicyWrite,
+): Promise<RoutingPolicy> {
+  const data = await schedulingWrite<{ routing_policy: RoutingPolicy }>(
+    'POST',
+    '/scheduling/routing-policies',
+    body,
+  );
+  return data.routing_policy;
+}
+
+export async function updateRoutingPolicy(
+  routingPolicyId: string,
+  body: RoutingPolicyWrite,
+  ifMatch: string,
+): Promise<RoutingPolicy> {
+  const data = await schedulingWrite<{ routing_policy: RoutingPolicy }>(
+    'PATCH',
+    `/scheduling/routing-policies/${encodeURIComponent(routingPolicyId)}`,
+    body,
+    ifMatch,
+  );
+  return data.routing_policy;
+}
+
+/** The optimistic-lock token for a row: its modified_at.at, or '*' to first-stamp a legacy row. */
+export function ifMatchToken(row: { modified_at?: ModifiedAt }): string {
+  return row.modified_at?.at ?? '*';
+}
