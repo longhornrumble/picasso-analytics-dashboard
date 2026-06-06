@@ -74,9 +74,32 @@ jobs:
       - name: Run npm audit
         run: npm audit --omit=dev --audit-level=high
 
+  tests:
+    name: Scheduling Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Scheduling-scoped on purpose: the sub-phase E Customer-Portal surfaces need a real
+      # CI gate, but the dashboard has ~108 pre-existing red tests elsewhere (tracked as a
+      # post-pilot cleanup). Scoping to the scheduling suites makes this a meaningful
+      # merge-gate for WS-E-PORTAL without the unrelated red noise blocking every PR.
+      - name: Run scheduling test suite
+        run: npm run test:scheduling
+
   deploy-staging:
     name: Deploy to Staging
-    needs: [lint, typecheck-and-build, security]
+    needs: [lint, typecheck-and-build, security, tests]
     runs-on: ubuntu-latest
     permissions:
       id-token: write

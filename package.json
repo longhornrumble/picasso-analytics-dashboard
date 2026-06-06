@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "build:staging": "tsc -b && vite build --mode staging",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:scheduling": "vitest run src/components/scheduling src/lib/scheduling src/pages/scheduling"
   },
   "dependencies": {
     "@clerk/react": "^6.1.2",
