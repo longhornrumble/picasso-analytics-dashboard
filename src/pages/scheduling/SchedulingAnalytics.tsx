@@ -11,6 +11,7 @@
  */
 import type { Booking, SchedulingViewer } from '../../types/scheduling';
 import { visibleBookings } from '../../lib/scheduling/bookingLogic';
+import { SchedulingMetricsPanel } from '../../components/scheduling/SchedulingMetricsPanel';
 import { OperationalDebtPanel } from '../../components/scheduling/OperationalDebtPanel';
 
 export function SchedulingAnalytics({
@@ -36,6 +37,7 @@ export function SchedulingAnalytics({
         </p>
       </div>
 
+      <SchedulingMetricsPanel bookings={scoped} now={now} />
       <OperationalDebtPanel bookings={scoped} now={now} />
     </div>
   );

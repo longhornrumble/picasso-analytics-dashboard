@@ -9,10 +9,11 @@ import { useAuth } from '../context/useAuth';
 import { NotificationsDashboard } from './NotificationsDashboard';
 import { TeamManagement } from './TeamManagement';
 import { NotificationPreferences } from './NotificationPreferences';
+import { SchedulingSetup } from './scheduling/SchedulingSetup';
 import AdminPanel from './AdminPanel';
 import type { DashboardFeatures } from '../types/analytics';
 
-type SettingsSubTab = 'notifications' | 'team' | 'preferences' | 'admin';
+type SettingsSubTab = 'notifications' | 'team' | 'preferences' | 'scheduling' | 'admin';
 
 const DEFAULT_FEATURES: DashboardFeatures = {
   dashboard_conversations: true,
@@ -45,6 +46,14 @@ export function SettingsPage() {
       id: 'preferences',
       label: 'Preferences',
       available: true,
+    },
+    {
+      id: 'scheduling',
+      label: 'Scheduling',
+      // Entitled tenants only (D1 Flag A). Visible to ALL entitled users: admins get the
+      // Teams/Appointment-Types config + staff roster; members get only their own calendar-
+      // email self-edit (E13c §8 matrix). Per-field auth is server-enforced regardless.
+      available: features.dashboard_scheduling,
     },
     {
       id: 'admin' as SettingsSubTab,
@@ -93,6 +102,10 @@ export function SettingsPage() {
 
       {activeSubTab === 'preferences' && (
         <NotificationPreferences />
+      )}
+
+      {activeSubTab === 'scheduling' && features.dashboard_scheduling && (
+        <SchedulingSetup />
       )}
 
       {activeSubTab === 'admin' && user?.role === 'super_admin' && (
