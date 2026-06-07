@@ -57,6 +57,7 @@ function extractDashboardFeatures(payload: Record<string, unknown>): DashboardFe
     dashboard_attribution: features.dashboard_attribution === true,      // default false (PREMIUM only)
     dashboard_notifications: features.dashboard_notifications === true,  // default false (feature-flagged)
     dashboard_settings: features.dashboard_settings === true,            // default false (Phase 3)
+    dashboard_scheduling: features.dashboard_scheduling === true,        // default false (scheduling entitlement, D1 Flag A)
   };
 }
 

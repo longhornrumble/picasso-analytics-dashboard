@@ -10,6 +10,7 @@ import { useAuth } from './context/useAuth';
 import { Dashboard } from './pages/Dashboard';
 import { ConversationsDashboard } from './pages/ConversationsDashboard';
 import { SettingsPage } from './pages/SettingsPage';
+import { SchedulingPage } from './pages/scheduling/SchedulingPage';
 import { PremiumLock } from './components/PremiumLock';
 import { fetchTenantList, setTenantOverride } from './services/analyticsApi';
 import type { DashboardFeatures, User, TenantOption } from './types/analytics';
@@ -18,7 +19,7 @@ import type { DashboardFeatures, User, TenantOption } from './types/analytics';
 // Default '/api' assumes CloudFront fronts the Lambda at /api/* (same-origin).
 const AUTH_API_BASE_URL = import.meta.env.VITE_ANALYTICS_API_URL || '/api';
 
-type DashboardTab = 'conversations' | 'forms' | 'attribution' | 'settings';
+type DashboardTab = 'conversations' | 'forms' | 'attribution' | 'scheduling' | 'settings';
 
 // Lock icon for premium features
 const LockIcon = () => (
@@ -45,6 +46,7 @@ const DEFAULT_FEATURES: DashboardFeatures = {
   dashboard_attribution: false,
   dashboard_notifications: false,
   dashboard_settings: true,
+  dashboard_scheduling: false,
 };
 
 /**
@@ -112,6 +114,16 @@ function NavigationBar({
       ),
     },
     {
+      id: 'scheduling',
+      label: 'SCHEDULING',
+      locked: false, // Entitlement gating is by visibility (see visibleTabs) — never shown as a locked teaser.
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      ),
+    },
+    {
       id: 'settings',
       label: 'SETTINGS',
       locked: false, // Settings is always accessible (Team + Profile are universal)
@@ -123,6 +135,12 @@ function NavigationBar({
       ),
     },
   ];
+
+  // Scheduling is a paid entitlement (D1 Flag A): hide the tab entirely until enabled,
+  // rather than showing a locked teaser, so non-entitled tenants never see the feature.
+  const visibleTabs = tabs.filter(
+    (tab) => tab.id !== 'scheduling' || features.dashboard_scheduling,
+  );
 
   const handleTabClick = (tab: typeof tabs[0]) => {
     if (tab.locked) {
@@ -150,7 +168,7 @@ function NavigationBar({
 
           {/* Desktop Navigation Tabs - hidden on mobile */}
           <nav className="hidden md:flex items-center gap-1">
-            {tabs.map((tab) => {
+            {visibleTabs.map((tab) => {
               const isActive = activeTab === tab.id;
               const isLocked = tab.locked;
 
@@ -311,7 +329,7 @@ function NavigationBar({
         style={{ top: '64px' }}
       >
         <nav className="px-3 py-3 space-y-2 max-w-lg mx-auto">
-          {tabs.map((tab) => {
+          {visibleTabs.map((tab) => {
             const isActive = activeTab === tab.id;
             const isLocked = tab.locked;
 
@@ -631,7 +649,8 @@ function AppContent() {
   };
 
   const renderDashboardContent = () => {
-    if (lockedTab) {
+    // Scheduling is visibility-gated, never premium-locked, so it never reaches PremiumLock.
+    if (lockedTab && lockedTab !== 'scheduling') {
       return (
         <PremiumLock
           feature={lockedTab}
@@ -661,6 +680,8 @@ function AppContent() {
             onReturn={() => setActiveTab('conversations')}
           />
         );
+      case 'scheduling':
+        return <SchedulingPage />;
       case 'settings':
         return <SettingsPage />;
       default:
