@@ -26,6 +26,7 @@ import {
   type AppointmentTypeWrite,
 } from '../../services/schedulingApi';
 import { StaffSchedulingSection } from '../../components/scheduling/StaffSchedulingSection';
+import { NotificationTemplatesEditor } from '../../components/scheduling/NotificationTemplatesEditor';
 
 /** A routing policy's team label = its first tag value, or "Everyone (solo)" when unconditioned. */
 function teamLabel(p: RoutingPolicy): string {
@@ -342,6 +343,9 @@ export function SchedulingSetup() {
 
       {/* ---- Staff (per-staff scheduling settings, E13) ---- */}
       <StaffSchedulingSection />
+
+      {/* ---- Notification templates (E14) ---- */}
+      <NotificationTemplatesEditor />
     </div>
   );
 }
