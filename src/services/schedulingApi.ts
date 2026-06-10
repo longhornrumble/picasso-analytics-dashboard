@@ -269,6 +269,44 @@ export async function updateRoutingPolicy(
   return data.routing_policy;
 }
 
+// --- Booking actions (§E12-actions / G6; lambda#269) -----------------------
+// ADA is the Clerk-authed entry; it proxies the side effect to BCH. §8 own-or-admin
+// is enforced server-side (404 — not 403 — for a non-owner, so existence isn't leaked).
+// booking_id contains '#' (booking#<hex>) → encodeURIComponent %-encodes it; ADA urldecodes.
+
+export interface CancelBookingResult {
+  booking_id: string;
+  /** 'canceled' on a synchronous delete; 'pending_calendar_sync' (202) when the listener will flip it. */
+  status: 'canceled' | 'pending_calendar_sync';
+}
+
+/** Cancel a booking with an audit reason (required, ≤1000 chars). 409 if already terminal. */
+export async function cancelBooking(
+  bookingId: string,
+  reason: string,
+): Promise<CancelBookingResult> {
+  return schedulingWrite<CancelBookingResult>(
+    'POST',
+    `/scheduling/bookings/${encodeURIComponent(bookingId)}/cancel`,
+    { reason },
+  );
+}
+
+export interface RescheduleLinkResult {
+  booking_id: string;
+  /** false when the notify dispatch missed (still a 200 — best-effort). */
+  sent: boolean;
+}
+
+/** Mint + send a fresh reschedule link to the guest (no body). 429 if within the 60s cooldown. */
+export async function sendRescheduleLink(bookingId: string): Promise<RescheduleLinkResult> {
+  return schedulingWrite<RescheduleLinkResult>(
+    'POST',
+    `/scheduling/bookings/${encodeURIComponent(bookingId)}/reschedule-link`,
+    {},
+  );
+}
+
 /** The optimistic-lock token for a row: its modified_at.at, or '*' to first-stamp a legacy row. */
 export function ifMatchToken(row: { modified_at?: ModifiedAt }): string {
   return row.modified_at?.at ?? '*';

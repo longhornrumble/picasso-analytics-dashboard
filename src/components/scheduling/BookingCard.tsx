@@ -8,24 +8,31 @@
  * by default, so it renders safely as text. The only injection sink is the external
  * link href — gated through safeExternalHref (https-only) to block scheme injection.
  *
- * NOT included in this slice: Reschedule / Cancel / admin-override actions — those mutate
- * via the Calendar API + token issuance (sub-phase E/D backend), out of the render slice.
+ * Cancel / reschedule-link actions (§E12-actions / G6) render via <BookingActions> when a
+ * `viewer` is supplied (the actions self-gate to a live booking the viewer owns or admins).
  */
-import type { Booking } from '../../types/scheduling';
+import type { Booking, SchedulingViewer } from '../../types/scheduling';
 import {
   appointmentTypeLabel,
   formatSlotLabel,
   safeExternalHref,
 } from '../../lib/scheduling/bookingLogic';
 import { StatusChip } from './StatusChip';
+import { BookingActions } from './BookingActions';
 
 export function BookingCard({
   booking,
+  viewer,
   appointmentTypeNames,
+  onActionComplete,
 }: {
   booking: Booking;
+  /** When supplied, enables the cancel + reschedule-link actions (self-gated by §8 + status). */
+  viewer?: SchedulingViewer;
   /** Optional id→name lookup so the card can show the type's label, not its id. */
   appointmentTypeNames?: Record<string, string>;
+  /** Bubbled to the parent after a successful cancel so it can re-fetch. */
+  onActionComplete?: () => void;
 }) {
   const calendarHref = safeExternalHref(booking.html_link);
   const attendeeName = booking.attendee?.name?.trim();
@@ -66,6 +73,14 @@ export function BookingCard({
         >
           Open in Google Calendar →
         </a>
+      )}
+
+      {viewer && (
+        <BookingActions
+          booking={booking}
+          viewer={viewer}
+          onActionComplete={onActionComplete}
+        />
       )}
     </div>
   );

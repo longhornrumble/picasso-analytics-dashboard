@@ -38,4 +38,24 @@ describe('useBookings', () => {
 
     vi.doUnmock('../../../services/schedulingApi');
   });
+
+  it('reload() re-fetches the current scope', async () => {
+    vi.resetModules();
+    const fetchBookings = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(allBookings);
+    vi.doMock('../../../services/schedulingApi', () => ({ fetchBookings }));
+    const { useBookings: freshUseBookings } = await import('../useBookings');
+
+    const { result } = renderHook(() => freshUseBookings('tenant_aggregate'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.bookings).toEqual([]);
+
+    result.current.reload();
+    await waitFor(() => expect(result.current.bookings).toEqual(allBookings));
+    expect(fetchBookings).toHaveBeenCalledTimes(2);
+
+    vi.doUnmock('../../../services/schedulingApi');
+  });
 });

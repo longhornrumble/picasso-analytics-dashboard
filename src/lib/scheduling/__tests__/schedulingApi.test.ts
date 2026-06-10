@@ -4,6 +4,8 @@ import {
   createAppointmentType,
   updateAppointmentType,
   createRoutingPolicy,
+  cancelBooking,
+  sendRescheduleLink,
   SchedulingApiError,
   ifMatchToken,
   type AppointmentType,
@@ -92,6 +94,34 @@ describe('schedulingApi §E13b client', () => {
     expect(err).toBeInstanceOf(SchedulingApiError);
     expect(err.status).toBe(401);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('schedulingApi §E12-actions client', () => {
+  it('POST cancel %-encodes the booking_id (#) and sends the reason', async () => {
+    fetchMock.mockResolvedValue(okJson(200, { booking_id: 'booking#abc', status: 'canceled' }));
+    const res = await cancelBooking('booking#abc', 'out sick');
+    expect(res).toEqual({ booking_id: 'booking#abc', status: 'canceled' });
+    const [url, opts] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/scheduling\/bookings\/booking%23abc\/cancel$/);
+    expect(opts.method).toBe('POST');
+    expect(JSON.parse(opts.body)).toEqual({ reason: 'out sick' });
+  });
+
+  it('POST reschedule-link %-encodes the id and returns { sent }', async () => {
+    fetchMock.mockResolvedValue(okJson(200, { booking_id: 'booking#abc', sent: true }));
+    const res = await sendRescheduleLink('booking#abc');
+    expect(res).toEqual({ booking_id: 'booking#abc', sent: true });
+    const [url, opts] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/scheduling\/bookings\/booking%23abc\/reschedule-link$/);
+    expect(opts.method).toBe('POST');
+  });
+
+  it('surfaces a 429 reschedule cooldown as a SchedulingApiError', async () => {
+    fetchMock.mockResolvedValue(okJson(429, { error: 'rate_limited' }));
+    const err = await sendRescheduleLink('booking#abc').catch((e) => e);
+    expect(err).toBeInstanceOf(SchedulingApiError);
+    expect(err.status).toBe(429);
   });
 });
 
