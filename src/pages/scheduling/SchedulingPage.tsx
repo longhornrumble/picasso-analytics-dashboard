@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { useAuth } from '../../context/useAuth';
 import type { SchedulingViewer } from '../../types/scheduling';
 import { useBookings } from '../../lib/scheduling/useBookings';
+import { useAppointmentTypeNames } from '../../lib/scheduling/useAppointmentTypeNames';
 import { MyBookings } from './MyBookings';
 import { SchedulingAnalytics } from './SchedulingAnalytics';
 
@@ -25,6 +26,9 @@ export function SchedulingPage() {
   const { bookings, loading, error } = useBookings(
     isAdmin ? 'tenant_aggregate' : 'staff_self',
   );
+  // Appointment-type names resolve raw ids in the bookings list + the per-type analytics
+  // breakdown. The endpoint is admin-only, so the map is empty for staff (ids fall back).
+  const { names: appointmentTypeNames } = useAppointmentTypeNames(isAdmin);
   const [activeSubTab, setActiveSubTab] = useState<SchedulingSubTab>('bookings');
 
   const subTabs: { id: SchedulingSubTab; label: string }[] = [
@@ -71,9 +75,9 @@ export function SchedulingPage() {
           Couldn't load bookings: {error}
         </p>
       ) : activeSubTab === 'bookings' ? (
-        <MyBookings bookings={bookings} viewer={viewer} />
+        <MyBookings bookings={bookings} viewer={viewer} appointmentTypeNames={appointmentTypeNames} />
       ) : (
-        <SchedulingAnalytics bookings={bookings} viewer={viewer} />
+        <SchedulingAnalytics bookings={bookings} viewer={viewer} appointmentTypeNames={appointmentTypeNames} />
       )}
     </div>
   );

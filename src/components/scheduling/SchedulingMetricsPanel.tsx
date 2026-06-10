@@ -9,20 +9,33 @@
  */
 import { useState } from 'react';
 import type { Booking } from '../../types/scheduling';
-import { computeBookingMetrics, formatRate } from '../../lib/scheduling/bookingLogic';
+import {
+  computeBookingMetrics,
+  formatRate,
+  noShowByAppointmentType,
+  appointmentTypeLabel,
+} from '../../lib/scheduling/bookingLogic';
 
 export function SchedulingMetricsPanel({
   bookings,
   now,
+  appointmentTypeNames,
 }: {
   bookings: Booking[];
   /** Injected for determinism; defaults to wall-clock in the app. */
   now?: number;
+  /**
+   * id→name map for the per-type no-show breakdown. Only the admin tenant-aggregate view
+   * provides it (the appointment-types endpoint is admin-only); when absent the breakdown
+   * is hidden (a staff own-view doesn't get the per-type slice).
+   */
+  appointmentTypeNames?: Record<string, string>;
 }) {
   // Capture wall-clock once at mount (lazy init keeps render pure); tests pass `now`.
   const [mountNow] = useState(() => Date.now());
   const ref = now ?? mountNow;
   const m = computeBookingMetrics(bookings, ref);
+  const byType = appointmentTypeNames ? noShowByAppointmentType(bookings) : [];
 
   const cards: { label: string; value: string; hint?: string }[] = [
     { label: 'Total bookings', value: String(m.total), hint: 'last 90 days' },
@@ -58,6 +71,31 @@ export function SchedulingMetricsPanel({
           </div>
         ))}
       </div>
+
+      {byType.length > 0 && (
+        <div className="mt-2">
+          <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
+            No-show rate by appointment type
+          </h4>
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100 bg-white">
+            {byType.map((t) => (
+              <li key={t.appointmentTypeId || '(unspecified)'} className="flex items-center justify-between px-4 py-2 text-sm">
+                <span className="text-slate-700">
+                  {t.appointmentTypeId === ''
+                    ? 'Unspecified'
+                    : appointmentTypeLabel(t.appointmentTypeId, appointmentTypeNames)}
+                </span>
+                <span className="flex items-baseline gap-2">
+                  <span className="font-semibold text-slate-800">{formatRate(t.noShowRate)}</span>
+                  <span className="text-[11px] text-slate-400">
+                    {t.noShow}/{t.dispositioned} disposed · {t.total} total
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

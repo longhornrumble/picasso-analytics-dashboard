@@ -283,6 +283,48 @@ export function formatRate(rate: number | null): string {
   return `${Math.round(rate * 100)}%`;
 }
 
+/** One appointment type's no-show slice (ui_plan §8 "should": no-show rate per type). */
+export interface AppointmentTypeNoShow {
+  /** '' when the booking carries no appointment_type_id (forward-compat; rendered "Unspecified"). */
+  appointmentTypeId: string;
+  total: number;
+  /** completed | no_show | coordinator_no_show — same disposition set as computeBookingMetrics. */
+  dispositioned: number;
+  noShow: number;
+  /** no_show / dispositioned (null when 0 dispositioned → UI shows "—"). Consistent with computeBookingMetrics. */
+  noShowRate: number | null;
+}
+
+/**
+ * Group the (already scope-filtered) bookings by appointment_type_id and compute each type's
+ * no-show rate — the SAME metric computeBookingMetrics reports tenant-wide, sliced by type so an
+ * admin can see WHICH appointment types drive no-shows. Pure client-side grouping of the §E7
+ * Booking projection (which carries appointment_type_id) — no separate endpoint. Sorted by
+ * total desc, then id, for stable display.
+ */
+export function noShowByAppointmentType(bookings: Booking[]): AppointmentTypeNoShow[] {
+  const groups = new Map<string, { total: number; dispositioned: number; noShow: number }>();
+  for (const b of bookings) {
+    const key = b.appointment_type_id ?? '';
+    const g = groups.get(key) ?? { total: 0, dispositioned: 0, noShow: 0 };
+    g.total += 1;
+    if (b.status === 'completed' || b.status === 'no_show' || b.status === 'coordinator_no_show') {
+      g.dispositioned += 1;
+    }
+    if (b.status === 'no_show') g.noShow += 1;
+    groups.set(key, g);
+  }
+  return [...groups.entries()]
+    .map(([appointmentTypeId, g]) => ({
+      appointmentTypeId,
+      total: g.total,
+      dispositioned: g.dispositioned,
+      noShow: g.noShow,
+      noShowRate: g.dispositioned === 0 ? null : g.noShow / g.dispositioned,
+    }))
+    .sort((a, b) => b.total - a.total || a.appointmentTypeId.localeCompare(b.appointmentTypeId));
+}
+
 // ---------------------------------------------------------------------------
 // Display helpers
 // ---------------------------------------------------------------------------
