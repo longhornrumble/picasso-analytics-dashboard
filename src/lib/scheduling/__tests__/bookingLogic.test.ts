@@ -10,6 +10,7 @@ import {
   appointmentTypeLabel,
   formatSlotLabel,
   safeExternalHref,
+  noShowByAppointmentType,
 } from '../bookingLogic';
 import type { Booking } from '../../../types/scheduling';
 import {
@@ -116,6 +117,49 @@ describe('computeOperationalDebt + staffDebtBreakdown — §8 buckets', () => {
       { coordinatorEmail: 'maya.fixture@example.invalid', unresolved: 3 },
       { coordinatorEmail: 'alex.fixture@example.invalid', unresolved: 1 },
     ]);
+  });
+});
+
+describe('noShowByAppointmentType — §8 per-type no-show slice', () => {
+  const b = (
+    booking_id: string,
+    appointment_type_id: string | undefined,
+    status: Booking['status'],
+  ): Booking => ({
+    booking_id,
+    status,
+    start_at: '2026-01-01T00:00:00Z',
+    ...(appointment_type_id ? { appointment_type_id } : {}),
+  });
+
+  it('groups by type, computes no-show/dispositioned rate, sorts by total desc', () => {
+    const rows = noShowByAppointmentType([
+      b('1', 'A', 'no_show'),
+      b('2', 'A', 'completed'),
+      b('3', 'A', 'booked'), // not dispositioned → excluded from the rate denominator
+      b('4', 'B', 'completed'),
+    ]);
+    expect(rows.map((r) => r.appointmentTypeId)).toEqual(['A', 'B']); // A:3 total before B:1
+    expect(rows[0]).toMatchObject({ total: 3, dispositioned: 2, noShow: 1, noShowRate: 0.5 });
+    expect(rows[1]).toMatchObject({ total: 1, dispositioned: 1, noShow: 0, noShowRate: 0 });
+  });
+
+  it('reports null rate when a type has no dispositioned bookings', () => {
+    const [row] = noShowByAppointmentType([b('1', 'A', 'booked'), b('2', 'A', 'canceled')]);
+    expect(row).toMatchObject({ total: 2, dispositioned: 0, noShow: 0, noShowRate: null });
+  });
+
+  it("groups bookings missing appointment_type_id under '' (rendered Unspecified)", () => {
+    const rows = noShowByAppointmentType([b('1', undefined, 'no_show')]);
+    expect(rows[0].appointmentTypeId).toBe('');
+  });
+
+  it('matches the fixture distribution (discovery 1/2=50%, interview 0/1=0%)', () => {
+    const rows = noShowByAppointmentType(allBookings);
+    const disc = rows.find((r) => r.appointmentTypeId === 'appt_1to1_discovery_30')!;
+    const intv = rows.find((r) => r.appointmentTypeId === 'appt_1to1_interview_60')!;
+    expect(disc).toMatchObject({ total: 7, dispositioned: 2, noShow: 1, noShowRate: 0.5 });
+    expect(intv).toMatchObject({ total: 4, dispositioned: 1, noShow: 0, noShowRate: 0 });
   });
 });
 

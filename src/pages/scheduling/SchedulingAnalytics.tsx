@@ -18,10 +18,13 @@ export function SchedulingAnalytics({
   bookings,
   viewer,
   now,
+  appointmentTypeNames,
 }: {
   bookings: Booking[];
   viewer: SchedulingViewer;
   now?: number;
+  /** Admin-only id→name map for the per-type no-show breakdown (undefined for staff). */
+  appointmentTypeNames?: Record<string, string>;
 }) {
   const isAdmin = viewer.role === 'admin' || viewer.role === 'super_admin';
   const scoped = visibleBookings(bookings, viewer);
@@ -37,7 +40,7 @@ export function SchedulingAnalytics({
         </p>
       </div>
 
-      <SchedulingMetricsPanel bookings={scoped} now={now} />
+      <SchedulingMetricsPanel bookings={scoped} now={now} appointmentTypeNames={appointmentTypeNames} />
       <OperationalDebtPanel bookings={scoped} now={now} />
     </div>
   );
