@@ -1,8 +1,12 @@
 name: Deploy Analytics Dashboard
 
-# Production deploy. Triggered by push to main (typically a merged PR).
-# Staging is handled by pr-checks.yml during the PR — when this fires,
-# the change has already been validated on staging.
+# Production deploy. Push to main runs quality gates + build only (final
+# verification — staging was already exercised by pr-checks during the PR).
+# The deploy-production job is DISPATCH-ONLY: promoting to prod is a
+# deliberate `gh workflow run "Deploy Analytics Dashboard"`. Uniform model
+# across all front-ends since CI-modernization Phase 2; deploy mechanics
+# (incl. the releases/<sha>/ rollback copy) live in the shared reusable
+# workflow longhornrumble/picasso/.github/workflows/deploy-frontend.yml.
 
 on:
   push:
@@ -13,8 +17,6 @@ on:
 env:
   NODE_VERSION: '22'
   AWS_REGION: 'us-east-1'
-  S3_BUCKET_PRODUCTION: 'app-myrecruiter-ai'
-  CLOUDFRONT_PRODUCTION_ID: 'EJ0Y6ZUIUBSAT'
 
 jobs:
   lint:
@@ -86,29 +88,25 @@ jobs:
   deploy-production:
     name: Deploy to Production
     needs: [lint, typecheck-and-build, security]
-    runs-on: ubuntu-latest
-    environment: production
+    # Dispatch-only prod deploys (uniform model, CI-modernization Phase 2 —
+    # same shape as config-builder/widget since Phase 0.3): push to main runs
+    # gates + build as final verification; promoting to prod is a deliberate
+    # `gh workflow run`. The previous `environment: production` marker had no
+    # required reviewers (toothless), and reusable-caller jobs can't carry
+    # `environment:` anyway — the dispatch IS the deliberate act.
+    if: github.event_name == 'workflow_dispatch'
     permissions:
       id-token: write
       contents: read
-    steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dashboard-build
-          path: dist/
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Deploy to production S3
-        run: aws s3 sync dist/ s3://${{ env.S3_BUCKET_PRODUCTION }}/ --delete
-
-      - name: Invalidate production CloudFront
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ env.CLOUDFRONT_PRODUCTION_ID }} \
-            --paths "/*"
+    # Shared deploy mechanics incl. the immutable releases/<sha>/ rollback
+    # copy (Phase 2.2) — rollback = re-sync a prior release prefix (exact
+    # command in the run summary).
+    uses: longhornrumble/picasso/.github/workflows/deploy-frontend.yml@main
+    with:
+      environment: production
+      artifact_name: dashboard-build
+      bucket: app-myrecruiter-ai
+      cloudfront_distribution_id: EJ0Y6ZUIUBSAT
+      website_url: https://d3r39xkfb0snuq.cloudfront.net
+    secrets:
+      deploy_role_arn: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}

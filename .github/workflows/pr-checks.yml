@@ -100,40 +100,20 @@ jobs:
   deploy-staging:
     name: Deploy to Staging
     needs: [lint, typecheck-and-build, security, tests]
-    runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
       pull-requests: write
-    steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dashboard-build
-          path: dist/
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Deploy to staging S3
-        run: aws s3 sync dist/ s3://picasso-analytics-portal-staging/ --delete
-
-      - name: Invalidate staging CloudFront
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id E2R9VHBON5PHMK \
-            --paths "/*"
-
-      - name: Post staging URL to PR
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## Staging Deployed\n\nTest at: **https://d2t5sxdcthprgd.cloudfront.net**\n\nAll quality gates passed. Merge when staging verification is complete.`
-            })
+    # Shared deploy mechanics (sync → invalidate → smoke → PR comment) live
+    # in the reusable workflow — CI-modernization Phase 2.1. Quality gates
+    # stay in this repo.
+    uses: longhornrumble/picasso/.github/workflows/deploy-frontend.yml@main
+    with:
+      environment: staging
+      artifact_name: dashboard-build
+      bucket: picasso-analytics-portal-staging
+      cloudfront_distribution_id: E2R9VHBON5PHMK
+      website_url: https://d2t5sxdcthprgd.cloudfront.net
+      comment_pr: true
+    secrets:
+      deploy_role_arn: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
