@@ -13,6 +13,8 @@ export interface UseBookingsResult {
   bookings: Booking[];
   loading: boolean;
   error: string | null;
+  /** Re-fetch the current scope (e.g. after a booking action mutates the set). */
+  reload: () => void;
 }
 
 export function useBookings(scope: BookingScope = 'staff_self'): UseBookingsResult {
@@ -48,5 +50,10 @@ export function useBookings(scope: BookingScope = 'staff_self'): UseBookingsResu
     };
   }, [loadData]);
 
-  return { bookings, loading, error };
+  // Manual re-fetch (from an event handler, not an effect) — always applies its result.
+  const reload = useCallback(() => {
+    loadData(() => true);
+  }, [loadData]);
+
+  return { bookings, loading, error, reload };
 }

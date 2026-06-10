@@ -22,12 +22,15 @@ export function MyBookings({
   viewer,
   appointmentTypeNames,
   now,
+  onActionComplete,
 }: {
   bookings: Booking[];
   viewer: SchedulingViewer;
   appointmentTypeNames?: Record<string, string>;
   /** Injected for deterministic time-range filtering; defaults to wall-clock. */
   now?: number;
+  /** Called after a booking action mutates the set, so the parent can re-fetch. */
+  onActionComplete?: () => void;
 }) {
   const [timeRange, setTimeRange] = useState<TimeRange>('upcoming');
   const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all'>('all');
@@ -72,7 +75,12 @@ export function MyBookings({
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {shown.map((b) => (
             <li key={b.booking_id}>
-              <BookingCard booking={b} appointmentTypeNames={appointmentTypeNames} />
+              <BookingCard
+                booking={b}
+                viewer={viewer}
+                appointmentTypeNames={appointmentTypeNames}
+                onActionComplete={onActionComplete}
+              />
             </li>
           ))}
         </ul>

@@ -23,7 +23,7 @@ export function SchedulingPage() {
   const isAdmin = viewer.role === 'admin' || viewer.role === 'super_admin';
 
   // ui_plan §8: admins read the tenant aggregate; staff read only their own.
-  const { bookings, loading, error } = useBookings(
+  const { bookings, loading, error, reload } = useBookings(
     isAdmin ? 'tenant_aggregate' : 'staff_self',
   );
   // Appointment-type names resolve raw ids in the bookings list + the per-type analytics
@@ -75,7 +75,7 @@ export function SchedulingPage() {
           Couldn't load bookings: {error}
         </p>
       ) : activeSubTab === 'bookings' ? (
-        <MyBookings bookings={bookings} viewer={viewer} appointmentTypeNames={appointmentTypeNames} />
+        <MyBookings bookings={bookings} viewer={viewer} appointmentTypeNames={appointmentTypeNames} onActionComplete={reload} />
       ) : (
         <SchedulingAnalytics bookings={bookings} viewer={viewer} appointmentTypeNames={appointmentTypeNames} />
       )}
