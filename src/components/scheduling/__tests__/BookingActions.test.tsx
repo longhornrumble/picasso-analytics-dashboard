@@ -102,4 +102,38 @@ describe('BookingActions (§E12-actions / G6)', () => {
       expect(screen.getByRole('alert')).toHaveTextContent(/try again in about a minute/i),
     );
   });
+
+  it('maps the backend 404 (non-owner, no-enumeration oracle) to a non-leaky message and does NOT refetch', async () => {
+    // Backend returns 404 (not 403) for a booking the viewer can't touch — the UX gate let
+    // this through (e.g. stale ownership). The message must not reveal the booking exists.
+    api.cancelBooking.mockRejectedValue(new SchedulingApiError(404, 'not found'));
+    const onActionComplete = vi.fn();
+    render(<BookingActions booking={booking} viewer={owner} onActionComplete={onActionComplete} />);
+    await userEvent.click(screen.getByRole('button', { name: /cancel booking/i }));
+    await userEvent.type(screen.getByLabelText(/reason for cancelling/i), 'no longer needed');
+    await userEvent.click(screen.getByRole('button', { name: /confirm cancel/i }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/can't change this booking/i));
+    expect(onActionComplete).not.toHaveBeenCalled(); // failed cancel must not trigger a refetch
+  });
+
+  it('tolerates a 202 pending_calendar_sync cancel result (still closes the modal + refetches)', async () => {
+    // The cancel was accepted but the calendar delete is async (the §14.2 listener flips status).
+    // The component treats it as success: notify the parent so the row re-fetches.
+    api.cancelBooking.mockResolvedValue({ booking_id: booking.booking_id, status: 'pending_calendar_sync' });
+    const onActionComplete = vi.fn();
+    render(<BookingActions booking={booking} viewer={owner} onActionComplete={onActionComplete} />);
+    await userEvent.click(screen.getByRole('button', { name: /cancel booking/i }));
+    await userEvent.type(screen.getByLabelText(/reason for cancelling/i), 'rebooking');
+    await userEvent.click(screen.getByRole('button', { name: /confirm cancel/i }));
+    await waitFor(() => expect(onActionComplete).toHaveBeenCalledTimes(1));
+    // modal closed → the reason textarea is gone
+    expect(screen.queryByLabelText(/reason for cancelling/i)).not.toBeInTheDocument();
+  });
+
+  it('reports a reschedule link that could not be delivered (sent:false)', async () => {
+    api.sendRescheduleLink.mockResolvedValue({ booking_id: booking.booking_id, sent: false });
+    render(<BookingActions booking={booking} viewer={owner} />);
+    await userEvent.click(screen.getByRole('button', { name: /send reschedule link/i }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/could not be delivered/i));
+  });
 });

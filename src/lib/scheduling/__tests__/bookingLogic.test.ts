@@ -6,6 +6,7 @@ import {
   isAwaitingDisposition,
   computeOperationalDebt,
   staffDebtBreakdown,
+  staffDispositionQueue,
   statusMeta,
   appointmentTypeLabel,
   formatSlotLabel,
@@ -117,6 +118,35 @@ describe('computeOperationalDebt + staffDebtBreakdown — §8 buckets', () => {
       { coordinatorEmail: 'maya.fixture@example.invalid', unresolved: 3 },
       { coordinatorEmail: 'alex.fixture@example.invalid', unresolved: 1 },
     ]);
+  });
+
+  describe('staffDispositionQueue — §8 drill-down target', () => {
+    it("returns one staff member's awaiting-disposition bookings, oldest-first", () => {
+      const q = staffDispositionQueue(debtBookings, FIXTURE_NOW, 'maya.fixture@example.invalid');
+      expect(q).toHaveLength(3); // matches her staffDebtBreakdown count
+      expect(q.every((b) => b.coordinator_email === 'maya.fixture@example.invalid')).toBe(true);
+      // oldest event end first (most overdue at the top)
+      const ends = q.map((b) => Date.parse(b.end_at ?? b.start_at));
+      expect(ends).toEqual([...ends].sort((a, b) => a - b));
+    });
+
+    it('groups rows missing a coordinator under the (unassigned) key', () => {
+      const orphan: Booking[] = [
+        { booking_id: 'o1', status: 'booked', start_at: '2026-01-01T00:00:00Z', end_at: '2026-01-01T01:00:00Z' },
+      ];
+      expect(staffDispositionQueue(orphan, FIXTURE_NOW, '(unassigned)')).toHaveLength(1);
+      expect(staffDispositionQueue(orphan, FIXTURE_NOW, 'someone@x')).toHaveLength(0);
+    });
+
+    it('excludes bookings that are not awaiting disposition (future / terminal)', () => {
+      const mixed: Booking[] = [
+        { booking_id: 'past', status: 'booked', start_at: '2026-01-01T00:00:00Z', end_at: '2026-01-01T01:00:00Z', coordinator_email: 'x@x' },
+        { booking_id: 'future', status: 'booked', start_at: '2099-01-01T00:00:00Z', coordinator_email: 'x@x' },
+        { booking_id: 'done', status: 'completed', start_at: '2026-01-01T00:00:00Z', end_at: '2026-01-01T01:00:00Z', coordinator_email: 'x@x' },
+      ];
+      const q = staffDispositionQueue(mixed, FIXTURE_NOW, 'x@x');
+      expect(q.map((b) => b.booking_id)).toEqual(['past']);
+    });
   });
 });
 

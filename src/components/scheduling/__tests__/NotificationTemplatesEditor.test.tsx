@@ -133,6 +133,44 @@ describe('NotificationTemplatesEditor (E14)', () => {
     expect(body).toHaveProperty('subject');
   });
 
+  it('seeds editable fields from the OVERRIDE only — a default moment starts blank with the default as placeholder (audit row 7)', async () => {
+    render(<NotificationTemplatesEditor />);
+    await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
+
+    // reschedule_link is NOT an override → fields must be empty (so "Save" can't persist the
+    // platform default AS a tenant override), with the default surfaced as a placeholder.
+    const subj = screen.getAllByLabelText('Subject')[0] as HTMLInputElement;
+    expect(subj.value).toBe('');
+    expect(subj).toHaveAttribute('placeholder', 'Default subject');
+    const sms = screen.getAllByLabelText('SMS text')[0] as HTMLTextAreaElement;
+    expect(sms.value).toBe('');
+    expect(sms).toHaveAttribute('placeholder', 'Default SMS {{firstName}}');
+  });
+
+  it('seeds an existing override INTO the field so it stays editable (audit row 7)', async () => {
+    render(<NotificationTemplatesEditor />);
+    await waitFor(() => expect(screen.getByText('Cancellation notice')).toBeInTheDocument());
+    // cancel_notice is is_override:true with subject 'Default subject' (the override value here).
+    const cancelCard = screen.getByText('Cancellation notice').closest('div')!.parentElement!.parentElement!;
+    const subj = within(cancelCard).getByLabelText('Subject') as HTMLInputElement;
+    expect(subj.value).toBe('Default subject'); // the override is loaded, not blanked
+  });
+
+  it('schema discipline: a moment missing available_variables does not crash (audit row 8)', async () => {
+    api.fetchNotificationTemplates.mockResolvedValue({
+      ...RESPONSE,
+      moments: {
+        ...RESPONSE.moments,
+        // drop available_variables + sms_available_variables (old-shape row)
+        reoffer: { ...tpl(), available_variables: undefined, sms_available_variables: undefined },
+      },
+    });
+    render(<NotificationTemplatesEditor />);
+    await waitFor(() => expect(screen.getByText('Reoffer (slot taken)')).toBeInTheDocument());
+    // renders without throwing; the variables line is simply omitted for that moment
+    expect(screen.getByText('Reoffer (slot taken)')).toBeInTheDocument();
+  });
+
   it('offers Reset SMS only on an SMS override → clears it', async () => {
     api.fetchNotificationTemplates.mockResolvedValue({
       ...RESPONSE,

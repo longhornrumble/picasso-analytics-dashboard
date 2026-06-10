@@ -148,4 +148,16 @@ describe('StaffSchedulingSection — member (self-service)', () => {
     await waitFor(() => expect(api.updateEmployeeScheduling).toHaveBeenCalledTimes(1));
     expect(api.updateEmployeeScheduling).toHaveBeenCalledWith('e1', { calendar_email_override: 'mine@x' });
   });
+
+  it('surfaces the D3 warning on the member self-view when they are half-configured', async () => {
+    // Maya is on a team (volunteer_coordinators) but has not connected a calendar →
+    // the "connect calendar" v1-MUST warning must show on her OWN view, not only the admin roster.
+    api.fetchTeamMembers.mockResolvedValue({
+      members: [{ ...MAYA, calendar_connected: false }],
+      admin_count: 1, total: 1, can_edit: true,
+    });
+    render(<StaffSchedulingSection />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: /my scheduling/i })).toBeInTheDocument());
+    expect(screen.getByText(/Connect calendar to be bookable/)).toBeInTheDocument();
+  });
 });
