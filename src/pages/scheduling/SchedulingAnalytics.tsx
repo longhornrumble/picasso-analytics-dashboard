@@ -41,7 +41,7 @@ export function SchedulingAnalytics({
       </div>
 
       <SchedulingMetricsPanel bookings={scoped} now={now} appointmentTypeNames={appointmentTypeNames} />
-      <OperationalDebtPanel bookings={scoped} now={now} />
+      <OperationalDebtPanel bookings={scoped} now={now} appointmentTypeNames={appointmentTypeNames} />
     </div>
   );
 }

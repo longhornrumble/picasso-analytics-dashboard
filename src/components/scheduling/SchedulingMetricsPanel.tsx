@@ -38,7 +38,7 @@ export function SchedulingMetricsPanel({
   const byType = appointmentTypeNames ? noShowByAppointmentType(bookings) : [];
 
   const cards: { label: string; value: string; hint?: string }[] = [
-    { label: 'Total bookings', value: String(m.total), hint: 'last 90 days' },
+    { label: 'Total bookings', value: String(m.total), hint: 'all on record' },
     { label: 'Upcoming', value: String(m.upcoming) },
     { label: 'Last 30 days', value: String(m.last30d) },
     { label: 'No-show rate', value: formatRate(m.noShowRate), hint: 'of dispositioned' },
@@ -53,7 +53,7 @@ export function SchedulingMetricsPanel({
           Booking volume &amp; outcomes
         </h3>
         <p className="text-xs text-slate-400">
-          Derived from Picasso bookings in the last 90 days. Rates over disposed meetings only.
+          Derived from all Picasso bookings on record. Rates over disposed meetings only.
         </p>
       </div>
 

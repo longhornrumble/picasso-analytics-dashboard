@@ -202,6 +202,30 @@ export function staffDebtBreakdown(bookings: Booking[], now: number): StaffDebtR
     .sort((a, b) => b.unresolved - a.unresolved);
 }
 
+/**
+ * The awaiting-disposition queue for ONE staff member (ui_plan §8: "admin can drill from
+ * any aggregate row to the individual staff member's queue"; also the staff own-view's
+ * "their pending dispositions, oldest first"). `coordinatorKey` matches the
+ * staffDebtBreakdown grouping key (coordinator_email, or '(unassigned)' for rows missing one).
+ * Sorted oldest-first by event end (the most overdue disposition at the top).
+ */
+export function staffDispositionQueue(
+  bookings: Booking[],
+  now: number,
+  coordinatorKey: string,
+): Booking[] {
+  return bookings
+    .filter(
+      (b) =>
+        isAwaitingDisposition(b, now) &&
+        (b.coordinator_email ?? '(unassigned)') === coordinatorKey,
+    )
+    .sort(
+      (a, b) =>
+        Date.parse(a.end_at ?? a.start_at) - Date.parse(b.end_at ?? b.start_at),
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Surface 8 — historical metrics (ui_plan §8 v1-must: booking volume + no-show rate)
 // ---------------------------------------------------------------------------

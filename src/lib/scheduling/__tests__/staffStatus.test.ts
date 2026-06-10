@@ -51,6 +51,31 @@ describe('staffSchedulingStatus (E13 / D3)', () => {
     const s = staffSchedulingStatus(mk({ scheduling_tags: ['t'] })); // no calendar_connected
     expect(s.needsCalendar).toBe(true);
   });
+
+  it('paused + fully configured (tagged + connected): pause suppresses bookable, still a participant', () => {
+    const s = staffSchedulingStatus(
+      mk({ scheduling_tags: ['t'], calendar_connected: true, bookable_override: 'off' }),
+    );
+    expect(s).toMatchObject({
+      paused: true,
+      bookable: false, // pause force-OFFs an otherwise-bookable member
+      isParticipant: true,
+      needsCalendar: false,
+      needsTeam: false,
+    });
+  });
+
+  it('paused + connected but on no team: pause suppresses the needsTeam warning', () => {
+    const s = staffSchedulingStatus(
+      mk({ scheduling_tags: [], calendar_connected: true, bookable_override: 'off' }),
+    );
+    expect(s).toMatchObject({
+      paused: true,
+      bookable: false,
+      needsTeam: false, // would be a warning if not paused; pause means "intentionally not bookable"
+      needsCalendar: false,
+    });
+  });
 });
 
 describe('staffWarning', () => {

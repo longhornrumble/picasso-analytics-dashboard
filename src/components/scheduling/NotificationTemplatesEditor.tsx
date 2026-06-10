@@ -34,11 +34,15 @@ function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : 'Something went wrong';
 }
 
+// Seed the editor from the tenant's OVERRIDE only — never from the effective (default) copy.
+// Otherwise "Save" on a moment the tenant never customized would persist the platform default
+// AS a tenant override. When no override exists the field starts blank and the default shows
+// as a placeholder; saving blank is the documented "reset to default" no-op. (Audit row 7.)
 const draftOf = (t: MomentTemplate): EditorDraft => ({
-  subject: t.subject,
-  body_text: t.body_text,
-  body_html: t.body_html,
-  sms_text: t.sms_text ?? '',
+  subject: t.is_override ? t.subject : '',
+  body_text: t.is_override ? t.body_text : '',
+  body_html: t.is_override ? t.body_html : '',
+  sms_text: t.sms_is_override ? (t.sms_text ?? '') : '',
 });
 
 export function NotificationTemplatesEditor() {
@@ -139,22 +143,24 @@ export function NotificationTemplatesEditor() {
 
             <div>
               <label htmlFor={`subj-${m.id}`} className="block text-xs font-medium text-slate-600 mb-1">Subject</label>
-              <input id={`subj-${m.id}`} className={inputCls} value={d.subject} onChange={(e) => setField('subject', e.target.value)} />
+              <input id={`subj-${m.id}`} className={inputCls} placeholder={t.default?.subject ?? ''} value={d.subject} onChange={(e) => setField('subject', e.target.value)} />
             </div>
             <div>
               <label htmlFor={`text-${m.id}`} className="block text-xs font-medium text-slate-600 mb-1">Body (plain text)</label>
-              <textarea id={`text-${m.id}`} rows={4} className={inputCls} value={d.body_text} onChange={(e) => setField('body_text', e.target.value)} />
+              <textarea id={`text-${m.id}`} rows={4} className={inputCls} placeholder={t.default?.body_text ?? ''} value={d.body_text} onChange={(e) => setField('body_text', e.target.value)} />
             </div>
             <div>
               <label htmlFor={`html-${m.id}`} className="block text-xs font-medium text-slate-600 mb-1">Body (HTML)</label>
-              <textarea id={`html-${m.id}`} rows={4} className={`${inputCls} font-mono text-xs`} value={d.body_html} onChange={(e) => setField('body_html', e.target.value)} />
+              <textarea id={`html-${m.id}`} rows={4} className={`${inputCls} font-mono text-xs`} placeholder={t.default?.body_html ?? ''} value={d.body_html} onChange={(e) => setField('body_html', e.target.value)} />
             </div>
 
-            <p className="text-[11px] text-slate-400">
-              Variables: {t.available_variables.map((v) => (
-                <code key={v} className="bg-slate-100 rounded px-1 mx-0.5">{v}</code>
-              ))}
-            </p>
+            {t.available_variables?.length ? (
+              <p className="text-[11px] text-slate-400">
+                Variables: {t.available_variables.map((v) => (
+                  <code key={v} className="bg-slate-100 rounded px-1 mx-0.5">{v}</code>
+                ))}
+              </p>
+            ) : null}
 
             <div className="flex gap-2">
               <button onClick={() => persist(m.id, { subject: d.subject, body_text: d.body_text, body_html: d.body_html })} disabled={busy}
@@ -178,6 +184,7 @@ export function NotificationTemplatesEditor() {
                 )}
               </div>
               <textarea id={`sms-${m.id}`} rows={3} maxLength={SMS_MAX} className={inputCls}
+                placeholder={t.sms_default ?? ''}
                 value={d.sms_text} onChange={(e) => setField('sms_text', e.target.value)} />
               <p className="text-[11px] text-slate-400">
                 {d.sms_text.length}/{SMS_MAX} · ~{Math.max(1, Math.ceil(d.sms_text.length / 160))} segment{d.sms_text.length > 160 ? 's' : ''}
