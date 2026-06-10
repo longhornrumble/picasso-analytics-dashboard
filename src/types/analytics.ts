@@ -678,6 +678,9 @@ export interface TeamMember {
   scheduling_tags?: string[];
   bookable_override?: 'off' | null;
   calendar_email_override?: string | null;
+  // §E13c addendum (G8): does this member have an ACTIVE E11 OAuth calendar connection?
+  // Additive — pre-G8 rows read as undefined → treated as not-connected (schema discipline).
+  calendar_connected?: boolean;
 }
 
 export interface TeamMembersResponse {
