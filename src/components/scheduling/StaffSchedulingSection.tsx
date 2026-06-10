@@ -20,6 +20,12 @@ import {
   type EmployeeSchedulingWrite,
 } from '../../services/schedulingApi';
 import type { TeamMember } from '../../types/analytics';
+import {
+  staffSchedulingStatus,
+  staffWarning,
+  matchesStaffFilter,
+  type StaffFilter,
+} from '../../lib/scheduling/staffStatus';
 
 function errMessage(e: unknown): string {
   if (e instanceof SchedulingApiError) {
@@ -49,6 +55,7 @@ export function StaffSchedulingSection() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>({ tags: [], bookableOff: false, calendarEmail: '' });
+  const [filter, setFilter] = useState<StaffFilter>('all');
 
   const load = useCallback(
     async (isActive: () => boolean) => {
@@ -144,6 +151,7 @@ export function StaffSchedulingSection() {
       return <p className="text-sm text-slate-400">Your staff record isn't available.</p>;
     }
     const editing = editingId === me.employee_id;
+    const meWarning = staffWarning(staffSchedulingStatus(me));
     return (
       <section aria-label="My scheduling" className="flex flex-col gap-3">
         <div>
@@ -154,6 +162,11 @@ export function StaffSchedulingSection() {
         <div className="rounded-xl border border-slate-100 bg-white p-4 flex flex-col gap-3">
           {me.scheduling_tags && me.scheduling_tags.length > 0 && (
             <p className="text-xs text-slate-500">Your teams: {me.scheduling_tags.join(', ')}</p>
+          )}
+          {meWarning && (
+            <p className="text-xs text-amber-600" role="status">
+              ⚠ {meWarning}
+            </p>
           )}
           <div>
             <label htmlFor="my-cal-email" className="block text-xs font-medium text-slate-600 mb-1">Calendar email</label>
@@ -183,17 +196,38 @@ export function StaffSchedulingSection() {
   }
 
   // ---- Admin roster ----
+  const shown = members.filter((m) => matchesStaffFilter(staffSchedulingStatus(m), filter));
   return (
     <section aria-label="Staff scheduling" className="flex flex-col gap-3">
-      <div>
-        <h3 className="text-sm font-bold text-slate-900">Staff</h3>
-        <p className="text-xs text-slate-500">Assign staff to teams (tags), force a booking pause, or set a booking calendar email.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">Staff</h3>
+          <p className="text-xs text-slate-500">Assign staff to teams (tags), force a booking pause, or set a booking calendar email.</p>
+        </div>
+        <label className="flex items-center gap-1.5 text-xs text-slate-500 shrink-0">
+          Show
+          <select
+            aria-label="Filter staff"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as StaffFilter)}
+            className="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          >
+            <option value="all">All staff</option>
+            <option value="bookable">Bookable</option>
+            <option value="not_bookable">Not bookable</option>
+            <option value="missing_connection">Missing connection</option>
+          </select>
+        </label>
       </div>
       {saveError && <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2" role="alert">{saveError}</p>}
 
+      {shown.length === 0 ? (
+        <p className="text-sm text-slate-400 py-6 text-center">No staff match this filter.</p>
+      ) : (
       <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100 bg-white">
-        {members.map((m) => {
+        {shown.map((m) => {
           const editing = editingId === m.employee_id;
+          const warning = staffWarning(staffSchedulingStatus(m));
           return (
             <li key={m.employee_id} className="px-4 py-3 text-sm">
               <div className="flex items-start justify-between gap-3">
@@ -203,6 +237,9 @@ export function StaffSchedulingSection() {
                     {(m.scheduling_tags?.length ?? 0) > 0 ? m.scheduling_tags!.join(', ') : 'No teams'}
                     {m.bookable_override === 'off' && <span className="ml-2 text-amber-600">· Booking paused</span>}
                   </p>
+                  {warning && (
+                    <p className="text-xs text-amber-600 mt-0.5">⚠ {warning}</p>
+                  )}
                 </div>
                 {!editing && (
                   <button onClick={() => openEdit(m)} className="shrink-0 text-sm text-primary-600 hover:text-primary-700">Edit</button>
@@ -255,6 +292,7 @@ export function StaffSchedulingSection() {
           );
         })}
       </ul>
+      )}
     </section>
   );
 }

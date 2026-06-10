@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SchedulingApiError } from '../../../services/schedulingApi';
 
@@ -87,6 +87,44 @@ describe('StaffSchedulingSection — admin', () => {
     api.fetchTeamMembers.mockRejectedValue(new Error('boom'));
     render(<StaffSchedulingSection />);
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/couldn't load staff: boom/i));
+  });
+
+  it('flags the D3 v1-MUST warnings (connect-calendar + not-on-team) and none for a bookable member', async () => {
+    api.fetchTeamMembers.mockResolvedValue({
+      members: [
+        { ...base, employee_id: 'c1', email: 'cal@x', name: 'Needs Cal', role: 'member' as const, scheduling_tags: ['volunteer_coordinators'], bookable_override: null, calendar_connected: false },
+        { ...base, employee_id: 'c2', email: 'team@x', name: 'Needs Team', role: 'member' as const, scheduling_tags: [], bookable_override: null, calendar_connected: true },
+        { ...base, employee_id: 'c3', email: 'ok@x', name: 'All Set', role: 'member' as const, scheduling_tags: ['volunteer_coordinators'], bookable_override: null, calendar_connected: true },
+      ],
+      admin_count: 1, total: 3, can_edit: true,
+    });
+    render(<StaffSchedulingSection />);
+    await waitFor(() => expect(screen.getByText('Needs Cal')).toBeInTheDocument());
+
+    expect(within(screen.getByText('Needs Cal').closest('li')!).getByText(/Connect calendar to be bookable/)).toBeInTheDocument();
+    expect(within(screen.getByText('Needs Team').closest('li')!).getByText(/Not on any team/)).toBeInTheDocument();
+    const okRow = screen.getByText('All Set').closest('li')!;
+    expect(within(okRow).queryByText(/Connect calendar|Not on any team/)).toBeNull();
+  });
+
+  it('filters the roster by booking status', async () => {
+    api.fetchTeamMembers.mockResolvedValue({
+      members: [
+        { ...base, employee_id: 'c1', email: 'cal@x', name: 'Needs Cal', role: 'member' as const, scheduling_tags: ['volunteer_coordinators'], bookable_override: null, calendar_connected: false },
+        { ...base, employee_id: 'c3', email: 'ok@x', name: 'All Set', role: 'member' as const, scheduling_tags: ['volunteer_coordinators'], bookable_override: null, calendar_connected: true },
+      ],
+      admin_count: 1, total: 2, can_edit: true,
+    });
+    render(<StaffSchedulingSection />);
+    await waitFor(() => expect(screen.getByText('All Set')).toBeInTheDocument());
+
+    await userEvent.selectOptions(screen.getByLabelText('Filter staff'), 'bookable');
+    expect(screen.getByText('All Set')).toBeInTheDocument();
+    expect(screen.queryByText('Needs Cal')).not.toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText('Filter staff'), 'missing_connection');
+    expect(screen.getByText('Needs Cal')).toBeInTheDocument();
+    expect(screen.queryByText('All Set')).not.toBeInTheDocument();
   });
 });
 
