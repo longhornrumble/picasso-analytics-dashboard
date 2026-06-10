@@ -28,6 +28,7 @@ import {
 } from '../../services/schedulingApi';
 import { StaffSchedulingSection } from '../../components/scheduling/StaffSchedulingSection';
 import { NotificationTemplatesEditor } from '../../components/scheduling/NotificationTemplatesEditor';
+import { lastEditedLabel } from '../../lib/scheduling/formatModifiedAt';
 
 /** A routing policy's team label = its first tag value, or "Everyone (solo)" when unconditioned. */
 function teamLabel(p: RoutingPolicy): string {
@@ -206,6 +207,9 @@ export function SchedulingSetup() {
               <div>
                 <span className="text-slate-700">{teamLabel(p)}</span>
                 <span className="ml-2 text-xs text-slate-400">{p.tie_breaker ?? 'round_robin'}</span>
+                {lastEditedLabel(p.modified_at) && (
+                  <p className="text-[11px] text-slate-400">{lastEditedLabel(p.modified_at)}</p>
+                )}
               </div>
               <button
                 onClick={() => {
@@ -290,6 +294,9 @@ export function SchedulingSetup() {
                 <p className="text-xs text-slate-400">
                   {a.duration_minutes} min · {policyById(a.routing_policy_id) ? teamLabel(policyById(a.routing_policy_id)!) : a.routing_policy_id}
                 </p>
+                {lastEditedLabel(a.modified_at) && (
+                  <p className="text-[11px] text-slate-400">{lastEditedLabel(a.modified_at)}</p>
+                )}
               </div>
               <button
                 onClick={() => {

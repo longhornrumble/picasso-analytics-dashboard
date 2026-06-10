@@ -75,6 +75,13 @@ describe('SchedulingSetup (E13b)', () => {
     expect(screen.getByLabelText('Teams')).toBeInTheDocument();
   });
 
+  it('surfaces modified_at on each row (AC#20)', async () => {
+    render(<SchedulingSetup />);
+    await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
+    // both the appt type (APPT.modified_at) and team (POLICY.modified_at) carry by=admin@x
+    expect(screen.getAllByText(/Edited by admin@x ·/).length).toBeGreaterThanOrEqual(2);
+  });
+
   it('creates an appointment type with the chosen team and reloads', async () => {
     api.createAppointmentType.mockResolvedValue({ ...APPT, appointment_type_id: 'a2', name: 'Interview' });
     render(<SchedulingSetup />);
