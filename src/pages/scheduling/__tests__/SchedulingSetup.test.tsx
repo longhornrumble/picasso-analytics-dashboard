@@ -9,6 +9,7 @@ const api = {
   createAppointmentType: vi.fn(),
   updateAppointmentType: vi.fn(),
   createRoutingPolicy: vi.fn(),
+  updateRoutingPolicy: vi.fn(),
   fetchTagVocabulary: vi.fn(),
   fetchNotificationTemplates: vi.fn(),
 };
@@ -23,6 +24,7 @@ vi.mock('../../../services/schedulingApi', async () => {
     createAppointmentType: (...a: unknown[]) => api.createAppointmentType(...a),
     updateAppointmentType: (...a: unknown[]) => api.updateAppointmentType(...a),
     createRoutingPolicy: (...a: unknown[]) => api.createRoutingPolicy(...a),
+    updateRoutingPolicy: (...a: unknown[]) => api.updateRoutingPolicy(...a),
     fetchTagVocabulary: () => api.fetchTagVocabulary(),
     fetchNotificationTemplates: () => api.fetchNotificationTemplates(),
   };
@@ -104,6 +106,27 @@ describe('SchedulingSetup (E13b)', () => {
       expect.objectContaining({ name: 'Discovery', routing_policy_id: 'rp1' }),
       '2026-06-06T00:00:00.000002Z', // ifMatchToken(APPT)
     );
+  });
+
+  it('edits a team with its If-Match optimistic-lock token', async () => {
+    api.updateRoutingPolicy.mockResolvedValue({ ...POLICY, tie_breaker: 'first_available' });
+    render(<SchedulingSetup />);
+    await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: /edit team volunteer_coordinators/i }));
+    await userEvent.selectOptions(screen.getByLabelText('Assignment'), 'first_available');
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(api.updateRoutingPolicy).toHaveBeenCalledTimes(1));
+    expect(api.updateRoutingPolicy).toHaveBeenCalledWith(
+      'rp1',
+      expect.objectContaining({
+        tie_breaker: 'first_available',
+        tag_conditions: [{ operator: 'in_any', values: ['volunteer_coordinators'] }],
+      }),
+      '2026-06-06T00:00:00.000001Z', // ifMatchToken(POLICY)
+    );
+    expect(api.fetchRoutingPolicies).toHaveBeenCalledTimes(2); // initial + reload
   });
 
   it('surfaces a 422 fail-closed unknown-tag error from a team save', async () => {

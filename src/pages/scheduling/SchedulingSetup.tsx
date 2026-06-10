@@ -19,6 +19,7 @@ import {
   createAppointmentType,
   updateAppointmentType,
   createRoutingPolicy,
+  updateRoutingPolicy,
   ifMatchToken,
   SchedulingApiError,
   type AppointmentType,
@@ -68,8 +69,10 @@ export function SchedulingSetup() {
   const [apptForm, setApptForm] = useState<
     (AppointmentTypeWrite & { _id?: string; _ifMatch?: string }) | null
   >(null);
-  // Team form: null = closed.
-  const [teamForm, setTeamForm] = useState<{ tag: string; tie_breaker: 'round_robin' | 'first_available' } | null>(null);
+  // Team form: null = closed; {_id} = editing existing, else creating.
+  const [teamForm, setTeamForm] = useState<
+    { tag: string; tie_breaker: 'round_robin' | 'first_available'; _id?: string; _ifMatch?: string } | null
+  >(null);
 
   const load = useCallback(async (isActive: () => boolean) => {
     // Teams + Appointment Types are admin-only endpoints; members skip them and see
@@ -126,11 +129,13 @@ export function SchedulingSetup() {
     setSaving(true);
     setSaveError(null);
     const tag = teamForm.tag.trim();
+    const body = {
+      tie_breaker: teamForm.tie_breaker,
+      tag_conditions: tag ? [{ operator: 'in_any' as const, values: [tag] }] : [],
+    };
     try {
-      await createRoutingPolicy({
-        tie_breaker: teamForm.tie_breaker,
-        tag_conditions: tag ? [{ operator: 'in_any', values: [tag] }] : [],
-      });
+      if (teamForm._id) await updateRoutingPolicy(teamForm._id, body, teamForm._ifMatch ?? '*');
+      else await createRoutingPolicy(body);
       setTeamForm(null);
       await reload();
     } catch (e) {
@@ -198,8 +203,25 @@ export function SchedulingSetup() {
         <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100 bg-white">
           {policies.map((p) => (
             <li key={p.routing_policy_id} className="flex items-center justify-between px-4 py-2 text-sm">
-              <span className="text-slate-700">{teamLabel(p)}</span>
-              <span className="text-xs text-slate-400">{p.tie_breaker ?? 'round_robin'}</span>
+              <div>
+                <span className="text-slate-700">{teamLabel(p)}</span>
+                <span className="ml-2 text-xs text-slate-400">{p.tie_breaker ?? 'round_robin'}</span>
+              </div>
+              <button
+                onClick={() => {
+                  setTeamForm({
+                    _id: p.routing_policy_id,
+                    _ifMatch: ifMatchToken(p),
+                    tag: p.tag_conditions?.[0]?.values?.[0] ?? '',
+                    tie_breaker: p.tie_breaker ?? 'round_robin',
+                  });
+                  setSaveError(null);
+                }}
+                aria-label={`Edit team ${teamLabel(p)}`}
+                className="text-sm text-primary-600 hover:text-primary-700"
+              >
+                Edit
+              </button>
             </li>
           ))}
         </ul>
@@ -231,7 +253,7 @@ export function SchedulingSetup() {
             </div>
             <div className="flex gap-2">
               <button onClick={saveTeam} disabled={saving} className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg disabled:opacity-50">
-                {saving ? 'Saving…' : 'Save team'}
+                {saving ? 'Saving…' : teamForm._id ? 'Save changes' : 'Save team'}
               </button>
               <button onClick={() => { setTeamForm(null); setSaveError(null); }} className="px-3 py-1.5 text-sm text-slate-500">Cancel</button>
             </div>
