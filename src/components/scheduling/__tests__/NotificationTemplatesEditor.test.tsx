@@ -19,13 +19,17 @@ vi.mock('../../../services/schedulingApi', async () => {
 
 import { NotificationTemplatesEditor } from '../NotificationTemplatesEditor';
 
-const tpl = (over: Partial<{ subject: string; is_override: boolean }> = {}) => ({
+const tpl = (over: Partial<{ subject: string; is_override: boolean; sms_is_override: boolean }> = {}) => ({
   subject: over.subject ?? 'Default subject',
   body_text: 'Hi {{firstName}}',
   body_html: '<p>Hi {{firstName}}</p>',
   is_override: over.is_override ?? false,
   default: { subject: 'Default subject', body_text: 'Hi {{firstName}}', body_html: '<p>Hi {{firstName}}</p>' },
   available_variables: ['{{firstName}}', '{{actionUrl}}'],
+  sms_text: 'Default SMS {{firstName}}',
+  sms_is_override: over.sms_is_override ?? false,
+  sms_default: 'Default SMS {{firstName}}',
+  sms_available_variables: ['{{firstName}}'],
 });
 
 const RESPONSE = {
@@ -35,6 +39,7 @@ const RESPONSE = {
     cancel_notice: { ...tpl({ is_override: true }), available_variables: ['{{firstName}}', '{{rebookText}}', '{{rebookHtml}}'] },
   },
   stop_footer_note: 'An unsubscribe (STOP) line is appended automatically and cannot be removed.',
+  sms_footer_note: 'A STOP/HELP line is appended automatically to every SMS.',
 };
 
 beforeEach(() => api.fetchNotificationTemplates.mockResolvedValue(RESPONSE));
@@ -92,5 +97,54 @@ describe('NotificationTemplatesEditor (E14)', () => {
     await userEvent.click(screen.getByRole('button', { name: /reset to default/i }));
     await waitFor(() => expect(api.updateNotificationTemplate).toHaveBeenCalledTimes(1));
     expect(api.updateNotificationTemplate).toHaveBeenCalledWith('cancel_notice', { subject: '', body_text: '', body_html: '' });
+  });
+
+  it('renders an SMS field per moment with a segment hint + held-delivery note', async () => {
+    render(<NotificationTemplatesEditor />);
+    await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
+    expect(screen.getAllByLabelText('SMS text').length).toBe(3);
+    expect(screen.getAllByText(/segment/i).length).toBe(3);
+    expect(screen.getAllByText(/SMS delivery isn't enabled yet/i).length).toBe(3);
+  });
+
+  it('Save SMS PATCHes only sms_text (never the email fields)', async () => {
+    api.updateNotificationTemplate.mockResolvedValue({ moment: 'reschedule_link', template: tpl({ sms_is_override: true }) });
+    render(<NotificationTemplatesEditor />);
+    await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
+
+    const sms = screen.getAllByLabelText('SMS text')[0];
+    await userEvent.clear(sms);
+    await userEvent.type(sms, 'New SMS copy');
+    await userEvent.click(screen.getAllByRole('button', { name: /^save sms$/i })[0]);
+
+    await waitFor(() => expect(api.updateNotificationTemplate).toHaveBeenCalledTimes(1));
+    expect(api.updateNotificationTemplate).toHaveBeenCalledWith('reschedule_link', { sms_text: 'New SMS copy' });
+  });
+
+  it('email Save never writes the SMS field (no cross-contamination)', async () => {
+    api.updateNotificationTemplate.mockResolvedValue({ moment: 'reschedule_link', template: tpl({ is_override: true }) });
+    render(<NotificationTemplatesEditor />);
+    await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
+
+    await userEvent.click(screen.getAllByRole('button', { name: /^save$/i })[0]);
+    await waitFor(() => expect(api.updateNotificationTemplate).toHaveBeenCalledTimes(1));
+    const [, body] = api.updateNotificationTemplate.mock.calls[0];
+    expect(body).not.toHaveProperty('sms_text');
+    expect(body).toHaveProperty('subject');
+  });
+
+  it('offers Reset SMS only on an SMS override → clears it', async () => {
+    api.fetchNotificationTemplates.mockResolvedValue({
+      ...RESPONSE,
+      moments: { ...RESPONSE.moments, reoffer: tpl({ sms_is_override: true }) },
+    });
+    api.updateNotificationTemplate.mockResolvedValue({ moment: 'reoffer', template: tpl() });
+    render(<NotificationTemplatesEditor />);
+    await waitFor(() => expect(screen.getByText('Reoffer (slot taken)')).toBeInTheDocument());
+
+    const resets = screen.getAllByRole('button', { name: /^reset sms$/i });
+    expect(resets.length).toBe(1);
+    await userEvent.click(resets[0]);
+    await waitFor(() => expect(api.updateNotificationTemplate).toHaveBeenCalledWith('reoffer', { sms_text: '' }));
   });
 });

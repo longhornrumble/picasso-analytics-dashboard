@@ -15,7 +15,13 @@ import {
   type NotificationMoment,
   type MomentTemplate,
   type TemplateCopy,
+  type NotificationTemplateWrite,
 } from '../../services/schedulingApi';
+
+/** The editor's per-moment draft = the editable email copy + the SMS override text. */
+type EditorDraft = TemplateCopy & { sms_text: string };
+
+const SMS_MAX = 480; // §E14 (G7a): ~3 segments; the STOP/HELP footer is appended on top server-side.
 
 const MOMENTS: { id: NotificationMoment; label: string; hint: string }[] = [
   { id: 'reschedule_link', label: 'Reschedule link', hint: 'Sent when a booking can be rescheduled.' },
@@ -28,16 +34,18 @@ function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : 'Something went wrong';
 }
 
-const draftOf = (t: MomentTemplate): TemplateCopy => ({
+const draftOf = (t: MomentTemplate): EditorDraft => ({
   subject: t.subject,
   body_text: t.body_text,
   body_html: t.body_html,
+  sms_text: t.sms_text ?? '',
 });
 
 export function NotificationTemplatesEditor() {
   const [moments, setMoments] = useState<Record<string, MomentTemplate>>({});
   const [stopNote, setStopNote] = useState('');
-  const [drafts, setDrafts] = useState<Record<string, TemplateCopy>>({});
+  const [smsNote, setSmsNote] = useState('');
+  const [drafts, setDrafts] = useState<Record<string, EditorDraft>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -51,7 +59,8 @@ export function NotificationTemplatesEditor() {
       if (!isActive()) return;
       setMoments(data.moments);
       setStopNote(data.stop_footer_note);
-      const d: Record<string, TemplateCopy> = {};
+      setSmsNote(data.sms_footer_note ?? '');
+      const d: Record<string, EditorDraft> = {};
       for (const [k, v] of Object.entries(data.moments)) d[k] = draftOf(v);
       setDrafts(d);
     } catch (e) {
@@ -69,7 +78,7 @@ export function NotificationTemplatesEditor() {
     };
   }, [load]);
 
-  async function persist(moment: NotificationMoment, body: Partial<TemplateCopy>) {
+  async function persist(moment: NotificationMoment, body: NotificationTemplateWrite) {
     setSavingMoment(moment);
     setSaveError(null);
     try {
@@ -113,7 +122,7 @@ export function NotificationTemplatesEditor() {
       {MOMENTS.filter((m) => moments[m.id]).map((m) => {
         const t = moments[m.id];
         const d = drafts[m.id] ?? draftOf(t);
-        const setField = (field: keyof TemplateCopy, value: string) =>
+        const setField = (field: keyof EditorDraft, value: string) =>
           setDrafts((prev) => ({ ...prev, [m.id]: { ...(prev[m.id] ?? draftOf(t)), [field]: value } }));
         const busy = savingMoment === m.id;
         return (
@@ -148,7 +157,7 @@ export function NotificationTemplatesEditor() {
             </p>
 
             <div className="flex gap-2">
-              <button onClick={() => persist(m.id, d)} disabled={busy}
+              <button onClick={() => persist(m.id, { subject: d.subject, body_text: d.body_text, body_html: d.body_html })} disabled={busy}
                 className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg disabled:opacity-50">
                 {busy ? 'Saving…' : 'Save'}
               </button>
@@ -158,6 +167,40 @@ export function NotificationTemplatesEditor() {
                   Reset to default
                 </button>
               )}
+            </div>
+
+            {/* SMS override (§E14 G7a) — EDITOR SURFACE: delivery is held until the SMS sender lands. */}
+            <div className="border-t border-slate-100 pt-3 flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <label htmlFor={`sms-${m.id}`} className="text-xs font-medium text-slate-600">SMS text</label>
+                {t.sms_is_override && (
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-primary-50 text-primary-700">Customized</span>
+                )}
+              </div>
+              <textarea id={`sms-${m.id}`} rows={3} maxLength={SMS_MAX} className={inputCls}
+                value={d.sms_text} onChange={(e) => setField('sms_text', e.target.value)} />
+              <p className="text-[11px] text-slate-400">
+                {d.sms_text.length}/{SMS_MAX} · ~{Math.max(1, Math.ceil(d.sms_text.length / 160))} segment{d.sms_text.length > 160 ? 's' : ''}
+                {t.sms_available_variables?.length ? (
+                  <> · vars: {t.sms_available_variables.map((v) => (
+                    <code key={v} className="bg-slate-100 rounded px-1 mx-0.5">{v}</code>
+                  ))}</>
+                ) : null}
+              </p>
+              {smsNote && <p className="text-[11px] text-slate-400">{smsNote}</p>}
+              <p className="text-[11px] text-amber-600">SMS delivery isn't enabled yet — saved copy applies once it goes live.</p>
+              <div className="flex gap-2 mt-1">
+                <button onClick={() => persist(m.id, { sms_text: d.sms_text })} disabled={busy}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg disabled:opacity-50">
+                  {busy ? 'Saving…' : 'Save SMS'}
+                </button>
+                {t.sms_is_override && (
+                  <button onClick={() => persist(m.id, { sms_text: '' })} disabled={busy}
+                    className="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700">
+                    Reset SMS
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         );

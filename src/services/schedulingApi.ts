@@ -365,35 +365,52 @@ export interface TemplateCopy {
 }
 
 export interface MomentTemplate extends TemplateCopy {
-  /** True when this tenant has overridden any field (else the platform default shows). */
+  /** True when this tenant has overridden any EMAIL field (else the platform default shows). */
   is_override: boolean;
-  /** The reset target — platform default copy. */
+  /** The reset target — platform default email copy. */
   default: TemplateCopy;
   modified_at?: ModifiedAt;
   /** Variables usable in THIS moment, e.g. {{firstName}}, {{actionUrl}} (per-moment). */
   available_variables: string[];
+  // §E14 SMS surface (G7a / lambda#271) — editor surface only; the actual SMS SEND stays
+  // HELD until the SMS_Sender twin + WS-E-TCPA. Additive; readers tolerate absence.
+  /** Effective SMS copy (override-or-default). */
+  sms_text?: string;
+  sms_is_override?: boolean;
+  sms_default?: string;
+  /** Plain-text variables valid for the SMS body (no html-only vars). */
+  sms_available_variables?: string[];
 }
 
 export interface NotificationTemplatesResponse {
   moments: Record<string, MomentTemplate>;
-  /** Read-only compliance note — STOP/unsubscribe is appended automatically, not editable. */
+  /** Read-only compliance note — STOP/unsubscribe is appended automatically, not editable (email). */
   stop_footer_note: string;
+  /** Read-only compliance note for SMS — the TCPA STOP/HELP footer is appended automatically. */
+  sms_footer_note?: string;
 }
+
+/** PATCH body: any subset of the email copy + the SMS override; empty string clears that field. */
+export type NotificationTemplateWrite = Partial<TemplateCopy> & { sms_text?: string };
 
 export async function fetchNotificationTemplates(): Promise<NotificationTemplatesResponse> {
   const data = await schedulingGet<NotificationTemplatesResponse>(
     '/scheduling/notification-templates',
   );
-  return { moments: data.moments ?? {}, stop_footer_note: data.stop_footer_note ?? '' };
+  return {
+    moments: data.moments ?? {},
+    stop_footer_note: data.stop_footer_note ?? '',
+    sms_footer_note: data.sms_footer_note ?? '',
+  };
 }
 
 /**
- * Upsert-merge one moment's copy. Send any subset of {subject, body_text, body_html};
+ * Upsert-merge one moment's copy. Send any subset of {subject, body_text, body_html, sms_text};
  * an empty-string field CLEARS that override back to the platform default. Unknown moment → 404.
  */
 export async function updateNotificationTemplate(
   moment: NotificationMoment,
-  body: Partial<TemplateCopy>,
+  body: NotificationTemplateWrite,
 ): Promise<{ moment: string; template: MomentTemplate }> {
   return schedulingWrite(
     'PATCH',
