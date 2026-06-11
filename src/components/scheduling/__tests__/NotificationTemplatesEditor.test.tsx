@@ -186,3 +186,32 @@ describe('NotificationTemplatesEditor (E14)', () => {
     await waitFor(() => expect(api.updateNotificationTemplate).toHaveBeenCalledWith('reoffer', { sms_text: '' }));
   });
 });
+
+// ─── S4d: the S4 moments (reminder_24h / reminder_1h / confirmation) ──────────────────
+
+describe('S4 moments', () => {
+  it('renders the reminder + confirmation editors when the API returns them', async () => {
+    api.fetchNotificationTemplates.mockResolvedValue({
+      ...RESPONSE,
+      moments: {
+        ...RESPONSE.moments,
+        reminder_24h: tpl(),
+        reminder_1h: tpl(),
+        confirmation: tpl(),
+      },
+    });
+    render(<NotificationTemplatesEditor />);
+    expect(await screen.findByText('Reminder (24 hours)')).toBeInTheDocument();
+    expect(screen.getByText('Reminder (1 hour)')).toBeInTheDocument();
+    expect(screen.getByText('Booking confirmation')).toBeInTheDocument();
+    // The confirmation hint carries the can't-remove-links invariant for the admin:
+    expect(screen.getByText(/calendar invite \(\.ics\)/)).toBeInTheDocument();
+  });
+
+  it('stays graceful against an older ADA that does not return the S4 moments', async () => {
+    render(<NotificationTemplatesEditor />); // RESPONSE has only the 3 v1 moments
+    expect(await screen.findByText('Reschedule link')).toBeInTheDocument();
+    expect(screen.queryByText('Reminder (24 hours)')).toBeNull();
+    expect(screen.queryByText('Booking confirmation')).toBeNull();
+  });
+});

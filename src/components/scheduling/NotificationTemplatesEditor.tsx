@@ -6,6 +6,12 @@
  * + body_html, upsert-merge via PATCH; clearing a field (empty) resets it to the platform
  * default. The STOP/unsubscribe line is appended automatically by notify.js and is NOT
  * editable (stop_footer_note shown read-only). Variables are per-moment.
+ *
+ * S4 moments (§E14 S4a vocab): reminder_24h · reminder_1h (dispatched by
+ * Scheduled_Message_Sender at fire time, S4b) · confirmation (Booking_Commit_Handler at
+ * commit, S4c — the .ics + cancel/reschedule/join links are appended OUTSIDE the editable
+ * body and cannot be removed by an override). Each moment renders only when the API
+ * returns it, so this stays graceful against an older ADA.
  */
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -27,6 +33,13 @@ const MOMENTS: { id: NotificationMoment; label: string; hint: string }[] = [
   { id: 'reschedule_link', label: 'Reschedule link', hint: 'Sent when a booking can be rescheduled.' },
   { id: 'reoffer', label: 'Reoffer (slot taken)', hint: 'Sent when the chosen time is no longer available.' },
   { id: 'cancel_notice', label: 'Cancellation notice', hint: 'Sent when a booking is canceled.' },
+  { id: 'reminder_24h', label: 'Reminder (24 hours)', hint: 'Sent the day before the appointment.' },
+  { id: 'reminder_1h', label: 'Reminder (1 hour)', hint: 'Sent about an hour before the appointment.' },
+  {
+    id: 'confirmation',
+    label: 'Booking confirmation',
+    hint: 'Sent right after a booking is confirmed. The calendar invite (.ics) and the cancel/reschedule/join links are always included automatically and cannot be removed.',
+  },
 ];
 
 function errMessage(e: unknown): string {

@@ -355,7 +355,13 @@ export async function updateEmployeeScheduling(
 // ===========================================================================
 
 /** The 3 v1 lifecycle moments that dispatch a full subject+body (§E14). */
-export type NotificationMoment = 'reschedule_link' | 'reoffer' | 'cancel_notice';
+export type NotificationMoment =
+  | 'reschedule_link'
+  | 'reoffer'
+  | 'cancel_notice'
+  | 'reminder_24h'
+  | 'reminder_1h'
+  | 'confirmation';
 
 /** The editable copy fields. */
 export interface TemplateCopy {
