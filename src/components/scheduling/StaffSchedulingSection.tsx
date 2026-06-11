@@ -165,7 +165,21 @@ export function StaffSchedulingSection() {
           )}
           {meWarning && (
             <p className="text-xs text-amber-600" role="status">
-              ⚠ {meWarning}
+              ⚠{' '}
+              {meWarning === 'Connect calendar to be bookable' ? (
+                <>
+                  {meWarning}.{' '}
+                  <a
+                    href="?settings_tab=calendar"
+                    className="underline hover:text-amber-700 focus:outline-none focus:ring-1 focus:ring-amber-500 rounded"
+                    aria-label="Go to Calendar settings to connect your calendar"
+                  >
+                    Go to Calendar settings
+                  </a>
+                </>
+              ) : (
+                meWarning
+              )}
             </p>
           )}
           <div>
@@ -238,7 +252,23 @@ export function StaffSchedulingSection() {
                     {m.bookable_override === 'off' && <span className="ml-2 text-amber-600">· Booking paused</span>}
                   </p>
                   {warning && (
-                    <p className="text-xs text-amber-600 mt-0.5">⚠ {warning}</p>
+                    <p className="text-xs text-amber-600 mt-0.5">
+                      ⚠{' '}
+                      {warning === 'Connect calendar to be bookable' ? (
+                        <>
+                          {warning}.{' '}
+                          <a
+                            href="?settings_tab=calendar"
+                            className="underline hover:text-amber-700 focus:outline-none focus:ring-1 focus:ring-amber-500 rounded"
+                            aria-label={`Go to Calendar settings to connect calendar for ${m.name || m.email}`}
+                          >
+                            Go to Calendar settings
+                          </a>
+                        </>
+                      ) : (
+                        warning
+                      )}
+                    </p>
                   )}
                 </div>
                 {!editing && (

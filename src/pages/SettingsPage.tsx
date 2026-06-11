@@ -11,9 +11,10 @@ import { TeamManagement } from './TeamManagement';
 import { NotificationPreferences } from './NotificationPreferences';
 import { SchedulingSetup } from './scheduling/SchedulingSetup';
 import AdminPanel from './AdminPanel';
+import { CalendarConnection } from '../components/scheduling/CalendarConnection';
 import type { DashboardFeatures } from '../types/analytics';
 
-type SettingsSubTab = 'notifications' | 'team' | 'preferences' | 'scheduling' | 'admin';
+type SettingsSubTab = 'notifications' | 'team' | 'preferences' | 'scheduling' | 'calendar' | 'admin';
 
 const DEFAULT_FEATURES: DashboardFeatures = {
   dashboard_conversations: true,
@@ -27,9 +28,14 @@ const DEFAULT_FEATURES: DashboardFeatures = {
 export function SettingsPage() {
   const { user } = useAuth();
   const features = user?.features || DEFAULT_FEATURES;
-  const [activeSubTab, setActiveSubTab] = useState<SettingsSubTab>(
-    features.dashboard_notifications ? 'notifications' : 'team'
-  );
+  // Support direct-link to the Calendar sub-tab from the E13 "Connect calendar" CTA
+  // (staffStatus warning appends ?settings_tab=calendar when routing here).
+  const initialTab = ((): SettingsSubTab => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('settings_tab') === 'calendar') return 'calendar';
+    return features.dashboard_notifications ? 'notifications' : 'team';
+  })();
+  const [activeSubTab, setActiveSubTab] = useState<SettingsSubTab>(initialTab);
 
   const subTabs: { id: SettingsSubTab; label: string; available: boolean }[] = [
     {
@@ -53,6 +59,13 @@ export function SettingsPage() {
       // Entitled tenants only (D1 Flag A). Visible to ALL entitled users: admins get the
       // Teams/Appointment-Types config + staff roster; members get only their own calendar-
       // email self-edit (E13c §8 matrix). Per-field auth is server-enforced regardless.
+      available: features.dashboard_scheduling,
+    },
+    {
+      id: 'calendar' as SettingsSubTab,
+      label: 'Calendar',
+      // Track 2 Surface 1: per-staff calendar connection (OAuth). Gated on the same
+      // dashboard_scheduling flag — only entitled tenants see this tab.
       available: features.dashboard_scheduling,
     },
     {
@@ -106,6 +119,10 @@ export function SettingsPage() {
 
       {activeSubTab === 'scheduling' && features.dashboard_scheduling && (
         <SchedulingSetup />
+      )}
+
+      {activeSubTab === 'calendar' && features.dashboard_scheduling && (
+        <CalendarConnection />
       )}
 
       {activeSubTab === 'admin' && user?.role === 'super_admin' && (
