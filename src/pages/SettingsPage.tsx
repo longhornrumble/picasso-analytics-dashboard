@@ -4,7 +4,7 @@
  * Profile management handled by Clerk's UserButton modal
  */
 
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/useAuth';
 import { NotificationsDashboard } from './NotificationsDashboard';
 import { TeamManagement } from './TeamManagement';
@@ -44,11 +44,9 @@ export function SettingsPage() {
   const [activeSubTab, setActiveSubTab] = useState<SettingsSubTab>(initialTab);
 
   // Strip the consumed `settings_tab` param so it doesn't survive tab switches.
-  // Called once after the initial render — cannot be in the initialTab IIFE because
-  // replaceState is a side effect (not safe in a pure initializer).
-  const settingsTabStripped = useRef(false);
-  if (!settingsTabStripped.current) {
-    settingsTabStripped.current = true;
+  // Runs once after mount — replaceState is a side effect, so it can't live in the
+  // initialTab IIFE (pure initializer) or the render body (refs/effects during render).
+  useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.has('settings_tab')) {
       p.delete('settings_tab');
@@ -58,7 +56,7 @@ export function SettingsPage() {
         : `${window.location.pathname}${window.location.hash}`;
       window.history.replaceState({}, '', newUrl);
     }
-  }
+  }, []);
 
   const subTabs: { id: SettingsSubTab; label: string; available: boolean }[] = [
     {

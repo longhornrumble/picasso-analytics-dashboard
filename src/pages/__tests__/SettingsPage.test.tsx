@@ -9,7 +9,6 @@
  */
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
-import { SchedulingApiError } from '../../services/schedulingApi';
 
 // ── Heavy child mocks ─────────────────────────────────────────────────────────
 // Most children are non-trivial (fetch, auth, etc.) — stub them out so

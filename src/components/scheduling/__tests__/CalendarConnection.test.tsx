@@ -359,14 +359,6 @@ const MEMBER_ON_TEAM_NO_CAL = {
   joined_at: '2026-01-01',
 };
 
-const ADMIN_NO_CAL = {
-  ...MEMBER_ON_TEAM_NO_CAL,
-  employee_id: 'e2',
-  email: 'admin@example.com',
-  name: 'Admin',
-  role: 'admin' as const,
-};
-
 // item 7: member self-view keeps the CTA link
 // The top-level vi.mock for useAuth returns jordan@example.com/member, which
 // matches MEMBER_ON_TEAM_NO_CAL — so the self-view path renders.
