@@ -18,6 +18,13 @@ env:
   NODE_VERSION: '22'
   AWS_REGION: 'us-east-1'
 
+# Serialize runs (picasso Phase-2 audit D1): two simultaneous dispatches
+# would race the live-bucket sync (--delete) and the prev-release lookup
+# in the reusable. Queue behind a mid-flight run, never cancel it.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   lint:
     name: Code Quality - Linting
@@ -101,7 +108,12 @@ jobs:
     # Shared deploy mechanics incl. the immutable releases/<sha>/ rollback
     # copy (Phase 2.2) — rollback = re-sync a prior release prefix (exact
     # command in the run summary).
-    uses: longhornrumble/picasso/.github/workflows/deploy-frontend.yml@main
+    # SHA-pinned (picasso Phase-2 audit D8): @main meant any reusable change
+    # could startup_failure this workflow with no warning in THIS repo (the
+    # picasso#494 class). Bump deliberately to adopt reusable changes.
+    # Current pin = picasso#520 (audit hardening: smoke retries, archive
+    # cache-control, input env-indirection).
+    uses: longhornrumble/picasso/.github/workflows/deploy-frontend.yml@643e0d83cb9d625554652533e2be6176c202761d
     with:
       environment: production
       artifact_name: dashboard-build

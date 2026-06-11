@@ -107,7 +107,9 @@ jobs:
     # Shared deploy mechanics (sync → invalidate → smoke → PR comment) live
     # in the reusable workflow — CI-modernization Phase 2.1. Quality gates
     # stay in this repo.
-    uses: longhornrumble/picasso/.github/workflows/deploy-frontend.yml@main
+    # SHA-pinned (picasso Phase-2 audit D8) — keep in sync with the pin in
+    # deploy-production.yml; bump both deliberately to adopt reusable changes.
+    uses: longhornrumble/picasso/.github/workflows/deploy-frontend.yml@643e0d83cb9d625554652533e2be6176c202761d
     with:
       environment: staging
       artifact_name: dashboard-build
