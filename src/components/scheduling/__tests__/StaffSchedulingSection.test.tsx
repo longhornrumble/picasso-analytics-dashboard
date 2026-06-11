@@ -128,6 +128,36 @@ describe('StaffSchedulingSection — admin', () => {
   });
 });
 
+// item 7 (audit fix-list): admin roster shows the warning TEXT but NO link
+// (linking the admin to their own calendar page from another staff member's row
+//  would be misleading — the audit mandated removal).
+describe('StaffSchedulingSection — admin roster CTA link removal (item 7)', () => {
+  beforeEach(() => {
+    mockUser.mockReturnValue({ role: 'admin', email: 'admin@x' });
+    api.fetchTagVocabulary.mockResolvedValue([]);
+  });
+
+  it('admin roster: warning text present but no "Go to Calendar settings" link', async () => {
+    api.fetchTeamMembers.mockResolvedValue({
+      members: [
+        {
+          ...base, employee_id: 'c1', email: 'staff@x', name: 'NoCalStaff',
+          role: 'member' as const, scheduling_tags: ['volunteer_coordinators'],
+          bookable_override: null, calendar_email_override: null,
+          calendar_connected: false,
+        },
+      ],
+      admin_count: 1, total: 1, can_edit: true,
+    });
+    render(<StaffSchedulingSection />);
+    await waitFor(() => expect(screen.getByText('NoCalStaff')).toBeInTheDocument());
+    // Warning text appears
+    expect(screen.getByText(/Connect calendar to be bookable/i)).toBeInTheDocument();
+    // No Calendar settings link — admin roster deliberately omits it
+    expect(screen.queryByRole('link', { name: /go to calendar settings/i })).toBeNull();
+  });
+});
+
 describe('StaffSchedulingSection — member (self-service)', () => {
   beforeEach(() => mockUser.mockReturnValue({ role: 'member', email: 'maya@x' }));
 

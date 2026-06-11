@@ -165,7 +165,21 @@ export function StaffSchedulingSection() {
           )}
           {meWarning && (
             <p className="text-xs text-amber-600" role="status">
-              ⚠ {meWarning}
+              ⚠{' '}
+              {meWarning === 'Connect calendar to be bookable' ? (
+                <>
+                  {meWarning}.{' '}
+                  <a
+                    href="?settings_tab=calendar"
+                    className="underline hover:text-amber-700 focus:outline-none focus:ring-1 focus:ring-amber-500 rounded"
+                    aria-label="Go to Calendar settings to connect your calendar"
+                  >
+                    Go to Calendar settings
+                  </a>
+                </>
+              ) : (
+                meWarning
+              )}
             </p>
           )}
           <div>
@@ -238,7 +252,13 @@ export function StaffSchedulingSection() {
                     {m.bookable_override === 'off' && <span className="ml-2 text-amber-600">· Booking paused</span>}
                   </p>
                   {warning && (
-                    <p className="text-xs text-amber-600 mt-0.5">⚠ {warning}</p>
+                    <p className="text-xs text-amber-600 mt-0.5">
+                      ⚠{' '}
+                      {/* Admin roster: show the warning TEXT only — no link, because the
+                          admin's own calendar page is at this URL and linking there from
+                          another staff member's row would be misleading. */}
+                      {warning}
+                    </p>
                   )}
                 </div>
                 {!editing && (

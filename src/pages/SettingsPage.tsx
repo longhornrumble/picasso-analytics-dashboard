@@ -4,16 +4,17 @@
  * Profile management handled by Clerk's UserButton modal
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/useAuth';
 import { NotificationsDashboard } from './NotificationsDashboard';
 import { TeamManagement } from './TeamManagement';
 import { NotificationPreferences } from './NotificationPreferences';
 import { SchedulingSetup } from './scheduling/SchedulingSetup';
 import AdminPanel from './AdminPanel';
+import { CalendarConnection } from '../components/scheduling/CalendarConnection';
 import type { DashboardFeatures } from '../types/analytics';
 
-type SettingsSubTab = 'notifications' | 'team' | 'preferences' | 'scheduling' | 'admin';
+type SettingsSubTab = 'notifications' | 'team' | 'preferences' | 'scheduling' | 'calendar' | 'admin';
 
 const DEFAULT_FEATURES: DashboardFeatures = {
   dashboard_conversations: true,
@@ -27,9 +28,35 @@ const DEFAULT_FEATURES: DashboardFeatures = {
 export function SettingsPage() {
   const { user } = useAuth();
   const features = user?.features || DEFAULT_FEATURES;
-  const [activeSubTab, setActiveSubTab] = useState<SettingsSubTab>(
-    features.dashboard_notifications ? 'notifications' : 'team'
-  );
+  // Support direct-link to the Calendar sub-tab from the E13 "Connect calendar" CTA
+  // (staffStatus warning appends ?settings_tab=calendar when routing here).
+  // NOTE: This SPA has no router — query-param full-load IS its deep-link mechanism.
+  // `settings_tab` is consumed once on mount; we immediately strip it with replaceState
+  // so it doesn't persist across subsequent tab changes (mirrors CalendarConnection's
+  // ?calendar=connected stripping).
+  const initialTab = ((): SettingsSubTab => {
+    const p = new URLSearchParams(window.location.search);
+    // Only resolve to calendar tab when the feature is entitled; un-entitled users
+    // fall through to the default tab (no blank pane).
+    if (p.get('settings_tab') === 'calendar' && features.dashboard_scheduling) return 'calendar';
+    return features.dashboard_notifications ? 'notifications' : 'team';
+  })();
+  const [activeSubTab, setActiveSubTab] = useState<SettingsSubTab>(initialTab);
+
+  // Strip the consumed `settings_tab` param so it doesn't survive tab switches.
+  // Runs once after mount — replaceState is a side effect, so it can't live in the
+  // initialTab IIFE (pure initializer) or the render body (refs/effects during render).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.has('settings_tab')) {
+      p.delete('settings_tab');
+      const newSearch = p.toString();
+      const newUrl = newSearch
+        ? `${window.location.pathname}?${newSearch}${window.location.hash}`
+        : `${window.location.pathname}${window.location.hash}`;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
 
   const subTabs: { id: SettingsSubTab; label: string; available: boolean }[] = [
     {
@@ -53,6 +80,13 @@ export function SettingsPage() {
       // Entitled tenants only (D1 Flag A). Visible to ALL entitled users: admins get the
       // Teams/Appointment-Types config + staff roster; members get only their own calendar-
       // email self-edit (E13c §8 matrix). Per-field auth is server-enforced regardless.
+      available: features.dashboard_scheduling,
+    },
+    {
+      id: 'calendar' as SettingsSubTab,
+      label: 'Calendar',
+      // Track 2 Surface 1: per-staff calendar connection (OAuth). Gated on the same
+      // dashboard_scheduling flag — only entitled tenants see this tab.
       available: features.dashboard_scheduling,
     },
     {
@@ -106,6 +140,10 @@ export function SettingsPage() {
 
       {activeSubTab === 'scheduling' && features.dashboard_scheduling && (
         <SchedulingSetup />
+      )}
+
+      {activeSubTab === 'calendar' && features.dashboard_scheduling && (
+        <CalendarConnection />
       )}
 
       {activeSubTab === 'admin' && user?.role === 'super_admin' && (
