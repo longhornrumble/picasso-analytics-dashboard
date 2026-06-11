@@ -4,7 +4,7 @@
  * Profile management handled by Clerk's UserButton modal
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth } from '../context/useAuth';
 import { NotificationsDashboard } from './NotificationsDashboard';
 import { TeamManagement } from './TeamManagement';
@@ -30,12 +30,35 @@ export function SettingsPage() {
   const features = user?.features || DEFAULT_FEATURES;
   // Support direct-link to the Calendar sub-tab from the E13 "Connect calendar" CTA
   // (staffStatus warning appends ?settings_tab=calendar when routing here).
+  // NOTE: This SPA has no router — query-param full-load IS its deep-link mechanism.
+  // `settings_tab` is consumed once on mount; we immediately strip it with replaceState
+  // so it doesn't persist across subsequent tab changes (mirrors CalendarConnection's
+  // ?calendar=connected stripping).
   const initialTab = ((): SettingsSubTab => {
     const p = new URLSearchParams(window.location.search);
-    if (p.get('settings_tab') === 'calendar') return 'calendar';
+    // Only resolve to calendar tab when the feature is entitled; un-entitled users
+    // fall through to the default tab (no blank pane).
+    if (p.get('settings_tab') === 'calendar' && features.dashboard_scheduling) return 'calendar';
     return features.dashboard_notifications ? 'notifications' : 'team';
   })();
   const [activeSubTab, setActiveSubTab] = useState<SettingsSubTab>(initialTab);
+
+  // Strip the consumed `settings_tab` param so it doesn't survive tab switches.
+  // Called once after the initial render — cannot be in the initialTab IIFE because
+  // replaceState is a side effect (not safe in a pure initializer).
+  const settingsTabStripped = useRef(false);
+  if (!settingsTabStripped.current) {
+    settingsTabStripped.current = true;
+    const p = new URLSearchParams(window.location.search);
+    if (p.has('settings_tab')) {
+      p.delete('settings_tab');
+      const newSearch = p.toString();
+      const newUrl = newSearch
+        ? `${window.location.pathname}?${newSearch}${window.location.hash}`
+        : `${window.location.pathname}${window.location.hash}`;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }
 
   const subTabs: { id: SettingsSubTab; label: string; available: boolean }[] = [
     {

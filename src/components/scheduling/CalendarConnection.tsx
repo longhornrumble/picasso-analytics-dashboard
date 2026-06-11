@@ -5,14 +5,18 @@
  * stale_connected) and provides a Connect / Reconnect button that initiates the OAuth flow.
  *
  * FLOW:
- *   1. On mount: call GET /scheduling/connection/init (Clerk-authed, via ADA).
- *      On success, immediately call GET <status_url> (plain fetch, init token = auth) to render
- *      current state. Store status_url + connect_url for reuse during the session.
- *   2. Connect / Reconnect button: navigate the browser to connect_url (full-page navigation,
- *      NOT fetch — the OAuth flow 302s to Google consent; a fetch would be blocked by CORS).
- *   3. On return from OAuth: read ?calendar=connected&watch=ok|pending query params from the
- *      current URL, show a success banner, then re-init + re-fetch status to confirm.
- *   4. Fallback: if init fails (e.g. 401, 500) show an inline error with a Retry button.
+ *   1. On mount: call GET /scheduling/connection/init (Clerk-authed, via ADA) to obtain
+ *      `status_url` for the status display.  The init response is stored only for that
+ *      purpose — the connect_url from it is intentionally NOT cached for the Connect button
+ *      (see item 1 below).
+ *   2. Connect / Reconnect button: mints a FRESH init token at click time (TTL 300 s; the
+ *      cached token from mount may have already expired while the user reads the page), then
+ *      calls `window.location.replace(freshUrl)` — replace, not href, so the token-bearing
+ *      URL never enters back-button history. The "Connecting…" label is shown during the mint.
+ *   3. On return from OAuth: reads ?calendar=connected&watch=ok|pending from the current URL
+ *      (parsed once at module load, before any state is set), strips them via replaceState
+ *      FIRST, then shows a success banner and re-inits + re-fetches status to confirm.
+ *   4. Fallback: if init fails (e.g. 401, 500) shows an inline error with a Retry button.
  *
  * OUT OF SCOPE (v1): Disconnect (no backend route), secondary calendars, timezone editing.
  */
@@ -36,17 +40,6 @@ function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : 'Something went wrong';
 }
 
-/** Read ?calendar= and ?watch= from a URL search string. */
-function parseOAuthReturn(search: string): { isReturn: boolean; watchOk: boolean } {
-  const params = new URLSearchParams(search);
-  const calendar = params.get('calendar');
-  const watch = params.get('watch');
-  return {
-    isReturn: calendar === 'connected',
-    watchOk: watch === 'ok',
-  };
-}
-
 /** Human-readable label for a connection status. */
 function statusLabel(status: CalendarConnectionStatusResponse['status']): string {
   switch (status) {
@@ -59,6 +52,17 @@ function statusLabel(status: CalendarConnectionStatusResponse['status']): string
   }
 }
 
+/** Read ?calendar= and ?watch= from a URL search string. */
+function parseOAuthReturn(search: string): { isReturn: boolean; watchOk: boolean } {
+  const params = new URLSearchParams(search);
+  const calendar = params.get('calendar');
+  const watch = params.get('watch');
+  return {
+    isReturn: calendar === 'connected',
+    watchOk: watch === 'ok',
+  };
+}
+
 // ─── component ──────────────────────────────────────────────────────────────
 
 type LoadState = 'loading' | 'error' | 'ready';
@@ -66,12 +70,12 @@ type LoadState = 'loading' | 'error' | 'ready';
 interface State {
   load: LoadState;
   loadError: string | null;
-  /** Cached init response (connect_url + status_url) for the session. */
+  /** Cached init response — used only for `status_url` (not `connect_url`). */
   init: CalendarConnectionInitResponse | null;
   status: CalendarConnectionStatusResponse | null;
-  /** True when connecting is in progress (button clicked, navigating away). */
+  /** True when minting a fresh init token + navigating away. */
   connecting: boolean;
-  /** Set after a successful OAuth return — cleared on next status refresh. */
+  /** Set after a successful OAuth return; cleared when the user clicks Retry. */
   oauthBanner: { watchOk: boolean } | null;
 }
 
@@ -86,17 +90,29 @@ const INITIAL: State = {
 
 export function CalendarConnection() {
   const [state, setState] = useState<State>(INITIAL);
-  const mountedRef = useRef(true);
+  // Parse the OAuth return params once — using a ref so the value is stable across
+  // renders and StrictMode double-invocations.  We read window.location.search at
+  // component creation time (inside useState's lazy initializer would also work,
+  // but useRef is cleaner and doesn't require a separate state update).
+  const oauthReturnRef = useRef<{ isReturn: boolean; watchOk: boolean } | null>(null);
+  if (oauthReturnRef.current === null) {
+    oauthReturnRef.current = parseOAuthReturn(window.location.search);
+  }
+  const oauthReturn = oauthReturnRef.current;
 
-  // Detect an OAuth return from the query string (once, on mount).
-  const oauthReturn = parseOAuthReturn(window.location.search);
-
-  const initAndFetch = useCallback(async () => {
-    if (!mountedRef.current) return;
+  /**
+   * initAndFetch: mint a fresh init token + fetch current status.
+   * The per-invocation `ignore` flag (closure boolean set in cleanup) prevents
+   * stale async results from landing after unmount or a concurrent re-invocation.
+   * We do NOT use a shared mountedRef — that is reset to true at the TOP of the
+   * effect which means a StrictMode double-fire would flip it back to true before
+   * the first async task resolves, making the guard useless.
+   */
+  const initAndFetch = useCallback(async (ignore: { current: boolean }) => {
     setState((s) => ({ ...s, load: 'loading', loadError: null }));
     try {
       const initResp = await initCalendarConnection();
-      if (!mountedRef.current) return;
+      if (ignore.current) return;
 
       let statusResp: CalendarConnectionStatusResponse | null = null;
       try {
@@ -106,7 +122,7 @@ export function CalendarConnection() {
         // Treat as disconnected so the Connect button is available.
         statusResp = { status: 'disconnected', bookable: false };
       }
-      if (!mountedRef.current) return;
+      if (ignore.current) return;
       setState((s) => ({
         ...s,
         load: 'ready',
@@ -115,33 +131,69 @@ export function CalendarConnection() {
         // Preserve any OAuth banner set before the re-fetch.
       }));
     } catch (e) {
-      if (!mountedRef.current) return;
+      if (ignore.current) return;
       setState((s) => ({ ...s, load: 'error', loadError: errMessage(e) }));
     }
   }, []);
 
+  // Stable ref so Retry can call the latest version without re-running the effect.
+  const initAndFetchRef = useRef(initAndFetch);
+  initAndFetchRef.current = initAndFetch;
+
+  // Guard: ensures the OAuth-param stripping + banner-set runs exactly once,
+  // even when StrictMode fires the effect twice (mount → unmount → mount).
+  const oauthHandledRef = useRef(false);
+
   useEffect(() => {
-    mountedRef.current = true;
-    // If we're returning from an OAuth flow, set the banner before fetching status.
-    if (oauthReturn.isReturn) {
+    // Strip OAuth return params FIRST (before the async fetch), once per mount
+    // sequence.  The ref guard prevents StrictMode's second invocation from
+    // calling replaceState twice or setting the banner twice.
+    if (oauthReturn.isReturn && !oauthHandledRef.current) {
+      oauthHandledRef.current = true;
       setState((s) => ({ ...s, oauthBanner: { watchOk: oauthReturn.watchOk } }));
-      // Remove the query params from the URL without a page reload.
       const url = new URL(window.location.href);
       url.searchParams.delete('calendar');
       url.searchParams.delete('watch');
       window.history.replaceState({}, '', url.toString());
     }
-    initAndFetch();
-    return () => {
-      mountedRef.current = false;
-    };
-  }, [initAndFetch, oauthReturn.isReturn, oauthReturn.watchOk]);
 
-  function handleConnect() {
-    if (!state.init?.connect_url) return;
+    // Per-invocation ignore flag — guards the async path against StrictMode
+    // double-fire and normal unmount races.
+    const ignore = { current: false };
+    initAndFetchRef.current(ignore);
+    return () => {
+      ignore.current = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — runs once per mount; oauthReturn is stable via ref
+
+  /** Retry: re-run initAndFetch with a fresh ignore ref; also clear the oauthBanner. */
+  function handleRetry() {
+    // Clear oauthBanner on retry so a stale banner from a failed OAuth return
+    // doesn't persist after the user manually retries.
+    setState((s) => ({ ...s, oauthBanner: null }));
+    const ignore = { current: false };
+    initAndFetch(ignore);
+  }
+
+  /**
+   * Connect / Reconnect: mints a FRESH init token at click time.
+   * The mount-time token (TTL 300 s) may have expired while the user read the page;
+   * using a stale connect_url would send the user to an already-expired OAuth entry
+   * point. Minting fresh here closes that window.
+   * Uses `window.location.replace` (not `.href = ...`) so the token-bearing URL is
+   * NOT pushed into browser history.
+   */
+  async function handleConnect() {
     setState((s) => ({ ...s, connecting: true }));
-    // Full-page navigation — the OAuth server 302s to Google consent.
-    window.location.href = state.init.connect_url;
+    try {
+      const freshInit = await initCalendarConnection();
+      window.location.replace(freshInit.connect_url);
+    } catch (e) {
+      // Mint failed (e.g. network error, 401): surface it as a load error so the
+      // user can see what went wrong and retry.
+      setState((s) => ({ ...s, connecting: false, load: 'error', loadError: errMessage(e) }));
+    }
   }
 
   // ─── render states ────────────────────────────────────────────────────────
@@ -167,7 +219,7 @@ export function CalendarConnection() {
           {state.loadError ?? 'Could not load calendar connection status.'}
         </p>
         <button
-          onClick={initAndFetch}
+          onClick={handleRetry}
           className="self-start px-3 py-1.5 text-sm font-medium text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
         >
           Retry
@@ -176,9 +228,14 @@ export function CalendarConnection() {
     );
   }
 
-  const { status, init, connecting, oauthBanner } = state;
+  const { status, connecting, oauthBanner } = state;
   const isConnected = status?.status === 'connected';
   const isStale = status?.status === 'stale_connected';
+
+  // Scopes: filter to strings and join (item 8 — guard against non-string entries).
+  const scopesStr = (status?.scopes ?? [])
+    .filter((s): s is string => typeof s === 'string')
+    .join(', ');
 
   return (
     <section aria-label="Calendar connection" className="flex flex-col gap-4">
@@ -189,7 +246,7 @@ export function CalendarConnection() {
         </p>
       </div>
 
-      {/* OAuth return success banner */}
+      {/* OAuth return success banner — persists until the user navigates away */}
       {oauthBanner && (
         <div
           className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700"
@@ -226,7 +283,7 @@ export function CalendarConnection() {
           )}
         </div>
 
-        {/* Connected detail */}
+        {/* Connected detail — only rendered when calendar_id is present */}
         {isConnected && status?.calendar_id && (
           <div className="flex flex-col gap-1">
             <p className="text-xs text-slate-500">
@@ -237,10 +294,10 @@ export function CalendarConnection() {
           </div>
         )}
 
-        {/* Connect / Reconnect button */}
+        {/* Connect / Reconnect button — stale_connected shows "Connect" (not "Reconnect") */}
         <button
           onClick={handleConnect}
-          disabled={connecting || !init?.connect_url}
+          disabled={connecting}
           aria-label={isConnected ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
           className={[
             'self-start px-4 py-2 text-sm font-medium rounded-lg',
@@ -251,13 +308,13 @@ export function CalendarConnection() {
               : 'text-white bg-primary-600 hover:bg-primary-700',
           ].join(' ')}
         >
-          {connecting ? 'Redirecting to Google…' : isConnected ? 'Reconnect' : 'Connect Google Calendar'}
+          {connecting ? 'Connecting…' : isConnected ? 'Reconnect' : 'Connect Google Calendar'}
         </button>
 
-        {/* Scope info (connected) */}
-        {isConnected && status?.scopes && status.scopes.length > 0 && (
+        {/* Scope info (connected + scopes present) */}
+        {isConnected && scopesStr && (
           <p className="text-[11px] text-slate-400">
-            Authorized scopes: {status.scopes.join(', ')}
+            Authorized scopes: {scopesStr}
           </p>
         )}
       </div>

@@ -433,6 +433,40 @@ export async function updateNotificationTemplate(
 // ===========================================================================
 
 /**
+ * Hard-default OAuth origin. Override with VITE_OAUTH_ORIGIN in .env files —
+ * same pattern as VITE_ANALYTICS_API_URL elsewhere in this file.
+ */
+const OAUTH_ORIGIN =
+  (import.meta.env.VITE_OAUTH_ORIGIN as string | undefined) ||
+  'https://staging.schedule.myrecruiter.ai';
+
+/**
+ * Validate that a server-supplied URL is safe to navigate to / fetch.
+ * Rules:
+ *   1. Must parse as a valid URL.
+ *   2. Protocol must be `https:`.
+ *   3. When VITE_OAUTH_ORIGIN is set (or the code-level default applies), the
+ *      URL's origin must match it exactly.
+ * Throws a plain Error with `label` in the message if any rule fails.
+ */
+export function assertOAuthUrl(url: string, label: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`${label}: invalid URL returned from server`);
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new Error(`${label}: server returned a non-https URL`);
+  }
+  if (parsed.origin !== OAUTH_ORIGIN) {
+    throw new Error(
+      `${label}: server URL origin (${parsed.origin}) does not match expected origin (${OAUTH_ORIGIN})`,
+    );
+  }
+}
+
+/**
  * Response from GET /scheduling/connection/init (Analytics_Dashboard_API proxy).
  * The ADA mints an HMAC init-token, returns it alongside the OAuth entry-point URL
  * and a matching status-poll URL.
@@ -470,20 +504,31 @@ export interface CalendarConnectionStatusResponse {
 /**
  * Mint an OAuth init token + return the connect_url and status_url.
  * Uses the Clerk-authed schedulingGet helper (same as every other scheduling endpoint).
+ * Origin-validates both URLs before returning (item 4 — security hardening).
  */
 export async function initCalendarConnection(): Promise<CalendarConnectionInitResponse> {
-  return schedulingGet<CalendarConnectionInitResponse>('/scheduling/connection/init');
+  const resp = await schedulingGet<CalendarConnectionInitResponse>(
+    '/scheduling/connection/init',
+  );
+  assertOAuthUrl(resp.connect_url, 'connect_url');
+  assertOAuthUrl(resp.status_url, 'status_url');
+  return resp;
 }
 
 /**
  * Fetch current connection status from the status_url returned by initCalendarConnection.
  * Does NOT send a Clerk authorization header — the init token embedded in the URL is the auth.
  * Tolerates missing optional fields (forward-compatible schema discipline).
+ * Hardened fetch options: no-referrer, omit credentials (item 5).
  */
 export async function fetchCalendarConnectionStatus(
   statusUrl: string,
 ): Promise<CalendarConnectionStatusResponse> {
-  const response = await fetch(statusUrl, { method: 'GET' });
+  const response = await fetch(statusUrl, {
+    method: 'GET',
+    referrerPolicy: 'no-referrer',
+    credentials: 'omit',
+  });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new SchedulingApiError(response.status, data.error || `Status fetch error: ${response.status}`);

@@ -5,19 +5,28 @@
  *   - Loading state (spinner rendered)
  *   - Connected status: renders status, calendar_id, Reconnect button
  *   - Disconnected status: renders "Not connected", Connect button
- *   - Stale_connected status: renders warning label
+ *   - Stale_connected status: renders warning label + Connect (not Reconnect) button
  *   - Revoked disconnected: renders revoked note
- *   - Connect button click: navigates to connect_url (full-page, not fetch)
+ *   - Connect button click: mints FRESH init + navigates via replace (full-page, not fetch)
+ *   - Reconnect button also navigates
  *   - Error state: init throws → renders error + Retry button
- *   - Retry button re-triggers the fetch
+ *   - Retry button: clears oauthBanner + re-triggers the fetch
  *   - Status fetch error: non-fatal → treats as disconnected
- *   - OAuth return (?calendar=connected&watch=ok): renders success banner
+ *   - 401 → "Session expired…" message
+ *   - 403 → "not enabled" message
+ *   - OAuth return (?calendar=connected&watch=ok): renders banner + strips params
  *   - OAuth return (?calendar=connected&watch=pending): renders "being set up" banner
+ *   - OAuth banner: survives after the status fetch (status content also rendered)
+ *   - replaceState strips the correct params (not just called)
  *   - statusUrl is passed to fetchCalendarConnectionStatus
- *   - CTA wiring: StaffSchedulingSection needsCalendar warning includes Calendar settings link
+ *   - Connected with null calendar_id: detail block not rendered
+ *   - Connected + scopes: scopes line renders
+ *   - CTA wiring: StaffSchedulingSection needsCalendar warning
+ *     - member self-view: link present with href containing settings_tab=calendar
+ *     - admin roster: link absent (warning text only)
  */
-import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import { describe, it, expect, afterEach, beforeEach, beforeAll, vi } from 'vitest';
+import { render, screen, cleanup, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SchedulingApiError } from '../../../services/schedulingApi';
 
@@ -56,21 +65,26 @@ vi.mock('../../../services/analyticsApi', () => ({
 // jsdom makes window.location non-configurable after first access in some versions.
 // We replace the whole object with a plain writable stub instead.
 let searchStr = '';
-let navigatedTo: string | undefined;
+let navigatedViaReplace: string | undefined;
+let navigatedViaHref: string | undefined;
 
 beforeEach(() => {
   searchStr = '';
-  navigatedTo = undefined;
+  navigatedViaReplace = undefined;
+  navigatedViaHref = undefined;
   vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
-  // Replace window.location with a stub object that behaves like Location for our usage.
+
   const stub = {
+    pathname: '/',
+    hash: '',
     href: 'http://localhost/',
     search: searchStr,
     assign: vi.fn(),
+    replace: vi.fn((val: string) => { navigatedViaReplace = val; }),
   };
   Object.defineProperty(stub, 'href', {
     get: () => `http://localhost/${searchStr}`,
-    set: (val: string) => { navigatedTo = val; },
+    set: (val: string) => { navigatedViaHref = val; },
     configurable: true,
   });
   Object.defineProperty(stub, 'search', {
@@ -85,18 +99,31 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// CalendarConnection reads _oauthReturn from module-level; re-import each test
+// so the module re-evaluates with the current searchStr. Each describe block
+// imports the component after setting searchStr.
 import { CalendarConnection } from '../CalendarConnection';
 import { StaffSchedulingSection } from '../StaffSchedulingSection';
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 const INIT_RESP = {
   expires_in: 300,
-  connect_url: 'https://oauth.example.com/connect?init=tok123',
-  status_url: 'https://oauth.example.com/connection/status?init=tok123',
+  connect_url: 'https://staging.schedule.myrecruiter.ai/connect?init=tok123',
+  status_url: 'https://staging.schedule.myrecruiter.ai/connection/status?init=tok123',
+};
+const INIT_RESP_2 = {
+  expires_in: 300,
+  connect_url: 'https://staging.schedule.myrecruiter.ai/connect?init=tok456',
+  status_url: 'https://staging.schedule.myrecruiter.ai/connection/status?init=tok456',
 };
 const CONNECTED_STATUS = {
   status: 'connected' as const,
   calendar_id: 'staff@example.com',
+  scopes: ['https://www.googleapis.com/auth/calendar.events'],
+};
+const CONNECTED_NO_CAL_ID = {
+  status: 'connected' as const,
+  calendar_id: null,
   scopes: ['https://www.googleapis.com/auth/calendar.events'],
 };
 const DISCONNECTED_STATUS = { status: 'disconnected' as const, bookable: false };
@@ -138,6 +165,16 @@ describe('CalendarConnection (Track 2 Surface 1)', () => {
     expect(screen.getByText(/could not verify/i)).toBeInTheDocument();
   });
 
+  // item 10c: stale_connected shows Connect (not Reconnect)
+  it('stale_connected shows Connect button (not Reconnect)', async () => {
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(STALE_STATUS);
+    render(<CalendarConnection />);
+    await waitFor(() => expect(screen.getByText('Connection unverified')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /connect google calendar/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /reconnect google calendar/i })).toBeNull();
+  });
+
   it('shows revocation note when status is disconnected + reason:revoked', async () => {
     api.initCalendarConnection.mockResolvedValue(INIT_RESP);
     api.fetchCalendarConnectionStatus.mockResolvedValue(REVOKED_STATUS);
@@ -146,24 +183,37 @@ describe('CalendarConnection (Track 2 Surface 1)', () => {
     expect(screen.getByText(/access was revoked/i)).toBeInTheDocument();
   });
 
-  it('Connect button navigates to connect_url (full-page, not fetch)', async () => {
-    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+  // item 1: Connect button mints a FRESH init token and uses window.location.replace
+  it('Connect button mints a fresh init token and navigates via replace (not href)', async () => {
+    api.initCalendarConnection
+      .mockResolvedValueOnce(INIT_RESP)   // mount-time init
+      .mockResolvedValueOnce(INIT_RESP_2); // fresh mint on click
     api.fetchCalendarConnectionStatus.mockResolvedValue(DISCONNECTED_STATUS);
     const user = userEvent.setup();
     render(<CalendarConnection />);
     await waitFor(() => screen.getByRole('button', { name: /connect google calendar/i }));
     await user.click(screen.getByRole('button', { name: /connect google calendar/i }));
-    expect(navigatedTo).toBe(INIT_RESP.connect_url);
+    await waitFor(() => expect(navigatedViaReplace).toBeDefined());
+    // Must use the FRESH token URL (INIT_RESP_2), not the stale mount-time one (INIT_RESP)
+    expect(navigatedViaReplace).toBe(INIT_RESP_2.connect_url);
+    // Must NOT use href= (that would push to history)
+    expect(navigatedViaHref).toBeUndefined();
+    // initCalendarConnection should have been called twice (mount + click)
+    expect(api.initCalendarConnection).toHaveBeenCalledTimes(2);
   });
 
-  it('Reconnect button also navigates to connect_url', async () => {
-    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+  it('Reconnect button also mints fresh and navigates via replace', async () => {
+    api.initCalendarConnection
+      .mockResolvedValueOnce(INIT_RESP)
+      .mockResolvedValueOnce(INIT_RESP_2);
     api.fetchCalendarConnectionStatus.mockResolvedValue(CONNECTED_STATUS);
     const user = userEvent.setup();
     render(<CalendarConnection />);
     await waitFor(() => screen.getByRole('button', { name: /reconnect google calendar/i }));
     await user.click(screen.getByRole('button', { name: /reconnect google calendar/i }));
-    expect(navigatedTo).toBe(INIT_RESP.connect_url);
+    await waitFor(() => expect(navigatedViaReplace).toBeDefined());
+    expect(navigatedViaReplace).toBe(INIT_RESP_2.connect_url);
+    expect(navigatedViaHref).toBeUndefined();
   });
 
   it('shows an error state + Retry button when init rejects', async () => {
@@ -196,16 +246,44 @@ describe('CalendarConnection (Track 2 Surface 1)', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('shows OAuth success banner (watch=ok) and calls replaceState to strip params', async () => {
+  // item 10b: 401 → "Session expired…"
+  it('shows "Session expired" message on 401 init error', async () => {
+    api.initCalendarConnection.mockRejectedValue(
+      new SchedulingApiError(401, 'Unauthorized'),
+    );
+    render(<CalendarConnection />);
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    expect(screen.getByText(/session expired/i)).toBeInTheDocument();
+  });
+
+  // item 10b: 403 → "not enabled"
+  it('shows "not enabled" message on 403 init error', async () => {
+    api.initCalendarConnection.mockRejectedValue(
+      new SchedulingApiError(403, 'Forbidden'),
+    );
+    render(<CalendarConnection />);
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    expect(screen.getByText(/not enabled for this account/i)).toBeInTheDocument();
+  });
+
+  // item 10e: OAuth-return banner test asserts status content ALSO rendered
+  it('shows OAuth success banner (watch=ok), strips params, and status content is rendered', async () => {
     searchStr = '?calendar=connected&watch=ok';
     api.initCalendarConnection.mockResolvedValue(INIT_RESP);
     api.fetchCalendarConnectionStatus.mockResolvedValue(CONNECTED_STATUS);
     render(<CalendarConnection />);
+    // Both the banner AND the connected status (from the status fetch) should be present
     await waitFor(() => screen.getByTestId('oauth-success-banner'));
+    await waitFor(() => expect(screen.getByText('Connected')).toBeInTheDocument());
     expect(screen.getByTestId('oauth-success-banner')).toHaveTextContent(
       'Calendar connected. You are now bookable.',
     );
+    // item 10a: replaceState called with the params actually stripped
     expect(window.history.replaceState).toHaveBeenCalled();
+    const replaceArgs = (window.history.replaceState as ReturnType<typeof vi.fn>).mock.calls[0];
+    const strippedUrl: string = replaceArgs[2];
+    expect(strippedUrl).not.toContain('calendar=');
+    expect(strippedUrl).not.toContain('watch=');
   });
 
   it('shows OAuth success banner with watch=pending ("being set up")', async () => {
@@ -217,12 +295,47 @@ describe('CalendarConnection (Track 2 Surface 1)', () => {
     expect(screen.getByTestId('oauth-success-banner')).toHaveTextContent('Watch channel is being set up');
   });
 
+  // item 9: Retry clears the oauthBanner
+  it('Retry clears the oauth banner', async () => {
+    searchStr = '?calendar=connected&watch=ok';
+    api.initCalendarConnection
+      .mockRejectedValueOnce(new SchedulingApiError(500, 'error'))
+      .mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(CONNECTED_STATUS);
+    const user = userEvent.setup();
+    render(<CalendarConnection />);
+    await waitFor(() => screen.getByRole('button', { name: /retry/i }));
+    expect(screen.queryByTestId('oauth-success-banner')).toBeNull();
+    await user.click(screen.getByRole('button', { name: /retry/i }));
+    await waitFor(() => expect(screen.getByText('Connected')).toBeInTheDocument());
+    expect(screen.queryByTestId('oauth-success-banner')).toBeNull();
+  });
+
   it('passes the exact status_url from init to fetchCalendarConnectionStatus', async () => {
     api.initCalendarConnection.mockResolvedValue(INIT_RESP);
     api.fetchCalendarConnectionStatus.mockResolvedValue(DISCONNECTED_STATUS);
     render(<CalendarConnection />);
     await waitFor(() => screen.getByText('Not connected'));
     expect(api.fetchCalendarConnectionStatus).toHaveBeenCalledWith(INIT_RESP.status_url);
+  });
+
+  // item 10g (cheap add): connected with null calendar_id skips the detail block
+  it('connected with null calendar_id: detail block not rendered', async () => {
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(CONNECTED_NO_CAL_ID);
+    render(<CalendarConnection />);
+    await waitFor(() => expect(screen.getByText('Connected')).toBeInTheDocument());
+    expect(screen.queryByTestId('calendar-id')).toBeNull();
+  });
+
+  // item 10g (cheap add): scopes line renders when present
+  it('scopes line renders when connected with scopes', async () => {
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(CONNECTED_STATUS);
+    render(<CalendarConnection />);
+    await waitFor(() => expect(screen.getByText('Connected')).toBeInTheDocument());
+    expect(screen.getByText(/authorized scopes/i)).toBeInTheDocument();
+    expect(screen.getByText(/calendar\.events/)).toBeInTheDocument();
   });
 });
 
@@ -246,7 +359,18 @@ const MEMBER_ON_TEAM_NO_CAL = {
   joined_at: '2026-01-01',
 };
 
-describe('E13 CTA wiring — needsCalendar warning links to Calendar settings', () => {
+const ADMIN_NO_CAL = {
+  ...MEMBER_ON_TEAM_NO_CAL,
+  employee_id: 'e2',
+  email: 'admin@example.com',
+  name: 'Admin',
+  role: 'admin' as const,
+};
+
+// item 7: member self-view keeps the CTA link
+// The top-level vi.mock for useAuth returns jordan@example.com/member, which
+// matches MEMBER_ON_TEAM_NO_CAL — so the self-view path renders.
+describe('E13 CTA wiring — needsCalendar warning (member self-view)', () => {
   beforeEach(() => {
     api.fetchTagVocabulary.mockResolvedValue([]);
     mockFetchTeamMembers.mockResolvedValue({
@@ -257,13 +381,61 @@ describe('E13 CTA wiring — needsCalendar warning links to Calendar settings', 
     });
   });
 
-  it('renders a "Go to Calendar settings" link in the needsCalendar warning (member self-view)', async () => {
+  // item 7 / 10f (self-view): link present with href containing settings_tab=calendar
+  // Uses within() scoped to the warning <p> to avoid ambiguity with other role=status elements.
+  it('member self-view: "Go to Calendar settings" link with settings_tab=calendar in href', async () => {
     render(<StaffSchedulingSection />);
-    // The member warning renders in the self-service "My scheduling" card.
-    // We wait for the warning container (role="status") to appear.
-    await waitFor(() => expect(screen.getByRole('status')).toBeInTheDocument());
-    const link = await screen.findByRole('link', { name: /go to calendar settings/i });
+    // Wait for loading to complete (the "My scheduling" heading appears)
+    await waitFor(() => expect(screen.getByRole('heading', { name: /my scheduling/i })).toBeInTheDocument());
+    // The warning paragraph has role="status" — there is exactly one after loading
+    const warningEl = screen.getByRole('status');
+    const link = within(warningEl).getByRole('link', { name: /go to calendar settings/i });
     expect(link).toBeInTheDocument();
     expect(link.getAttribute('href')).toContain('settings_tab=calendar');
+  });
+});
+// NOTE: The admin roster "warning text only, no link" test is in StaffSchedulingSection.test.tsx
+// (item 7b) where the mockUser vi.fn() pattern allows toggling the role per-test.
+
+// ─────────────────────────────────────────────────────────────────────────────
+// assertOAuthUrl — direct unit tests for the origin-validation utility
+// These use vi.importActual to get the real function (not the mock used above).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('assertOAuthUrl (direct unit — item 4)', () => {
+  let assertOAuthUrl: (url: string, label: string) => void;
+
+  beforeAll(async () => {
+    const mod = await vi.importActual<typeof import('../../../services/schedulingApi')>(
+      '../../../services/schedulingApi',
+    );
+    assertOAuthUrl = mod.assertOAuthUrl;
+  });
+
+  it('accepts a valid https URL matching the default OAUTH_ORIGIN', () => {
+    // Should not throw for a well-formed https URL on the expected origin.
+    expect(() =>
+      assertOAuthUrl(
+        'https://staging.schedule.myrecruiter.ai/connect?init=tok',
+        'connect_url',
+      ),
+    ).not.toThrow();
+  });
+
+  it('rejects an http:// URL (non-https protocol)', () => {
+    expect(() =>
+      assertOAuthUrl(
+        'http://staging.schedule.myrecruiter.ai/connect?init=tok',
+        'connect_url',
+      ),
+    ).toThrow(/non-https/);
+  });
+
+  it('rejects a URL whose origin does not match the expected OAUTH_ORIGIN', () => {
+    expect(() =>
+      assertOAuthUrl(
+        'https://evil.attacker.com/connect?init=tok',
+        'connect_url',
+      ),
+    ).toThrow(/does not match expected origin/);
   });
 });

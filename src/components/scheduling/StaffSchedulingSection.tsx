@@ -254,20 +254,10 @@ export function StaffSchedulingSection() {
                   {warning && (
                     <p className="text-xs text-amber-600 mt-0.5">
                       ⚠{' '}
-                      {warning === 'Connect calendar to be bookable' ? (
-                        <>
-                          {warning}.{' '}
-                          <a
-                            href="?settings_tab=calendar"
-                            className="underline hover:text-amber-700 focus:outline-none focus:ring-1 focus:ring-amber-500 rounded"
-                            aria-label={`Go to Calendar settings to connect calendar for ${m.name || m.email}`}
-                          >
-                            Go to Calendar settings
-                          </a>
-                        </>
-                      ) : (
-                        warning
-                      )}
+                      {/* Admin roster: show the warning TEXT only — no link, because the
+                          admin's own calendar page is at this URL and linking there from
+                          another staff member's row would be misleading. */}
+                      {warning}
                     </p>
                   )}
                 </div>
