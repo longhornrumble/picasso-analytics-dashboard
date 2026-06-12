@@ -12,6 +12,7 @@ import { ConversationsDashboard } from './pages/ConversationsDashboard';
 import { SettingsPage } from './pages/SettingsPage';
 import { SchedulingPage } from './pages/scheduling/SchedulingPage';
 import { PremiumLock } from './components/PremiumLock';
+import { AttributionWorkspace } from './components/attribution';
 import { fetchTenantList, setTenantOverride } from './services/analyticsApi';
 import type { DashboardFeatures, User, TenantOption } from './types/analytics';
 
@@ -674,12 +675,10 @@ function AppContent() {
           />
         );
       case 'attribution':
-        return (
-          <PremiumLock
-            feature="attribution"
-            onReturn={() => setActiveTab('conversations')}
-          />
-        );
+        // features.dashboard_attribution flag drives the `locked` path in NavigationBar;
+        // lockedTab is set before we reach this switch when the tab is locked, so
+        // if we land here the flag is confirmed ON. Render the v5 workspace.
+        return <AttributionWorkspace />;
       case 'scheduling':
         return <SchedulingPage />;
       case 'settings':
