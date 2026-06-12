@@ -2,7 +2,8 @@
  * CalendarConnection — Track 2 Surface 1 (ui_plan §3 "Surface 1 — Calendar Connection").
  *
  * Displays the signed-in staff member's calendar connection state (connected / disconnected /
- * stale_connected) and provides a Connect / Reconnect button that initiates the OAuth flow.
+ * stale_connected) and provides a Connect / Reconnect button that initiates the OAuth flow,
+ * and a Disconnect button for connected/stale_connected state (§E11b, WS-T3-DISC-FE).
  *
  * FLOW:
  *   1. On mount: call GET /scheduling/connection/init (Clerk-authed, via ADA) to obtain
@@ -17,13 +18,16 @@
  *      (parsed once at module load, before any state is set), strips them via replaceState
  *      FIRST, then shows a success banner and re-inits + re-fetches status to confirm.
  *   4. Fallback: if init fails (e.g. 401, 500) shows an inline error with a Retry button.
- *
- * OUT OF SCOPE (v1): Disconnect (no backend route), secondary calendars, timezone editing.
+ *   5. Disconnect button (§E11b): visible when status ∈ {connected, stale_connected}. Native
+ *      window.confirm dialog warns that bookings stop routing + existing events NOT deleted.
+ *      On confirm → POST /scheduling/connection/disconnect; success → status flips to
+ *      disconnected + disconnect success banner; failure → inline error + retry.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   initCalendarConnection,
   fetchCalendarConnectionStatus,
+  disconnectCalendarConnection,
   SchedulingApiError,
   type CalendarConnectionInitResponse,
   type CalendarConnectionStatusResponse,
@@ -31,16 +35,19 @@ import {
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-function errMessage(e: unknown): string {
+function errMessage(
+  e: unknown,
+  fallback = 'Couldn’t load the calendar connection. Please try again or contact support.',
+): string {
   if (e instanceof SchedulingApiError) {
     if (e.status === 401) return 'Session expired — please reload the page.';
     if (e.status === 403) return 'Calendar connection is not enabled for this account.';
     return e.message;
   }
   // Non-API errors (origin-validation failures, network TypeErrors) carry
-  // internals like raw URLs that don't belong in the UI — the catch sites
+  // internals like raw URLs that don’t belong in the UI — the catch sites
   // console.error the original; users get friendly copy + Retry.
-  return 'Couldn’t load the calendar connection. Please try again or contact support.';
+  return fallback;
 }
 
 /** Human-readable label for a connection status. */
@@ -78,6 +85,12 @@ interface State {
   status: CalendarConnectionStatusResponse | null;
   /** True when minting a fresh init token + navigating away. */
   connecting: boolean;
+  /** True while the disconnect POST is in-flight. */
+  disconnecting: boolean;
+  /** True after a successful disconnect. */
+  disconnectBanner: boolean;
+  /** Non-null after a disconnect failure — inline error for retry. */
+  disconnectError: string | null;
   /** Set after a successful OAuth return; cleared when the user clicks Retry. */
   oauthBanner: { watchOk: boolean } | null;
 }
@@ -88,6 +101,9 @@ const INITIAL: State = {
   init: null,
   status: null,
   connecting: false,
+  disconnecting: false,
+  disconnectBanner: false,
+  disconnectError: null,
   oauthBanner: null,
 };
 
@@ -201,6 +217,42 @@ export function CalendarConnection() {
     }
   }
 
+  /**
+   * Disconnect: native confirm → POST /scheduling/connection/disconnect.
+   * On success: flip status to disconnected + show disconnect success banner.
+   * On cancel-at-confirm or failure: show inline error; allow retry.
+   * Copy per §E11b: "bookings stop routing to this calendar" + "existing events are NOT deleted".
+   */
+  async function handleDisconnect() {
+    const confirmed = window.confirm(
+      'Are you sure you want to disconnect your Google Calendar?\n\n' +
+      'Bookings will stop routing to this calendar. Existing calendar events will NOT be deleted.',
+    );
+    if (!confirmed) return;
+
+    setState((s) => ({ ...s, disconnecting: true, disconnectError: null }));
+    try {
+      await disconnectCalendarConnection();
+      setState((s) => ({
+        ...s,
+        disconnecting: false,
+        disconnectBanner: true,
+        oauthBanner: null,
+        status: { status: 'disconnected', bookable: false },
+      }));
+    } catch (e) {
+      console.error('Calendar disconnect failed:', e);
+      setState((s) => ({
+        ...s,
+        disconnecting: false,
+        disconnectError: errMessage(
+          e,
+          'Could not disconnect the calendar. Please try again or contact support.',
+        ),
+      }));
+    }
+  }
+
   // ─── render states ────────────────────────────────────────────────────────
 
   if (state.load === 'loading') {
@@ -233,9 +285,10 @@ export function CalendarConnection() {
     );
   }
 
-  const { status, connecting, oauthBanner } = state;
+  const { status, connecting, disconnecting, disconnectBanner, disconnectError, oauthBanner } = state;
   const isConnected = status?.status === 'connected';
   const isStale = status?.status === 'stale_connected';
+  const showDisconnect = isConnected || isStale;
 
   // Scopes: filter to strings and join (item 8 — guard against non-string entries).
   const scopesStr = (status?.scopes ?? [])
@@ -262,6 +315,18 @@ export function CalendarConnection() {
           {oauthBanner.watchOk
             ? 'Calendar connected. You are now bookable.'
             : 'Calendar connected. Watch channel is being set up — this may take a moment.'}
+        </div>
+      )}
+
+      {/* Disconnect success banner */}
+      {disconnectBanner && (
+        <div
+          className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-700"
+          role="status"
+          aria-live="polite"
+          data-testid="disconnect-success-banner"
+        >
+          Calendar disconnected. Bookings will no longer route to this calendar.
         </div>
       )}
 
@@ -300,21 +365,51 @@ export function CalendarConnection() {
         )}
 
         {/* Connect / Reconnect button — stale_connected shows "Connect" (not "Reconnect") */}
-        <button
-          onClick={handleConnect}
-          disabled={connecting}
-          aria-label={isConnected ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
-          className={[
-            'self-start px-4 py-2 text-sm font-medium rounded-lg',
-            'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1',
-            'disabled:opacity-50',
-            isConnected
-              ? 'text-slate-600 border border-slate-200 hover:bg-slate-50'
-              : 'text-white bg-primary-600 hover:bg-primary-700',
-          ].join(' ')}
-        >
-          {connecting ? 'Connecting…' : isConnected ? 'Reconnect' : 'Connect Google Calendar'}
-        </button>
+        <div className="flex flex-wrap gap-2 items-center">
+          <button
+            onClick={handleConnect}
+            disabled={connecting || disconnecting}
+            aria-label={isConnected ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
+            className={[
+              'px-4 py-2 text-sm font-medium rounded-lg',
+              'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1',
+              'disabled:opacity-50',
+              isConnected
+                ? 'text-slate-600 border border-slate-200 hover:bg-slate-50'
+                : 'text-white bg-primary-600 hover:bg-primary-700',
+            ].join(' ')}
+          >
+            {connecting ? 'Connecting…' : isConnected ? 'Reconnect' : 'Connect Google Calendar'}
+          </button>
+
+          {/* Disconnect button — only visible when connected or stale_connected */}
+          {showDisconnect && (
+            <button
+              onClick={handleDisconnect}
+              disabled={disconnecting || connecting}
+              aria-label="Disconnect Google Calendar"
+              className={[
+                'px-4 py-2 text-sm font-medium rounded-lg',
+                'text-red-600 border border-red-200 hover:bg-red-50',
+                'focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1',
+                'disabled:opacity-50',
+              ].join(' ')}
+            >
+              {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+            </button>
+          )}
+        </div>
+
+        {/* Disconnect inline error */}
+        {disconnectError && (
+          <p
+            className="text-sm text-red-600"
+            role="alert"
+            data-testid="disconnect-error"
+          >
+            {disconnectError}
+          </p>
+        )}
 
         {/* Scope info (connected + scopes present) */}
         {isConnected && scopesStr && (

@@ -535,3 +535,25 @@ export async function fetchCalendarConnectionStatus(
   }
   return data as CalendarConnectionStatusResponse;
 }
+
+/**
+ * §E11b — user-initiated calendar disconnect.
+ * POST /scheduling/connection/disconnect → 200 { status, watch }. An empty JSON body ({}) is sent and ignored server-side.
+ * Clerk-authed via the standard schedulingWrite helper.
+ * Idempotent: already-disconnected/missing-secret → 200 { status:'disconnected', watch:'none' }.
+ * On 4xx/5xx throws SchedulingApiError (generic message; no secret-path leakage from server).
+ */
+export interface DisconnectCalendarConnectionResponse {
+  /** Always 'disconnected' on success. */
+  status: 'disconnected';
+  /** Outcome of the best-effort async watch offboarder call. */
+  watch: 'stopped' | 'pending' | 'none';
+}
+
+export async function disconnectCalendarConnection(): Promise<DisconnectCalendarConnectionResponse> {
+  return schedulingWrite<DisconnectCalendarConnectionResponse>(
+    'POST',
+    '/scheduling/connection/disconnect',
+    {},
+  );
+}

@@ -24,6 +24,18 @@
  *   - CTA wiring: StaffSchedulingSection needsCalendar warning
  *     - member self-view: link present with href containing settings_tab=calendar
  *     - admin roster: link absent (warning text only)
+ *
+ * §E11b Disconnect (WS-T3-DISC-FE):
+ *   - Disconnect button visible when connected
+ *   - Disconnect button visible when stale_connected
+ *   - Disconnect button NOT visible when disconnected
+ *   - Cancel at confirm: no API call, status unchanged
+ *   - Confirm → success: POST called, status flips to disconnected, success banner shown
+ *   - Confirm → success: stale_connected also disconnects + banner shown
+ *   - Confirm → failure (SchedulingApiError): inline error rendered, status NOT flipped
+ *   - Confirm → failure (non-API error): friendly error copy, internals hidden
+ *   - disconnectCalendarConnection called with no arguments (zero-arg pin in success test)
+ *   - Buttons disabled during in-flight disconnect
  */
 import { describe, it, expect, afterEach, beforeEach, beforeAll, vi } from 'vitest';
 import { render, screen, cleanup, waitFor, within } from '@testing-library/react';
@@ -34,6 +46,7 @@ import { SchedulingApiError } from '../../../services/schedulingApi';
 const api = {
   initCalendarConnection: vi.fn(),
   fetchCalendarConnectionStatus: vi.fn(),
+  disconnectCalendarConnection: vi.fn(),
   fetchTagVocabulary: vi.fn(),
   updateEmployeeScheduling: vi.fn(),
 };
@@ -46,6 +59,7 @@ vi.mock('../../../services/schedulingApi', async () => {
     ...actual,
     initCalendarConnection: () => api.initCalendarConnection(),
     fetchCalendarConnectionStatus: (url: string) => api.fetchCalendarConnectionStatus(url),
+    disconnectCalendarConnection: () => api.disconnectCalendarConnection(),
     fetchTagVocabulary: () => api.fetchTagVocabulary(),
     updateEmployeeScheduling: (...a: unknown[]) => api.updateEmployeeScheduling(...a),
   };
@@ -68,10 +82,14 @@ let searchStr = '';
 let navigatedViaReplace: string | undefined;
 let navigatedViaHref: string | undefined;
 
+let confirmReturnValue = false;
+
 beforeEach(() => {
   searchStr = '';
   navigatedViaReplace = undefined;
   navigatedViaHref = undefined;
+  confirmReturnValue = false;
+  vi.spyOn(window, 'confirm').mockImplementation(() => confirmReturnValue);
   vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
 
   const stub = {
@@ -171,7 +189,8 @@ describe('CalendarConnection (Track 2 Surface 1)', () => {
     api.fetchCalendarConnectionStatus.mockResolvedValue(STALE_STATUS);
     render(<CalendarConnection />);
     await waitFor(() => expect(screen.getByText('Connection unverified')).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /connect google calendar/i })).toBeInTheDocument();
+    // Use exact label to distinguish from "Disconnect Google Calendar" (also present for stale)
+    expect(screen.getByRole('button', { name: 'Connect Google Calendar' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /reconnect google calendar/i })).toBeNull();
   });
 
@@ -356,6 +375,159 @@ describe('CalendarConnection (Track 2 Surface 1)', () => {
     await waitFor(() => expect(screen.getByText('Connected')).toBeInTheDocument());
     expect(screen.getByText(/authorized scopes/i)).toBeInTheDocument();
     expect(screen.getByText(/calendar\.events/)).toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §E11b — Disconnect button (WS-T3-DISC-FE)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DISCONNECT_RESP = { status: 'disconnected' as const, watch: 'stopped' as const };
+
+describe('§E11b — Disconnect button', () => {
+  it('Disconnect button is visible when status is connected', async () => {
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(CONNECTED_STATUS);
+    render(<CalendarConnection />);
+    await waitFor(() => expect(screen.getByText('Connected')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /disconnect google calendar/i })).toBeInTheDocument();
+  });
+
+  it('Disconnect button is visible when status is stale_connected', async () => {
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(STALE_STATUS);
+    render(<CalendarConnection />);
+    await waitFor(() => expect(screen.getByText('Connection unverified')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /disconnect google calendar/i })).toBeInTheDocument();
+  });
+
+  it('Disconnect button is NOT visible when status is disconnected', async () => {
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(DISCONNECTED_STATUS);
+    render(<CalendarConnection />);
+    await waitFor(() => expect(screen.getByText('Not connected')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /disconnect google calendar/i })).toBeNull();
+  });
+
+  it('cancel at native confirm: disconnectCalendarConnection not called, status unchanged', async () => {
+    confirmReturnValue = false; // user clicks Cancel
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(CONNECTED_STATUS);
+    const user = userEvent.setup();
+    render(<CalendarConnection />);
+    await waitFor(() => screen.getByRole('button', { name: /disconnect google calendar/i }));
+    await user.click(screen.getByRole('button', { name: /disconnect google calendar/i }));
+    expect(api.disconnectCalendarConnection).not.toHaveBeenCalled();
+    // Status remains connected
+    expect(screen.getByText('Connected')).toBeInTheDocument();
+    expect(screen.queryByTestId('disconnect-success-banner')).toBeNull();
+  });
+
+  it('confirm → success: POST called, status flips to disconnected, success banner shown', async () => {
+    confirmReturnValue = true; // user clicks OK
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(CONNECTED_STATUS);
+    api.disconnectCalendarConnection.mockResolvedValue(DISCONNECT_RESP);
+    const user = userEvent.setup();
+    render(<CalendarConnection />);
+    await waitFor(() => screen.getByRole('button', { name: /disconnect google calendar/i }));
+    await user.click(screen.getByRole('button', { name: /disconnect google calendar/i }));
+    await waitFor(() => screen.getByTestId('disconnect-success-banner'));
+    // §E11b required confirm-dialog phrases
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('stop routing to this calendar'),
+    );
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Existing calendar events will NOT be deleted'),
+    );
+    // Disconnect called with no arguments (zero-arg pin)
+    expect(api.disconnectCalendarConnection).toHaveBeenCalledWith();
+    expect(api.disconnectCalendarConnection).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('disconnect-success-banner')).toHaveTextContent(
+      'Calendar disconnected. Bookings will no longer route to this calendar.',
+    );
+    // Status must flip to disconnected (disconnect button hidden, connect shown)
+    expect(screen.getByText('Not connected')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /disconnect google calendar/i })).toBeNull();
+  });
+
+  it('confirm → success from stale_connected: banner shown, status flips', async () => {
+    confirmReturnValue = true;
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(STALE_STATUS);
+    api.disconnectCalendarConnection.mockResolvedValue(DISCONNECT_RESP);
+    const user = userEvent.setup();
+    render(<CalendarConnection />);
+    await waitFor(() => screen.getByRole('button', { name: /disconnect google calendar/i }));
+    await user.click(screen.getByRole('button', { name: /disconnect google calendar/i }));
+    await waitFor(() => screen.getByTestId('disconnect-success-banner'));
+    expect(screen.getByText('Not connected')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /disconnect google calendar/i })).toBeNull();
+  });
+
+  it('confirm → SchedulingApiError: inline error shown, status NOT flipped', async () => {
+    confirmReturnValue = true;
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(CONNECTED_STATUS);
+    api.disconnectCalendarConnection.mockRejectedValue(
+      new SchedulingApiError(500, 'Disconnect failed'),
+    );
+    const user = userEvent.setup();
+    render(<CalendarConnection />);
+    await waitFor(() => screen.getByRole('button', { name: /disconnect google calendar/i }));
+    await user.click(screen.getByRole('button', { name: /disconnect google calendar/i }));
+    await waitFor(() => screen.getByTestId('disconnect-error'));
+    expect(screen.getByTestId('disconnect-error')).toHaveTextContent('Disconnect failed');
+    // Status must remain connected
+    expect(screen.getByText('Connected')).toBeInTheDocument();
+    expect(screen.queryByTestId('disconnect-success-banner')).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith('Calendar disconnect failed:', expect.any(Error));
+    consoleSpy.mockRestore();
+  });
+
+  it('confirm → non-API error: friendly copy shown, internals hidden', async () => {
+    confirmReturnValue = true;
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(CONNECTED_STATUS);
+    api.disconnectCalendarConnection.mockRejectedValue(
+      new Error('TypeError: Failed to fetch https://internal-url'),
+    );
+    const user = userEvent.setup();
+    render(<CalendarConnection />);
+    await waitFor(() => screen.getByRole('button', { name: /disconnect google calendar/i }));
+    await user.click(screen.getByRole('button', { name: /disconnect google calendar/i }));
+    await waitFor(() => screen.getByTestId('disconnect-error'));
+    const errorEl = screen.getByTestId('disconnect-error');
+    expect(errorEl).toHaveTextContent(
+      'Could not disconnect the calendar. Please try again or contact support.',
+    );
+    // The internal URL must not appear in the error element (scopes in the page are unrelated).
+    expect(errorEl.textContent).not.toMatch(/https?:\/\//);
+    consoleSpy.mockRestore();
+  });
+
+  it('buttons are disabled during in-flight disconnect', async () => {
+    confirmReturnValue = true;
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(CONNECTED_STATUS);
+    // Never resolves — keeps the in-flight state
+    api.disconnectCalendarConnection.mockReturnValue(new Promise(() => {}));
+    const user = userEvent.setup();
+    render(<CalendarConnection />);
+    await waitFor(() => screen.getByRole('button', { name: /disconnect google calendar/i }));
+    await user.click(screen.getByRole('button', { name: /disconnect google calendar/i }));
+    // Both Reconnect and Disconnect should be disabled while in-flight.
+    // The disconnect button keeps aria-label="Disconnect Google Calendar" but shows "Disconnecting…"
+    // text and is disabled; check text content + disabled state via the testid-adjacent query.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /disconnect google calendar/i })).toBeDisabled(),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /disconnect google calendar/i })).toHaveTextContent('Disconnecting'),
+    );
+    expect(screen.getByRole('button', { name: /reconnect google calendar/i })).toBeDisabled();
   });
 });
 
