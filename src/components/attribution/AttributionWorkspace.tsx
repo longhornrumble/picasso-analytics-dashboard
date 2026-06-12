@@ -1,8 +1,21 @@
 /**
- * AttributionWorkspace — v5 Numbers workspace.
+ * AttributionWorkspace — two-view container for the Attribution tab.
  *
- * Page anatomy (locked, v5 — ATTRIBUTION_SURFACE_NUMBERS.md §Page anatomy):
- *   1. Top bar — month picker, + Mint (disabled, N2), no Export CSV (N3)
+ * view = 'briefing' | 'numbers'
+ * Default: 'briefing' (B1 spec: Briefing is the default landing view).
+ *
+ * Masthead quiet link "prefer charts? open the numbers →" switches to Numbers.
+ * Numbers top-bar gains a "← back to briefing" crumb.
+ *
+ * Data: same getAttributionSummary + getAttributionChannel payloads shared
+ * by both views — no new endpoints (B1 spec).
+ *
+ * Deep links (credibility mechanism): Briefing's load-bearing figures call
+ * onDeepLinkChannel, which switches to Numbers view and expands the matching
+ * channel row.
+ *
+ * Page anatomy for Numbers (locked, v5 — ATTRIBUTION_SURFACE_NUMBERS.md):
+ *   1. Top bar — "← back to briefing" crumb + month picker + Mint (disabled, N2)
  *   2. Ecosystem lede — EcosystemDonut + OutcomesTable + insight line
  *   3. Journey band — all-channels FunnelStrip
  *   4. MoneyBand — dark hero (NEVER moves below fold)
@@ -12,7 +25,7 @@
  * This component assumes flag is ON — it never re-checks internally.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { AttributionSummaryResponse, AttributionChannel } from '../../types/attribution';
 import { getAttributionSummary, getAttributionChannel } from '../../services/attributionApi';
 import { CHANNEL_ORDER } from './channelMeta';
@@ -23,9 +36,16 @@ import { MoneyBand } from './MoneyBand';
 import { ChannelRow } from './ChannelRow';
 import { AttributionSkeleton } from './AttributionSkeleton';
 import { AttributionEmpty } from './AttributionEmpty';
+import { AttributionBriefing } from './AttributionBriefing';
 
 // ---------------------------------------------------------------------------
-// Month picker helpers
+// View state type
+// ---------------------------------------------------------------------------
+
+type AttributionView = 'briefing' | 'numbers';
+
+// ---------------------------------------------------------------------------
+// Month picker helpers (unchanged from N1)
 // ---------------------------------------------------------------------------
 
 function currentMonthISO(): string {
@@ -68,15 +88,16 @@ function monthISOs(count = 12): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Top bar
+// Top bar — Numbers view (adds "← back to briefing" crumb)
 // ---------------------------------------------------------------------------
 
 interface TopBarProps {
   month: string;
   onMonthChange: (m: string) => void;
+  onBackToBriefing: () => void;
 }
 
-function TopBar({ month, onMonthChange }: TopBarProps) {
+function TopBar({ month, onMonthChange, onBackToBriefing }: TopBarProps) {
   const [open, setOpen] = useState(false);
   const options = monthISOs(12);
   const prior = priorMonthISO(month);
@@ -87,6 +108,24 @@ function TopBar({ month, onMonthChange }: TopBarProps) {
       style={{ padding: '18px 24px', gap: 14 }}
     >
       <div>
+        {/* Back-to-briefing crumb (B1 spec: Numbers top-bar crumb) */}
+        <button
+          onClick={onBackToBriefing}
+          style={{
+            fontSize: '0.72rem',
+            fontWeight: 600,
+            color: '#059669',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            display: 'block',
+            marginBottom: 4,
+          }}
+          aria-label="Back to briefing view"
+        >
+          ← back to briefing
+        </button>
         <div
           className="font-bold uppercase text-slate-400"
           style={{ fontSize: '0.7rem', letterSpacing: '0.05em' }}
@@ -174,17 +213,20 @@ function TopBar({ month, onMonthChange }: TopBarProps) {
 // ---------------------------------------------------------------------------
 
 export function AttributionWorkspace() {
+  const [view, setView] = useState<AttributionView>('briefing');
   const [month, setMonth] = useState<string>(currentMonthISO);
   const [summary, setSummary] = useState<AttributionSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Deep-link target: channel to expand after switching to Numbers view
+  const deepLinkChannelRef = useRef<AttributionChannel | null>(null);
+  // Refs keyed by channel for scroll-to expand
+  const channelRowRefs = useRef<Map<AttributionChannel, () => void>>(new Map());
+
   useEffect(() => {
     let cancelled = false;
 
-    // Reset state as a batch at the start of each fetch.
-    // The setState calls below run synchronously before the async fetch begins;
-    // they are accepted by React 18 automatic batching and do not cause cascading renders.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
@@ -204,6 +246,24 @@ export function AttributionWorkspace() {
     return () => { cancelled = true; };
   }, [month]);
 
+  // After switching to Numbers view, fire the deep-link expand if one is pending
+  useEffect(() => {
+    if (view === 'numbers' && deepLinkChannelRef.current) {
+      const ch = deepLinkChannelRef.current;
+      deepLinkChannelRef.current = null;
+      // Small rAF delay so the Numbers DOM has mounted
+      requestAnimationFrame(() => {
+        const expand = channelRowRefs.current.get(ch);
+        if (expand) expand();
+      });
+    }
+  }, [view]);
+
+  const handleDeepLinkChannel = useCallback((channel: AttributionChannel) => {
+    deepLinkChannelRef.current = channel;
+    setView('numbers');
+  }, []);
+
   const handleExpand = useCallback(
     async (channel: AttributionChannel) => {
       const data = await getAttributionChannel(channel, month);
@@ -220,27 +280,36 @@ export function AttributionWorkspace() {
     [month],
   );
 
+  // ---------------------------------------------------------------------------
+  // Loading state
+  // ---------------------------------------------------------------------------
+
   if (loading) {
     return (
       <>
-        <TopBar month={month} onMonthChange={setMonth} />
+        {view === 'numbers' ? (
+          <TopBar month={month} onMonthChange={setMonth} onBackToBriefing={() => setView('briefing')} />
+        ) : null}
         <AttributionSkeleton />
       </>
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Error state
+  // ---------------------------------------------------------------------------
+
   if (error) {
     return (
-      <div
-        className="max-w-5xl mx-auto px-4 py-8"
-        role="alert"
-      >
-        <TopBar month={month} onMonthChange={setMonth} />
+      <div className="max-w-5xl mx-auto px-4 py-8" role="alert">
+        {view === 'numbers' && (
+          <TopBar month={month} onMonthChange={setMonth} onBackToBriefing={() => setView('briefing')} />
+        )}
         <div className="mt-4 bg-white border border-slate-200 rounded-2xl p-8 text-center">
           <p className="text-slate-500 mb-4">{error}</p>
           <button
             className="text-emerald-700 font-semibold text-sm underline"
-            onClick={() => setMonth((m) => m)} // re-trigger effect
+            onClick={() => setMonth((m) => m)}
           >
             Try again
           </button>
@@ -262,12 +331,54 @@ export function AttributionWorkspace() {
   const isEmpty = totalConv === 0 && (funnel?.leads ?? 0) === 0;
   if (isEmpty) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-5 flex flex-col gap-4">
-        <TopBar month={month} onMonthChange={setMonth} />
+      <div className="max-w-5xl mx-auto px-4 py-5 flex flex-col gap-4" data-testid="attribution-workspace">
+        {view === 'numbers' && (
+          <TopBar month={month} onMonthChange={setMonth} onBackToBriefing={() => setView('briefing')} />
+        )}
         <AttributionEmpty />
       </div>
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Briefing view (default)
+  // ---------------------------------------------------------------------------
+
+  if (view === 'briefing') {
+    // Collect advice boxes from summary insight for §05
+    const adviceBoxes = [];
+    if (summary?.insight && !summary.insight.held && summary.insight.text) {
+      adviceBoxes.push({
+        text: summary.insight.text,
+        rule_id: summary.insight.rule_id ?? undefined,
+        tier: 'double_down' as const,
+      });
+    }
+
+    return (
+      <div
+        className="max-w-5xl mx-auto px-4 py-5"
+        data-testid="attribution-workspace"
+      >
+        {/* White document-style briefing card */}
+        <div
+          className="bg-white border border-slate-200 rounded-2xl shadow-sm"
+          style={{ padding: '48px 56px 40px' }}
+        >
+          <AttributionBriefing
+            summary={summary ?? {}}
+            adviceBoxes={adviceBoxes}
+            onSwitchToNumbers={() => setView('numbers')}
+            onDeepLinkChannel={handleDeepLinkChannel}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Numbers view
+  // ---------------------------------------------------------------------------
 
   // Channels present in payload, in canonical order, with > 0 conversations
   const activeChannels = CHANNEL_ORDER
@@ -279,8 +390,8 @@ export function AttributionWorkspace() {
       className="max-w-5xl mx-auto px-4 py-5 flex flex-col gap-4"
       data-testid="attribution-workspace"
     >
-      {/* 1. Top bar */}
-      <TopBar month={month} onMonthChange={setMonth} />
+      {/* 1. Top bar — with back-to-briefing crumb */}
+      <TopBar month={month} onMonthChange={setMonth} onBackToBriefing={() => setView('briefing')} />
 
       {/* 2. Ecosystem lede */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
@@ -383,6 +494,9 @@ export function AttributionWorkspace() {
           key={ch!.channel}
           channelData={ch!}
           onExpand={handleExpand}
+          onRegisterExpand={(expand) => {
+            channelRowRefs.current.set(ch!.channel, expand);
+          }}
         />
       ))}
     </div>
