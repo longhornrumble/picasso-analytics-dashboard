@@ -9,7 +9,7 @@
  * No master-detail / split-pane (locked decision).
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type {
   AttributionChannelEcosystem,
   AttributionFunnel,
@@ -329,6 +329,12 @@ interface ChannelRowProps {
     suggested_move?: AttributionAdviceBox | null;
   } | null>;
   trendPoints?: AttributionTrendPoint[];
+  /**
+   * Deep-link registration hook (B1 credibility mechanism).
+   * Called once on mount with a callback that expands this row and scrolls to it.
+   * Used by AttributionWorkspace to fulfill deep-links from the Briefing view.
+   */
+  onRegisterExpand?: (expand: () => void) => void;
 }
 
 interface ExpandedDetail {
@@ -341,7 +347,7 @@ interface ExpandedDetail {
   suggestedMove: AttributionAdviceBox | null;
 }
 
-export function ChannelRow({ channelData, onExpand, trendPoints }: ChannelRowProps) {
+export function ChannelRow({ channelData, onExpand, trendPoints, onRegisterExpand }: ChannelRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<ExpandedDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -350,19 +356,25 @@ export function ChannelRow({ channelData, onExpand, trendPoints }: ChannelRowPro
   const channel = channelData.channel as AttributionChannel;
   const meta = getChannelMeta(channel);
 
-  const handleToggle = useCallback(async () => {
-    if (expanded) {
-      setExpanded(false);
-      return;
-    }
-    setExpanded(true);
-    if (detail) return; // already loaded
+  // Register a programmatic expand callback for deep-link support (B1).
+  // Stable reference — only depends on onRegisterExpand (mount-time identity).
+  useEffect(() => {
+    if (!onRegisterExpand) return;
+    onRegisterExpand(() => {
+      setExpanded(true);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Fetch detail whenever expanded becomes true and we don't have it yet.
+  // Handles both click-expand and programmatic deep-link expand.
+  useEffect(() => {
+    if (!expanded || detail || loading) return;
+    let cancelled = false;
     setLoading(true);
     setError(null);
-    try {
-      const data = await onExpand(channel);
-      if (data) {
+    onExpand(channel).then((data) => {
+      if (!cancelled && data) {
         setDetail({
           funnel: data.funnel ?? null,
           entryPoints: data.entryPoints ?? null,
@@ -373,12 +385,18 @@ export function ChannelRow({ channelData, onExpand, trendPoints }: ChannelRowPro
           suggestedMove: data.suggested_move ?? null,
         });
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
-  }, [expanded, detail, channel, onExpand]);
+    }).catch((err: unknown) => {
+      if (!cancelled) setError(err instanceof Error ? err.message : 'Unknown error');
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded]);
+
+  const handleToggle = useCallback(async () => {
+    setExpanded((v) => !v);
+  }, []);
 
   const sharePct = channelData.share_pct ?? 0;
 

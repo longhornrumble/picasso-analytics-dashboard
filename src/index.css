@@ -674,3 +674,73 @@ body {
 }
 
 /* Focus ring handled by global drawer focus styles */
+
+/* ========================================
+   ATTRIBUTION BRIEFING — PRINT STYLESHEET (B3)
+   window.print() triggered by "Export for your board packet" button.
+   Goal: clean paginated document; nav/tab chrome hidden; dated header;
+   epistemic footer on every page.
+   ======================================== */
+
+@media print {
+  /* Hide all dashboard chrome */
+  header,
+  nav,
+  aside,
+  [data-testid="tab-bar"],
+  [class*="sidebar"],
+  [class*="TopBar"],
+  .briefing-actions button:not([aria-label*="Export"]) {
+    display: none !important;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 18mm 16mm 20mm 16mm;
+  }
+
+  body {
+    background: #fff !important;
+    color: #0f172a !important;
+    font-size: 10pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Briefing document */
+  .briefing-root {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Section page breaks */
+  .briefing-root section {
+    break-inside: avoid;
+  }
+
+  /* Time strip — keep on one page */
+  .briefing-time-strip {
+    break-inside: avoid;
+  }
+
+  /* Epistemic footer always visible */
+  .briefing-epistemic {
+    display: block !important;
+    break-before: auto;
+  }
+
+  /* Hide the export button itself in print */
+  .briefing-masthead .briefing-actions {
+    display: none !important;
+  }
+
+  /* Ensure emerald backgrounds survive print */
+  .briefing-lede {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

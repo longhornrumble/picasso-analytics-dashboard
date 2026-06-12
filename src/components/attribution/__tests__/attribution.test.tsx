@@ -161,10 +161,13 @@ describe('AttributionWorkspace — flag-on renders', () => {
     expect(els.length).toBeGreaterThan(0);
   });
 
-  it('shows The Numbers heading', async () => {
+  it('shows The Numbers heading after switching to numbers view', async () => {
     mockGetAttributionSummary.mockResolvedValue(C6_SUMMARY);
     renderWs();
     await waitFor(() => screen.getByTestId('attribution-workspace'));
+    // Default view is Briefing (B1). Switch to Numbers to verify Numbers heading.
+    fireEvent.click(screen.getByRole('button', { name: /switch to numbers/i }));
+    await waitFor(() => screen.getByRole('heading', { name: /The Numbers/i }));
     expect(screen.getByRole('heading', { name: /The Numbers/i })).toBeInTheDocument();
   });
 
@@ -175,10 +178,13 @@ describe('AttributionWorkspace — flag-on renders', () => {
     expect(screen.getByText(/1\.7×/)).toBeInTheDocument();
   });
 
-  it('shows journey band heading', async () => {
+  it('shows journey band heading in numbers view', async () => {
     mockGetAttributionSummary.mockResolvedValue(C6_SUMMARY);
     renderWs();
     await waitFor(() => screen.getByTestId('attribution-workspace'));
+    // Default view is Briefing (B1). Switch to Numbers to verify journey heading.
+    fireEvent.click(screen.getByRole('button', { name: /switch to numbers/i }));
+    await waitFor(() => screen.getByRole('heading', { name: /The journey/i }));
     expect(screen.getByRole('heading', { name: /The journey/i })).toBeInTheDocument();
   });
 
@@ -190,10 +196,13 @@ describe('AttributionWorkspace — flag-on renders', () => {
     expect(screen.getByText('428')).toBeInTheDocument();
   });
 
-  it('renders a channel row for each active channel', async () => {
+  it('renders a channel row for each active channel in numbers view', async () => {
     mockGetAttributionSummary.mockResolvedValue(C6_SUMMARY);
     renderWs();
     await waitFor(() => screen.getByTestId('attribution-workspace'));
+    // Default view is Briefing (B1). Switch to Numbers to verify channel rows.
+    fireEvent.click(screen.getByRole('button', { name: /switch to numbers/i }));
+    await waitFor(() => screen.getByRole('heading', { name: /The Numbers/i }));
     // 4 channel expand buttons
     const buttons = screen.getAllByRole('button', { name: /conversations/i });
     expect(buttons.length).toBeGreaterThanOrEqual(1);
