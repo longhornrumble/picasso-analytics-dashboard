@@ -37,7 +37,10 @@ function errMessage(e: unknown): string {
     if (e.status === 403) return 'Calendar connection is not enabled for this account.';
     return e.message;
   }
-  return e instanceof Error ? e.message : 'Something went wrong';
+  // Non-API errors (origin-validation failures, network TypeErrors) carry
+  // internals like raw URLs that don't belong in the UI — the catch sites
+  // console.error the original; users get friendly copy + Retry.
+  return 'Couldn’t load the calendar connection. Please try again or contact support.';
 }
 
 /** Human-readable label for a connection status. */
@@ -132,6 +135,7 @@ export function CalendarConnection() {
       }));
     } catch (e) {
       if (ignore.current) return;
+      console.error('Calendar connection init failed:', e);
       setState((s) => ({ ...s, load: 'error', loadError: errMessage(e) }));
     }
   }, []);
@@ -192,6 +196,7 @@ export function CalendarConnection() {
     } catch (e) {
       // Mint failed (e.g. network error, 401): surface it as a load error so the
       // user can see what went wrong and retry.
+      console.error('Calendar connect failed:', e);
       setState((s) => ({ ...s, connecting: false, load: 'error', loadError: errMessage(e) }));
     }
   }

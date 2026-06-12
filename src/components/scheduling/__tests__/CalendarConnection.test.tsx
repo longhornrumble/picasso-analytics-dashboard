@@ -266,6 +266,26 @@ describe('CalendarConnection (Track 2 Surface 1)', () => {
     expect(screen.getByText(/not enabled for this account/i)).toBeInTheDocument();
   });
 
+  // Non-API errors (e.g. assertOAuthUrl origin-validation failures) must render
+  // friendly copy — never the raw message, which carries internals like URLs.
+  it('hides non-API error internals behind friendly copy (origin-validation failure)', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    api.initCalendarConnection.mockRejectedValue(
+      new Error('connect_url: server URL origin (https://evil.example) does not match expected origin (https://ok.example)'),
+    );
+    render(<CalendarConnection />);
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    expect(screen.getByText(/couldn’t load the calendar connection/i)).toBeInTheDocument();
+    expect(screen.queryByText(/does not match expected origin/i)).toBeNull();
+    expect(screen.queryByText(/https:\/\//i)).toBeNull();
+    // The detail is still observable for debugging:
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Calendar connection init failed:',
+      expect.any(Error),
+    );
+    consoleSpy.mockRestore();
+  });
+
   // item 10e: OAuth-return banner test asserts status content ALSO rendered
   it('shows OAuth success banner (watch=ok), strips params, and status content is rendered', async () => {
     searchStr = '?calendar=connected&watch=ok';
