@@ -6,6 +6,7 @@ import {
   createRoutingPolicy,
   cancelBooking,
   sendRescheduleLink,
+  disconnectCalendarConnection,
   SchedulingApiError,
   ifMatchToken,
   type AppointmentType,
@@ -129,5 +130,34 @@ describe('ifMatchToken', () => {
   it('returns modified_at.at, or "*" to first-stamp a legacy row', () => {
     expect(ifMatchToken({ modified_at: { at: 'T', by: 'e' } })).toBe('T');
     expect(ifMatchToken({})).toBe('*');
+  });
+});
+
+describe('schedulingApi §E11b disconnectCalendarConnection client', () => {
+  it('POST /scheduling/connection/disconnect — correct URL, method, Authorization header, and empty body', async () => {
+    fetchMock.mockResolvedValue(okJson(200, { status: 'disconnected', watch: 'stopped' }));
+    const res = await disconnectCalendarConnection();
+    expect(res).toEqual({ status: 'disconnected', watch: 'stopped' });
+    const [url, opts] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/scheduling\/connection\/disconnect$/);
+    expect(opts.method).toBe('POST');
+    expect(opts.headers.Authorization).toBe('Bearer tkn');
+    expect(JSON.parse(opts.body)).toEqual({});
+  });
+
+  it('4xx response surfaces a SchedulingApiError with the correct status', async () => {
+    fetchMock.mockResolvedValue(okJson(409, { error: 'Conflict' }));
+    const err = await disconnectCalendarConnection().catch((e) => e);
+    expect(err).toBeInstanceOf(SchedulingApiError);
+    expect(err.status).toBe(409);
+    expect(err.message).toBe('Conflict');
+  });
+
+  it('401 unauthenticated (no token) never calls fetch', async () => {
+    localStorage.clear();
+    const err = await disconnectCalendarConnection().catch((e) => e);
+    expect(err).toBeInstanceOf(SchedulingApiError);
+    expect(err.status).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

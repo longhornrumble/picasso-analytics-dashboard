@@ -538,7 +538,7 @@ export async function fetchCalendarConnectionStatus(
 
 /**
  * §E11b — user-initiated calendar disconnect.
- * POST /scheduling/connection/disconnect (no body) → 200 { status, watch }.
+ * POST /scheduling/connection/disconnect → 200 { status, watch }. An empty JSON body ({}) is sent and ignored server-side.
  * Clerk-authed via the standard schedulingWrite helper.
  * Idempotent: already-disconnected/missing-secret → 200 { status:'disconnected', watch:'none' }.
  * On 4xx/5xx throws SchedulingApiError (generic message; no secret-path leakage from server).

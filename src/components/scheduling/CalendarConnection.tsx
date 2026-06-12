@@ -35,16 +35,19 @@ import {
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-function errMessage(e: unknown): string {
+function errMessage(
+  e: unknown,
+  fallback = 'Couldn’t load the calendar connection. Please try again or contact support.',
+): string {
   if (e instanceof SchedulingApiError) {
     if (e.status === 401) return 'Session expired — please reload the page.';
     if (e.status === 403) return 'Calendar connection is not enabled for this account.';
     return e.message;
   }
   // Non-API errors (origin-validation failures, network TypeErrors) carry
-  // internals like raw URLs that don't belong in the UI — the catch sites
+  // internals like raw URLs that don’t belong in the UI — the catch sites
   // console.error the original; users get friendly copy + Retry.
-  return 'Couldn’t load the calendar connection. Please try again or contact support.';
+  return fallback;
 }
 
 /** Human-readable label for a connection status. */
@@ -84,7 +87,7 @@ interface State {
   connecting: boolean;
   /** True while the disconnect POST is in-flight. */
   disconnecting: boolean;
-  /** Non-null after a successful disconnect. */
+  /** True after a successful disconnect. */
   disconnectBanner: boolean;
   /** Non-null after a disconnect failure — inline error for retry. */
   disconnectError: string | null;
@@ -242,9 +245,10 @@ export function CalendarConnection() {
       setState((s) => ({
         ...s,
         disconnecting: false,
-        disconnectError: e instanceof SchedulingApiError
-          ? e.message
-          : 'Could not disconnect the calendar. Please try again or contact support.',
+        disconnectError: errMessage(
+          e,
+          'Could not disconnect the calendar. Please try again or contact support.',
+        ),
       }));
     }
   }

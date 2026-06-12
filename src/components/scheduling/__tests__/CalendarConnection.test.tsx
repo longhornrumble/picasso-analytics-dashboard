@@ -34,7 +34,7 @@
  *   - Confirm → success: stale_connected also disconnects + banner shown
  *   - Confirm → failure (SchedulingApiError): inline error rendered, status NOT flipped
  *   - Confirm → failure (non-API error): friendly error copy, internals hidden
- *   - disconnectCalendarConnection called with no arguments (empty body proxied by helper)
+ *   - disconnectCalendarConnection called with no arguments (zero-arg pin in success test)
  *   - Buttons disabled during in-flight disconnect
  */
 import { describe, it, expect, afterEach, beforeEach, beforeAll, vi } from 'vitest';
@@ -433,6 +433,15 @@ describe('§E11b — Disconnect button', () => {
     await waitFor(() => screen.getByRole('button', { name: /disconnect google calendar/i }));
     await user.click(screen.getByRole('button', { name: /disconnect google calendar/i }));
     await waitFor(() => screen.getByTestId('disconnect-success-banner'));
+    // §E11b required confirm-dialog phrases
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('stop routing to this calendar'),
+    );
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Existing calendar events will NOT be deleted'),
+    );
+    // Disconnect called with no arguments (zero-arg pin)
+    expect(api.disconnectCalendarConnection).toHaveBeenCalledWith();
     expect(api.disconnectCalendarConnection).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('disconnect-success-banner')).toHaveTextContent(
       'Calendar disconnected. Bookings will no longer route to this calendar.',
