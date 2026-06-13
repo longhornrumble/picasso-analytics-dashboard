@@ -111,9 +111,10 @@ jobs:
     # SHA-pinned (picasso Phase-2 audit D8): @main meant any reusable change
     # could startup_failure this workflow with no warning in THIS repo (the
     # picasso#494 class). Bump deliberately to adopt reusable changes.
-    # Current pin = picasso#520 (audit hardening: smoke retries, archive
-    # cache-control, input env-indirection).
-    uses: longhornrumble/picasso/.github/workflows/deploy-frontend.yml@643e0d83cb9d625554652533e2be6176c202761d
+    # Current pin = picasso#561/#562 (D10 fix: the prior pin 643e0d8 carried
+    # an auto-rollback that would WIPE the live bucket; this pin rewrites it
+    # download-then-upload + adds an empty-source abort guard).
+    uses: longhornrumble/picasso/.github/workflows/deploy-frontend.yml@aec1b46e8d242b3d123a8b7ff51c41fc44e635e6
     with:
       environment: production
       artifact_name: dashboard-build
