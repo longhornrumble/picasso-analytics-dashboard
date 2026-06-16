@@ -123,3 +123,27 @@ jobs:
       website_url: https://d3r39xkfb0snuq.cloudfront.net
     secrets:
       deploy_role_arn: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  # The reusable deploy job archives releases/<sha>/ but does NOT tag. This job
+  # supplies the deploy-production-* tag that prod-staleness-check.yml diffs
+  # against — without it the staleness check no-ops forever (no tags to compare).
+  # Mirrors the widget's post-deploy "Create deployment tag" step.
+  post-deploy:
+    name: Tag production deployment
+    needs: deploy-production
+    # Only when the prod deploy actually ran + succeeded (the deploy job is
+    # dispatch-gated; on a plain push to main it's skipped).
+    if: needs.deploy-production.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # pushes the deploy-production-* tag
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create deployment tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          TAG_NAME="deploy-production-$(date +%Y%m%d-%H%M%S)"
+          git tag -a "$TAG_NAME" -m "Production deployment $TAG_NAME"
+          git push origin "$TAG_NAME"
