@@ -137,7 +137,7 @@ describe('StaffSchedulingSection — admin roster CTA link removal (item 7)', ()
     api.fetchTagVocabulary.mockResolvedValue([]);
   });
 
-  it('admin roster: warning text present but no "Go to Calendar settings" link', async () => {
+  it('admin roster: warning text present but no "Integrations" connect link', async () => {
     api.fetchTeamMembers.mockResolvedValue({
       members: [
         {
@@ -153,8 +153,8 @@ describe('StaffSchedulingSection — admin roster CTA link removal (item 7)', ()
     await waitFor(() => expect(screen.getByText('NoCalStaff')).toBeInTheDocument());
     // Warning text appears
     expect(screen.getByText(/Connect calendar to be bookable/i)).toBeInTheDocument();
-    // No Calendar settings link — admin roster deliberately omits it
-    expect(screen.queryByRole('link', { name: /go to calendar settings/i })).toBeNull();
+    // No Integrations connect link — admin roster deliberately omits it
+    expect(screen.queryByRole('link', { name: /integrations/i })).toBeNull();
   });
 });
 

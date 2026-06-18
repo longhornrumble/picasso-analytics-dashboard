@@ -226,7 +226,7 @@ export interface NotificationEvent {
   segment_count?: number;
 }
 
-export type NotificationSubTab = 'dashboard' | 'recipients' | 'templates';
+export type NotificationSubTab = 'dashboard' | 'recipients' | 'templates' | 'preferences';
 
 // Features API response
 export interface FeaturesResponse {

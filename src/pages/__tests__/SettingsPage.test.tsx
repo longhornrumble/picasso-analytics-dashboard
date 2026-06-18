@@ -20,9 +20,6 @@ vi.mock('../TeamManagement', () => ({
 vi.mock('../NotificationsDashboard', () => ({
   NotificationsDashboard: () => <div>NotificationsDashboard</div>,
 }));
-vi.mock('../NotificationPreferences', () => ({
-  NotificationPreferences: () => <div>NotificationPreferences</div>,
-}));
 vi.mock('../scheduling/SchedulingSetup', () => ({
   SchedulingSetup: () => <div>SchedulingSetup</div>,
 }));
@@ -132,8 +129,8 @@ describe('SettingsPage deep-link + feature-flag guard (item 10d)', () => {
       expect(screen.getByTestId('calendar-connection')).toBeInTheDocument(),
     );
 
-    // Calendar tab button should be present and the tab navigation rendered
-    expect(screen.getByRole('button', { name: /calendar/i })).toBeInTheDocument();
+    // Integrations tab button (id 'calendar') should be present and the tab navigation rendered
+    expect(screen.getByRole('button', { name: /integrations/i })).toBeInTheDocument();
 
     // Param should be stripped via replaceState
     expect(window.history.replaceState).toHaveBeenCalled();
@@ -162,8 +159,8 @@ describe('SettingsPage deep-link + feature-flag guard (item 10d)', () => {
     // CalendarConnection should NOT be rendered (feature off)
     expect(screen.queryByTestId('calendar-connection')).toBeNull();
 
-    // Calendar tab button should not appear in navigation
-    expect(screen.queryByRole('button', { name: /^calendar$/i })).toBeNull();
+    // Integrations tab button (id 'calendar') should not appear in navigation
+    expect(screen.queryByRole('button', { name: /^integrations$/i })).toBeNull();
 
     // Default tab (team) should be rendered instead
     expect(screen.getByTestId('team-management')).toBeInTheDocument();

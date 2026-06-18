@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/useAuth';
 import { StatCard } from '../components/StatCard';
+import { NotificationPreferences } from './NotificationPreferences';
 import {
   PageHeader,
   FilterDropdown,
@@ -2477,6 +2478,12 @@ export function NotificationsDashboard() {
         >
           Templates
         </SubTabButton>
+        <SubTabButton
+          active={subTab === 'preferences'}
+          onClick={() => setSubTab('preferences')}
+        >
+          Preferences
+        </SubTabButton>
       </div>
 
       {/* Sub-tab content panels */}
@@ -2484,6 +2491,7 @@ export function NotificationsDashboard() {
         {subTab === 'dashboard' && <NotificationDashboardTab />}
         {subTab === 'recipients' && <RecipientsTab />}
         {subTab === 'templates' && <TemplatesTab />}
+        {subTab === 'preferences' && <NotificationPreferences />}
       </div>
     </div>
   );

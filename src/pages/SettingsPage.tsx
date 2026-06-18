@@ -8,13 +8,12 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/useAuth';
 import { NotificationsDashboard } from './NotificationsDashboard';
 import { TeamManagement } from './TeamManagement';
-import { NotificationPreferences } from './NotificationPreferences';
 import { SchedulingSetup } from './scheduling/SchedulingSetup';
 import AdminPanel from './AdminPanel';
 import { CalendarConnection } from '../components/scheduling/CalendarConnection';
 import type { DashboardFeatures } from '../types/analytics';
 
-type SettingsSubTab = 'notifications' | 'team' | 'preferences' | 'scheduling' | 'calendar' | 'admin';
+type SettingsSubTab = 'notifications' | 'team' | 'scheduling' | 'calendar' | 'admin';
 
 const DEFAULT_FEATURES: DashboardFeatures = {
   dashboard_conversations: true,
@@ -70,11 +69,6 @@ export function SettingsPage() {
       available: true,
     },
     {
-      id: 'preferences',
-      label: 'Preferences',
-      available: true,
-    },
-    {
       id: 'scheduling',
       label: 'Scheduling',
       // Entitled tenants only (D1 Flag A). Visible to ALL entitled users: admins get the
@@ -84,7 +78,7 @@ export function SettingsPage() {
     },
     {
       id: 'calendar' as SettingsSubTab,
-      label: 'Calendar',
+      label: 'Integrations',
       // Track 2 Surface 1: per-staff calendar connection (OAuth). Gated on the same
       // dashboard_scheduling flag — only entitled tenants see this tab.
       available: features.dashboard_scheduling,
@@ -132,10 +126,6 @@ export function SettingsPage() {
 
       {activeSubTab === 'team' && (
         <TeamManagement />
-      )}
-
-      {activeSubTab === 'preferences' && (
-        <NotificationPreferences />
       )}
 
       {activeSubTab === 'scheduling' && features.dashboard_scheduling && (
