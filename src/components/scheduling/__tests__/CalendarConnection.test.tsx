@@ -567,13 +567,13 @@ describe('E13 CTA wiring — needsCalendar warning (member self-view)', () => {
 
   // item 7 / 10f (self-view): link present with href containing settings_tab=calendar
   // Uses within() scoped to the warning <p> to avoid ambiguity with other role=status elements.
-  it('member self-view: "Go to Calendar settings" link with settings_tab=calendar in href', async () => {
+  it('member self-view: "Integrations" link with settings_tab=calendar in href', async () => {
     render(<StaffSchedulingSection />);
     // Wait for loading to complete (the "My scheduling" heading appears)
     await waitFor(() => expect(screen.getByRole('heading', { name: /my scheduling/i })).toBeInTheDocument());
     // The warning paragraph has role="status" — there is exactly one after loading
     const warningEl = screen.getByRole('status');
-    const link = within(warningEl).getByRole('link', { name: /go to calendar settings/i });
+    const link = within(warningEl).getByRole('link', { name: /integrations/i });
     expect(link).toBeInTheDocument();
     expect(link.getAttribute('href')).toContain('settings_tab=calendar');
   });
