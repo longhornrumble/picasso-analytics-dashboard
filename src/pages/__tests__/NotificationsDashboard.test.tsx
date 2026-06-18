@@ -41,6 +41,18 @@ vi.mock('../../services/analyticsApi', () => ({
 vi.mock('../../context/AuthContext', () => ({
   useAuth: () => ({ user: { tenant_id: 'TEST001', tenant_hash: 'te1234', email: 'admin@test.com' } }),
 }));
+// NotificationsDashboard imports useAuth from ../context/useAuth (split out of
+// AuthContext); mock that path too or the real hook throws "must be used within
+// an AuthProvider" and the whole suite fails to render.
+vi.mock('../../context/useAuth', () => ({
+  useAuth: () => ({ user: { tenant_id: 'TEST001', tenant_hash: 'te1234', email: 'admin@test.com' } }),
+}));
+
+// Preferences moved into the Notifications submenu — mock to a sentinel so the
+// sub-tab test doesn't need the real preferences backend.
+vi.mock('../NotificationPreferences', () => ({
+  NotificationPreferences: () => <div data-testid="notification-preferences">NotificationPreferences</div>,
+}));
 
 import { NotificationsDashboard } from '../NotificationsDashboard';
 import {
@@ -200,13 +212,14 @@ describe('NotificationsDashboard', () => {
   });
 
   describe('sub-tab bar', () => {
-    it('renders all three sub-tab buttons', async () => {
+    it('renders all four sub-tab buttons', async () => {
       setupDashboard();
       render(<NotificationsDashboard />);
 
       expect(screen.getByRole('tab', { name: /Dashboard/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /Recipients/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /Templates/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /Preferences/i })).toBeInTheDocument();
     });
 
     it('shows the Dashboard sub-tab as selected by default', async () => {
@@ -237,6 +250,18 @@ describe('NotificationsDashboard', () => {
       await waitFor(() => {
         expect(screen.getByRole('tab', { name: /Templates/i })).toHaveAttribute('aria-selected', 'true');
       });
+    });
+
+    it('activates Preferences tab on click and shows the preferences panel', async () => {
+      setupDashboard();
+      render(<NotificationsDashboard />);
+
+      await navigateTo(/Preferences/i);
+
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /Preferences/i })).toHaveAttribute('aria-selected', 'true');
+      });
+      expect(screen.getByTestId('notification-preferences')).toBeInTheDocument();
     });
 
     it('can navigate back to Dashboard tab', async () => {

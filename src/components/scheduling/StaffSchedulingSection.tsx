@@ -172,9 +172,9 @@ export function StaffSchedulingSection() {
                   <a
                     href="?settings_tab=calendar"
                     className="underline hover:text-amber-700 focus:outline-none focus:ring-1 focus:ring-amber-500 rounded"
-                    aria-label="Go to Calendar settings to connect your calendar"
+                    aria-label="Open Integrations to connect your calendar"
                   >
-                    Go to Calendar settings
+                    Integrations
                   </a>
                 </>
               ) : (
