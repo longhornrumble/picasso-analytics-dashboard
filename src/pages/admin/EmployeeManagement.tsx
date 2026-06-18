@@ -14,6 +14,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { DataTable, BadgeCell, TwoLineCell } from '../../components/shared/DataTable';
 import { ConfirmDialog } from '../../components/shared/ConfirmDialog';
 import InviteEmployeeModal from './InviteEmployeeModal';
+import { useAuth } from '../../context/useAuth';
 import {
   fetchAdminTenants,
   fetchAdminEmployees,
@@ -35,6 +36,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function EmployeeManagement() {
+  const { user } = useAuth();
   const [tenants, setTenants] = useState<AdminTenant[]>([]);
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [invitations, setInvitations] = useState<AdminInvitation[]>([]);
@@ -97,22 +99,35 @@ export default function EmployeeManagement() {
     }
   }, []);
 
-  // Initial mount — fetch tenants, employees, and invitations
+  // Initial mount — fetch tenants, then scope to one tenant. The admin roster is
+  // always tenant-scoped (no cross-tenant load); default to the signed-in admin's
+  // own tenant (on staging that's always MyRecruiter), falling back to the first
+  // tenant if the admin's own isn't in the list.
   useEffect(() => {
     setLoading(true);
-    // Fetch tenants first so we have the list for the all-tenants invitation query
     fetchAdminTenants()
       .then((data) => {
         setTenants(data);
-        loadInvitations('', data);
+        const defaultTenant =
+          data.find(t => t.tenantId === user?.tenant_id)?.tenantId
+          ?? data[0]?.tenantId
+          ?? '';
+        setSelectedTenantId(defaultTenant);
+        if (defaultTenant) {
+          loadEmployees(defaultTenant, '');
+          loadInvitations(defaultTenant, data);
+        } else {
+          setEmployees([]);
+          setInvitations([]);
+          setLoading(false);
+        }
       })
       .catch((err) => {
         console.warn('Failed to load tenants for filter:', err);
-        // Still attempt invitation load — will result in empty list
-        loadInvitations('', []);
+        setError('Failed to load tenants');
+        setLoading(false);
       });
-    loadEmployees('', '');
-  }, [loadEmployees, loadInvitations]);
+  }, [loadEmployees, loadInvitations, user?.tenant_id]);
 
   // Tenant filter change — immediate refetch
   const handleTenantChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -309,7 +324,6 @@ export default function EmployeeManagement() {
       aria-label="Filter by tenant"
       className="h-9 pl-3 pr-8 border border-gray-200 rounded-lg text-sm text-slate-700 bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
     >
-      <option value="">All tenants</option>
       {tenants.map((t) => (
         <option key={t.tenantId} value={t.tenantId}>
           {t.companyName}
