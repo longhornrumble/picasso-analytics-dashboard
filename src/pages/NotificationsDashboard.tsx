@@ -1438,6 +1438,9 @@ function RecipientsTab() {
     const selectedIds = internal.recipient_employee_ids || [];
     const employeeIds = new Set(teamMembers!.map(e => e.employeeId));
     const staleIds = selectedIds.filter(id => !employeeIds.has(id));
+    // Resolve stale (non-active) recipient ids to their retained record so a deactivated
+    // employee shows by NAME, not a bare UUID. Truly-erased ids have no entry → UUID fallback.
+    const directory = settings?.recipients_directory ?? {};
 
     return (
       <div>
@@ -1506,28 +1509,47 @@ function RecipientsTab() {
             );
           })}
 
-          {/* Stale employee_ids — in config but not in current registry */}
-          {staleIds.map((employeeId) => (
-            <div key={employeeId} className="flex items-center gap-3 px-4 py-3 bg-amber-50">
-              <svg className="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-amber-800 font-medium">Former team member</p>
-                <p className="text-xs text-amber-600 truncate font-mono">{employeeId}</p>
+          {/* Recipients in config but not an ACTIVE registry member. If the registry still
+              has the (deactivated) record we show their NAME; a truly-erased id has no
+              directory entry → fall back to the raw id. */}
+          {staleIds.map((employeeId) => {
+            const former = directory[employeeId];
+            return (
+              <div key={employeeId} className="flex items-center gap-3 px-4 py-3 bg-amber-50">
+                <svg className="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  {former ? (
+                    <>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-sm font-medium text-amber-800 truncate">{former.name || former.email || employeeId}</p>
+                        <span className="inline-block px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 rounded">
+                          Former
+                        </span>
+                      </div>
+                      {former.email && <p className="text-xs text-amber-600 truncate">{former.email}</p>}
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-amber-800 font-medium">Former team member</p>
+                      <p className="text-xs text-amber-600 truncate font-mono">{employeeId}</p>
+                    </>
+                  )}
+                </div>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => removeStaleUserId(formId, employeeId)}
+                    className="text-xs text-amber-700 hover:text-red-600 font-medium transition-colors"
+                    aria-label={`Remove ${former?.name || 'stale recipient'} ${employeeId}`}
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => removeStaleUserId(formId, employeeId)}
-                  className="text-xs text-amber-700 hover:text-red-600 font-medium transition-colors"
-                  aria-label={`Remove stale recipient ${employeeId}`}
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {selectedIds.length === 0 && (

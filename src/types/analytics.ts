@@ -634,9 +634,19 @@ export interface FormNotificationSettings {
   };
 }
 
+export interface RecipientDirectoryEntry {
+  name: string;
+  email: string;
+  status: string;
+}
+
 export interface NotificationSettingsResponse {
   forms: Record<string, FormNotificationSettings>;
   sms_provisioned?: boolean;
+  // Resolves recipient_employee_ids → {name,email,status} including INACTIVE (former)
+  // employees, so a deactivated recipient renders by name, not a bare UUID. IDs with no
+  // registry record are absent → render the "Former team member <id>" fallback row.
+  recipients_directory?: Record<string, RecipientDirectoryEntry>;
 }
 
 export interface TemplatePreviewResponse {
