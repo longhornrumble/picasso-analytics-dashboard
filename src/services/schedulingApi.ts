@@ -201,6 +201,25 @@ async function schedulingGet<T>(path: string): Promise<T> {
   return data as T;
 }
 
+// --- Scheduling activation (org-level) -------------------------------------
+
+export interface SchedulingActivation {
+  /** Raw feature_flags.scheduling_enabled for the org. */
+  enabled: boolean;
+  /** Whether the caller (admin/super_admin) may change it. */
+  can_manage: boolean;
+}
+
+/** GET the org's scheduling activation state (raw flag + whether caller can manage). */
+export async function fetchSchedulingActivation(): Promise<SchedulingActivation> {
+  return schedulingGet<SchedulingActivation>('/settings/scheduling/activation');
+}
+
+/** Admin-only: turn scheduling on/off for the org. Returns the new state. */
+export async function setSchedulingActivation(enabled: boolean): Promise<{ enabled: boolean }> {
+  return schedulingWrite<{ enabled: boolean }>('PATCH', '/settings/scheduling/activation', { enabled });
+}
+
 // --- Appointment Types -----------------------------------------------------
 
 export async function fetchAppointmentTypes(): Promise<AppointmentType[]> {

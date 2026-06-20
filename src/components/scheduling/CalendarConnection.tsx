@@ -28,6 +28,8 @@ import {
   initCalendarConnection,
   fetchCalendarConnectionStatus,
   disconnectCalendarConnection,
+  fetchSchedulingActivation,
+  setSchedulingActivation,
   SchedulingApiError,
   type CalendarConnectionInitResponse,
   type CalendarConnectionStatusResponse,
@@ -109,6 +111,13 @@ const INITIAL: State = {
 
 export function CalendarConnection() {
   const [state, setState] = useState<State>(INITIAL);
+  // Org-level scheduling activation gate. null = still loading. Until scheduling is
+  // enabled for the org, calendar connection is unavailable: admins (can_manage) get an
+  // Enable action, everyone else gets a locked message. (The backend enforces this too —
+  // Calendar_OAuth_Connect 403s when scheduling_enabled is off.)
+  const [activation, setActivation] = useState<{ enabled: boolean; canManage: boolean } | null>(null);
+  const [enabling, setEnabling] = useState(false);
+  const [enableError, setEnableError] = useState<string | null>(null);
   // Parse the OAuth return params once — using a ref so the value is stable across
   // renders and StrictMode double-invocations.  We read window.location.search at
   // component creation time (inside useState's lazy initializer would also work,
@@ -164,7 +173,22 @@ export function CalendarConnection() {
   // even when StrictMode fires the effect twice (mount → unmount → mount).
   const oauthHandledRef = useRef(false);
 
+  // Fetch the org activation state once on mount. Fail-closed (locked, not manageable)
+  // so a transient error never exposes the connect flow before activation is confirmed.
   useEffect(() => {
+    let ignore = false;
+    fetchSchedulingActivation()
+      .then((a) => { if (!ignore) setActivation({ enabled: a.enabled, canManage: a.can_manage }); })
+      .catch(() => { if (!ignore) setActivation({ enabled: false, canManage: false }); });
+    return () => { ignore = true; };
+  }, []);
+
+  useEffect(() => {
+    // Only touch the calendar-connect API once scheduling is activated for the org —
+    // otherwise initCalendarConnection 403s and we'd render a confusing error instead
+    // of the locked/enable gate.
+    if (activation?.enabled !== true) return;
+
     // Strip OAuth return params FIRST (before the async fetch), once per mount
     // sequence.  The ref guard prevents StrictMode's second invocation from
     // calling replaceState twice or setting the banner twice.
@@ -185,7 +209,22 @@ export function CalendarConnection() {
       ignore.current = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally empty — runs once per mount; oauthReturn is stable via ref
+  }, [activation?.enabled]); // runs when activation flips to enabled; oauthReturn stable via ref
+
+  /** Admin: enable scheduling for the org, then let the connect flow load. */
+  async function handleEnable() {
+    setEnabling(true);
+    setEnableError(null);
+    try {
+      const res = await setSchedulingActivation(true);
+      setEnabling(false);
+      setActivation((a) => ({ enabled: res.enabled, canManage: a?.canManage ?? true }));
+    } catch (e) {
+      console.error('Enable scheduling failed:', e);
+      setEnabling(false);
+      setEnableError(errMessage(e, 'Could not enable scheduling. Please try again.'));
+    }
+  }
 
   /** Retry: re-run initAndFetch with a fresh ignore ref; also clear the oauthBanner. */
   function handleRetry() {
@@ -254,6 +293,58 @@ export function CalendarConnection() {
   }
 
   // ─── render states ────────────────────────────────────────────────────────
+
+  // Org activation gate — evaluated before the calendar-connect flow.
+  if (activation === null) {
+    return (
+      <div className="flex items-center gap-2 py-6" role="status" aria-live="polite" aria-label="Loading scheduling status">
+        <div className="w-5 h-5 rounded-full animate-spin border-4 border-primary-200 border-t-primary-500" aria-hidden="true" />
+        <span className="text-sm text-slate-500">Loading…</span>
+      </div>
+    );
+  }
+
+  if (!activation.enabled) {
+    return (
+      <section aria-label="Calendar connection" className="flex flex-col gap-4">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">Calendar</h3>
+          <p className="text-xs text-slate-500">
+            Connect your Google Calendar to become bookable. Picasso writes confirmed appointments to your primary calendar.
+          </p>
+        </div>
+
+        {activation.canManage ? (
+          <div className="rounded-xl border border-primary-100 bg-primary-50 p-4 flex flex-col gap-2" data-testid="enable-scheduling-panel">
+            <p className="text-sm font-semibold text-primary-800">Enable scheduling for your organization</p>
+            <p className="text-xs text-slate-600">
+              Turn this on to let your team connect their calendars and start taking bookings. You’ll connect your own calendar next.
+            </p>
+            <div>
+              <button
+                onClick={handleEnable}
+                disabled={enabling}
+                className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 disabled:opacity-50"
+              >
+                {enabling ? 'Enabling…' : 'Enable scheduling'}
+              </button>
+            </div>
+            {enableError && <p className="text-sm text-red-600" role="alert">{enableError}</p>}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4" role="status" data-testid="scheduling-locked">
+            <p className="text-sm text-amber-800">
+              Your admin needs to enable scheduling for your organization before you can connect your calendar.
+            </p>
+          </div>
+        )}
+
+        <p className="text-xs text-slate-400">
+          Only your primary calendar is used. Picasso never reads email, contacts, or other calendar data.
+        </p>
+      </section>
+    );
+  }
 
   if (state.load === 'loading') {
     return (
