@@ -35,9 +35,9 @@ export function SettingsPage() {
   // ?calendar=connected stripping).
   const initialTab = ((): SettingsSubTab => {
     const p = new URLSearchParams(window.location.search);
-    // Only resolve to calendar tab when the feature is entitled; un-entitled users
-    // fall through to the default tab (no blank pane).
-    if (p.get('settings_tab') === 'calendar' && features.dashboard_scheduling) return 'calendar';
+    // Integrations is always available, so the deep-link always resolves there;
+    // the Calendar card self-gates on org activation.
+    if (p.get('settings_tab') === 'calendar') return 'calendar';
     return features.dashboard_notifications ? 'notifications' : 'team';
   })();
   const [activeSubTab, setActiveSubTab] = useState<SettingsSubTab>(initialTab);
@@ -79,9 +79,11 @@ export function SettingsPage() {
     {
       id: 'calendar' as SettingsSubTab,
       label: 'Integrations',
-      // Track 2 Surface 1: per-staff calendar connection (OAuth). Gated on the same
-      // dashboard_scheduling flag — only entitled tenants see this tab.
-      available: features.dashboard_scheduling,
+      // Integrations is a persistent connectivity surface (marketplace), always visible.
+      // Each connector card owns its own lifecycle: the Google Calendar card gates itself
+      // on org scheduling activation (admins get an Enable action; others see a locked
+      // state) — so the tab no longer keys on dashboard_scheduling.
+      available: true,
     },
     {
       id: 'admin' as SettingsSubTab,
@@ -132,7 +134,7 @@ export function SettingsPage() {
         <SchedulingSetup />
       )}
 
-      {activeSubTab === 'calendar' && features.dashboard_scheduling && (
+      {activeSubTab === 'calendar' && (
         <CalendarConnection />
       )}
 

@@ -4,8 +4,8 @@
  * Covers:
  *   (i)  ?settings_tab=calendar + dashboard_scheduling:true → CalendarConnection renders
  *        + param stripped from URL
- *   (ii) ?settings_tab=calendar + dashboard_scheduling:false → no Calendar tab,
- *        deep link falls through to default tab (no blank pane)
+ *   (ii) ?settings_tab=calendar + dashboard_scheduling:false → Integrations is always
+ *        available (marketplace surface); deep-link resolves, Calendar card self-gates
  */
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
@@ -139,8 +139,10 @@ describe('SettingsPage deep-link + feature-flag guard (item 10d)', () => {
     expect(strippedUrl).not.toContain('settings_tab=');
   });
 
-  // (ii) settings_tab=calendar + dashboard_scheduling:false → no Calendar tab, default tab shown
-  it('ignores ?settings_tab=calendar when dashboard_scheduling is false — no blank pane', () => {
+  // (ii) settings_tab=calendar + dashboard_scheduling:false → Integrations is ALWAYS
+  // available now (persistent marketplace surface); the deep-link resolves and the
+  // Calendar card renders (the card self-gates on org activation internally).
+  it('still resolves ?settings_tab=calendar when dashboard_scheduling is false — Integrations is always available', () => {
     searchStr = '?settings_tab=calendar';
     mockUserFn.mockReturnValue({
       email: 'staff@example.com',
@@ -156,13 +158,9 @@ describe('SettingsPage deep-link + feature-flag guard (item 10d)', () => {
     });
     render(<SettingsPage />);
 
-    // CalendarConnection should NOT be rendered (feature off)
-    expect(screen.queryByTestId('calendar-connection')).toBeNull();
-
-    // Integrations tab button (id 'calendar') should not appear in navigation
-    expect(screen.queryByRole('button', { name: /^integrations$/i })).toBeNull();
-
-    // Default tab (team) should be rendered instead
-    expect(screen.getByTestId('team-management')).toBeInTheDocument();
+    // Integrations tab is present even with the scheduling entitlement off.
+    expect(screen.getByRole('button', { name: /^integrations$/i })).toBeInTheDocument();
+    // The Calendar card renders; it self-gates on org activation internally.
+    expect(screen.getByTestId('calendar-connection')).toBeInTheDocument();
   });
 });

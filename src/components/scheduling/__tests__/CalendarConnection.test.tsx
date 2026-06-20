@@ -49,6 +49,8 @@ const api = {
   disconnectCalendarConnection: vi.fn(),
   fetchTagVocabulary: vi.fn(),
   updateEmployeeScheduling: vi.fn(),
+  fetchSchedulingActivation: vi.fn(),
+  setSchedulingActivation: vi.fn(),
 };
 
 vi.mock('../../../services/schedulingApi', async () => {
@@ -62,6 +64,8 @@ vi.mock('../../../services/schedulingApi', async () => {
     disconnectCalendarConnection: () => api.disconnectCalendarConnection(),
     fetchTagVocabulary: () => api.fetchTagVocabulary(),
     updateEmployeeScheduling: (...a: unknown[]) => api.updateEmployeeScheduling(...a),
+    fetchSchedulingActivation: () => api.fetchSchedulingActivation(),
+    setSchedulingActivation: (enabled: boolean) => api.setSchedulingActivation(enabled),
   };
 });
 
@@ -110,6 +114,12 @@ beforeEach(() => {
     configurable: true,
   });
   vi.stubGlobal('location', stub);
+
+  // Default: scheduling is activated for the org + caller can manage, so the
+  // existing connect-flow tests pass the activation gate. Gate-specific tests
+  // override this.
+  api.fetchSchedulingActivation.mockResolvedValue({ enabled: true, can_manage: true });
+  api.setSchedulingActivation.mockResolvedValue({ enabled: true });
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -150,12 +160,45 @@ const REVOKED_STATUS = { status: 'disconnected' as const, bookable: false, reaso
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+describe('CalendarConnection — org activation gate', () => {
+  it('locks connection for a member when scheduling is not enabled', async () => {
+    api.fetchSchedulingActivation.mockResolvedValue({ enabled: false, can_manage: false });
+    render(<CalendarConnection />);
+    expect(await screen.findByTestId('scheduling-locked')).toBeInTheDocument();
+    expect(screen.getByText(/your admin needs to enable scheduling/i)).toBeInTheDocument();
+    // Never touches the calendar-connect API when not activated.
+    expect(api.initCalendarConnection).not.toHaveBeenCalled();
+  });
+
+  it('shows an Enable action for an admin when scheduling is not enabled', async () => {
+    api.fetchSchedulingActivation.mockResolvedValue({ enabled: false, can_manage: true });
+    render(<CalendarConnection />);
+    expect(await screen.findByTestId('enable-scheduling-panel')).toBeInTheDocument();
+    expect(api.initCalendarConnection).not.toHaveBeenCalled();
+  });
+
+  it('enabling activates the org and loads the connect flow', async () => {
+    api.fetchSchedulingActivation.mockResolvedValue({ enabled: false, can_manage: true });
+    api.setSchedulingActivation.mockResolvedValue({ enabled: true });
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(DISCONNECTED_STATUS);
+
+    const user = userEvent.setup();
+    render(<CalendarConnection />);
+    await user.click(await screen.findByRole('button', { name: /enable scheduling/i }));
+
+    expect(api.setSchedulingActivation).toHaveBeenCalledWith(true);
+    // Activation flips → connect flow loads.
+    expect(await screen.findByRole('button', { name: /connect google calendar/i })).toBeInTheDocument();
+  });
+});
+
 describe('CalendarConnection (Track 2 Surface 1)', () => {
-  it('shows a loading spinner during init', () => {
+  it('shows a loading spinner during init', async () => {
     api.initCalendarConnection.mockReturnValue(new Promise(() => {}));
     render(<CalendarConnection />);
-    expect(screen.getByRole('status', { name: /loading calendar/i })).toBeInTheDocument();
-    expect(screen.getByText(/loading calendar connection/i)).toBeInTheDocument();
+    // Activation gate resolves first (enabled), then the calendar-connect init is pending.
+    expect(await screen.findByText(/loading calendar connection/i)).toBeInTheDocument();
   });
 
   it('renders connected status with calendar_id and Reconnect button', async () => {
