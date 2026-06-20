@@ -191,6 +191,36 @@ describe('CalendarConnection — org activation gate', () => {
     // Activation flips → connect flow loads.
     expect(await screen.findByRole('button', { name: /connect google calendar/i })).toBeInTheDocument();
   });
+
+  it('admin can disable scheduling for the org from the connected card', async () => {
+    api.fetchSchedulingActivation.mockResolvedValue({ enabled: true, can_manage: true });
+    api.setSchedulingActivation.mockResolvedValue({ enabled: false });
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(DISCONNECTED_STATUS);
+    confirmReturnValue = true; // window.confirm → proceed
+
+    const user = userEvent.setup();
+    render(<CalendarConnection />);
+    await user.click(await screen.findByRole('button', { name: /^disable$/i }));
+
+    expect(api.setSchedulingActivation).toHaveBeenCalledWith(false);
+    // Flips back to the enable panel (off state).
+    expect(await screen.findByTestId('enable-scheduling-panel')).toBeInTheDocument();
+  });
+
+  it('backward-compat: missing activation endpoint falls back to dashboard_scheduling (connect flow, no management)', async () => {
+    // Old API (e.g. prod before lambda#347) 404s the activation endpoint.
+    api.fetchSchedulingActivation.mockRejectedValue(new Error('404'));
+    api.initCalendarConnection.mockResolvedValue(INIT_RESP);
+    api.fetchCalendarConnectionStatus.mockResolvedValue(DISCONNECTED_STATUS);
+    // useAuth mock carries features.dashboard_scheduling: true → fallback treats as enabled.
+    render(<CalendarConnection />);
+
+    expect(await screen.findByRole('button', { name: /connect google calendar/i })).toBeInTheDocument();
+    // No management affordance on the fallback path (canManage:false).
+    expect(screen.queryByTestId('org-scheduling-on')).toBeNull();
+    expect(screen.queryByTestId('enable-scheduling-panel')).toBeNull();
+  });
 });
 
 describe('CalendarConnection (Track 2 Surface 1)', () => {

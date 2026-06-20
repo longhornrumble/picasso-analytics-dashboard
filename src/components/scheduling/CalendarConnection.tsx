@@ -24,6 +24,7 @@
  *      disconnected + disconnect success banner; failure → inline error + retry.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAuth } from '../../context/useAuth';
 import {
   initCalendarConnection,
   fetchCalendarConnectionStatus,
@@ -110,6 +111,7 @@ const INITIAL: State = {
 };
 
 export function CalendarConnection() {
+  const { user } = useAuth();
   const [state, setState] = useState<State>(INITIAL);
   // Org-level scheduling activation gate. null = still loading. Until scheduling is
   // enabled for the org, calendar connection is unavailable: admins (can_manage) get an
@@ -173,14 +175,25 @@ export function CalendarConnection() {
   // even when StrictMode fires the effect twice (mount → unmount → mount).
   const oauthHandledRef = useRef(false);
 
-  // Fetch the org activation state once on mount. Fail-closed (locked, not manageable)
-  // so a transient error never exposes the connect flow before activation is confirmed.
+  // Fetch the org activation state once on mount.
+  // Backward-compat: an API that predates the activation endpoint (e.g. the prod
+  // API before lambda#347) 404s here. Rather than fail-closed to a locked state —
+  // which would regress a scheduling-entitled tenant's working calendar surface —
+  // fall back to the existing dashboard_scheduling entitlement and suppress the
+  // management UI (canManage:false), so old backends behave exactly as before:
+  // entitled → connect flow, un-entitled → locked. Once the endpoint exists, its
+  // can_manage drives the admin enable/disable affordances.
   useEffect(() => {
     let ignore = false;
     fetchSchedulingActivation()
       .then((a) => { if (!ignore) setActivation({ enabled: a.enabled, canManage: a.can_manage }); })
-      .catch(() => { if (!ignore) setActivation({ enabled: false, canManage: false }); });
+      .catch(() => {
+        if (!ignore) {
+          setActivation({ enabled: user?.features?.dashboard_scheduling === true, canManage: false });
+        }
+      });
     return () => { ignore = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -223,6 +236,27 @@ export function CalendarConnection() {
       console.error('Enable scheduling failed:', e);
       setEnabling(false);
       setEnableError(errMessage(e, 'Could not enable scheduling. Please try again.'));
+    }
+  }
+
+  /** Admin: turn scheduling off for the whole org (confirmed — it's a big switch). */
+  async function handleDisableOrg() {
+    const ok = window.confirm(
+      'Turn off scheduling for your entire organization?\n\n' +
+      'New bookings will stop and the assistant will no longer offer scheduling. ' +
+      'Connected calendars stay connected — you can turn it back on anytime.',
+    );
+    if (!ok) return;
+    setEnabling(true);
+    setEnableError(null);
+    try {
+      await setSchedulingActivation(false);
+      setEnabling(false);
+      setActivation((a) => ({ enabled: false, canManage: a?.canManage ?? true }));
+    } catch (e) {
+      console.error('Disable scheduling failed:', e);
+      setEnabling(false);
+      setEnableError(errMessage(e, 'Could not disable scheduling. Please try again.'));
     }
   }
 
@@ -509,6 +543,23 @@ export function CalendarConnection() {
           </p>
         )}
       </div>
+
+      {/* Admin org-level control: scheduling is on; allow turning it back off.
+          Only when manageable (real activation endpoint) — suppressed on the
+          backward-compat fallback so old backends never show a control that 404s. */}
+      {activation.canManage && (
+        <p className="text-xs text-slate-500" data-testid="org-scheduling-on">
+          Scheduling is on for your organization ·{' '}
+          <button
+            onClick={handleDisableOrg}
+            disabled={enabling}
+            className="text-red-600 hover:underline disabled:opacity-50"
+          >
+            {enabling ? 'Working…' : 'Disable'}
+          </button>
+        </p>
+      )}
+      {enableError && <p className="text-sm text-red-600" role="alert">{enableError}</p>}
 
       <p className="text-xs text-slate-400">
         Only your primary calendar is used. Picasso never reads email, contacts, or other calendar data.
