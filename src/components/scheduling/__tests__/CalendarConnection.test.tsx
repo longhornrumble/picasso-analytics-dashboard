@@ -69,8 +69,12 @@ vi.mock('../../../services/schedulingApi', async () => {
   };
 });
 
+const mockRefreshFeatures = vi.fn();
 vi.mock('../../../context/useAuth', () => ({
-  useAuth: () => ({ user: { email: 'jordan@example.com', role: 'member', features: { dashboard_scheduling: true } } }),
+  useAuth: () => ({
+    user: { email: 'jordan@example.com', role: 'member', features: { dashboard_scheduling: true } },
+    refreshFeatures: mockRefreshFeatures,
+  }),
 }));
 
 const mockFetchTeamMembers = vi.fn();
@@ -190,6 +194,8 @@ describe('CalendarConnection — org activation gate', () => {
     expect(api.setSchedulingActivation).toHaveBeenCalledWith(true);
     // Activation flips → connect flow loads.
     expect(await screen.findByRole('button', { name: /connect google calendar/i })).toBeInTheDocument();
+    // Cached entitlement is refreshed so the Scheduling tab re-appears in sync.
+    expect(mockRefreshFeatures).toHaveBeenCalled();
   });
 
   it('admin can disable scheduling for the org from the connected card', async () => {
