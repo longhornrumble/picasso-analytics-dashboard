@@ -12,6 +12,9 @@ const api = {
   updateRoutingPolicy: vi.fn(),
   fetchTagVocabulary: vi.fn(),
   fetchNotificationTemplates: vi.fn(),
+  fetchSchedulingActivation: vi.fn(),
+  initCalendarConnection: vi.fn(),
+  fetchCalendarConnectionStatus: vi.fn(),
 };
 vi.mock('../../../services/schedulingApi', async () => {
   const actual = await vi.importActual<typeof import('../../../services/schedulingApi')>(
@@ -27,6 +30,9 @@ vi.mock('../../../services/schedulingApi', async () => {
     updateRoutingPolicy: (...a: unknown[]) => api.updateRoutingPolicy(...a),
     fetchTagVocabulary: () => api.fetchTagVocabulary(),
     fetchNotificationTemplates: () => api.fetchNotificationTemplates(),
+    fetchSchedulingActivation: () => api.fetchSchedulingActivation(),
+    initCalendarConnection: () => api.initCalendarConnection(),
+    fetchCalendarConnectionStatus: (url: string) => api.fetchCalendarConnectionStatus(url),
   };
 });
 
@@ -59,10 +65,43 @@ beforeEach(() => {
   api.fetchRoutingPolicies.mockResolvedValue([POLICY]);
   api.fetchTagVocabulary.mockResolvedValue(['volunteer_coordinators']);
   api.fetchNotificationTemplates.mockResolvedValue({ moments: {}, stop_footer_note: '' });
+  // Default: past the onboarding gate (org activated + viewer's calendar connected),
+  // so the existing setup-render tests apply. Gate tests override these.
+  api.fetchSchedulingActivation.mockResolvedValue({ enabled: true, can_manage: true });
+  api.initCalendarConnection.mockResolvedValue({
+    connect_url: 'https://x/connect?init=t', status_url: 'https://x/status?init=t', expires_in: 300,
+  });
+  api.fetchCalendarConnectionStatus.mockResolvedValue({ status: 'connected' });
 });
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+});
+
+describe('SchedulingSetup — onboarding gate', () => {
+  it('blocks with the Step 1 (approve) overlay when scheduling is not enabled for the org', async () => {
+    api.fetchSchedulingActivation.mockResolvedValue({ enabled: false, can_manage: true });
+    render(<SchedulingSetup />);
+    expect(await screen.findByTestId('gate-needs-activation')).toBeInTheDocument();
+    // Config endpoints are NOT called while gated.
+    expect(api.fetchAppointmentTypes).not.toHaveBeenCalled();
+  });
+
+  it('blocks with the Step 2 (connect) overlay when activated but the calendar is not connected', async () => {
+    api.fetchSchedulingActivation.mockResolvedValue({ enabled: true, can_manage: true });
+    api.fetchCalendarConnectionStatus.mockResolvedValue({ status: 'disconnected' });
+    render(<SchedulingSetup />);
+    expect(await screen.findByTestId('gate-needs-connection')).toBeInTheDocument();
+    expect(api.fetchAppointmentTypes).not.toHaveBeenCalled();
+  });
+
+  it('renders the setup once activated AND connected', async () => {
+    // defaults: enabled + connected
+    render(<SchedulingSetup />);
+    await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
+    expect(screen.queryByTestId('gate-needs-activation')).toBeNull();
+    expect(screen.queryByTestId('gate-needs-connection')).toBeNull();
+  });
 });
 
 describe('SchedulingSetup (E13b)', () => {

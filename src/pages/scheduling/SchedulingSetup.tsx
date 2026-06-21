@@ -20,6 +20,9 @@ import {
   updateAppointmentType,
   createRoutingPolicy,
   updateRoutingPolicy,
+  fetchSchedulingActivation,
+  initCalendarConnection,
+  fetchCalendarConnectionStatus,
   ifMatchToken,
   SchedulingApiError,
   type AppointmentType,
@@ -56,6 +59,36 @@ const blankAppt: AppointmentTypeWrite = {
   routing_policy_id: '',
 };
 
+/** 3-step onboarding progress badges (Approve → Connect → Set up). */
+function StepBadges({ current }: { current: 1 | 2 | 3 }) {
+  const labels = ['Approve scheduling', 'Connect your calendar', 'Set up scheduling'];
+  return (
+    <ol className="flex flex-wrap items-center justify-center gap-2 text-xs mb-5">
+      {labels.map((label, i) => {
+        const n = i + 1;
+        const done = n < current;
+        const active = n === current;
+        return (
+          <li
+            key={n}
+            className={[
+              'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border',
+              active
+                ? 'border-primary-300 bg-primary-50 text-primary-700 font-semibold'
+                : done
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-slate-200 bg-slate-50 text-slate-400',
+            ].join(' ')}
+          >
+            <span aria-hidden="true">{done ? '✓' : `${n}.`}</span>
+            {label}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 export function SchedulingSetup() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
@@ -65,6 +98,11 @@ export function SchedulingSetup() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // 3-step onboarding gate — the setup is blocked until both prerequisites are met:
+  //   (1) admin approves scheduling for the org  (2) connect your calendar  (3) set up
+  const [readiness, setReadiness] =
+    useState<'loading' | 'needs_activation' | 'needs_connection' | 'ready'>('loading');
 
   // Appointment-type form: null = closed; {id?} = editing existing (id present) or creating.
   const [apptForm, setApptForm] = useState<
@@ -96,13 +134,46 @@ export function SchedulingSetup() {
     }
   }, [isAdmin]);
 
+  // Readiness gate (once on mount): org activation → viewer's calendar connection.
   useEffect(() => {
+    let active = true;
+    (async () => {
+      let enabled: boolean;
+      try {
+        const act = await fetchSchedulingActivation();
+        enabled = act.enabled;
+      } catch {
+        // Backward-compat: an API without the activation endpoint (e.g. prod before
+        // lambda#347) → fall back to the dashboard_scheduling entitlement.
+        enabled = user?.features?.dashboard_scheduling === true;
+      }
+      if (!active) return;
+      if (!enabled) { setReadiness('needs_activation'); return; }
+      // Activated → is the viewer's own calendar connected?
+      let connected = false;
+      try {
+        const init = await initCalendarConnection();
+        const status = await fetchCalendarConnectionStatus(init.status_url);
+        connected = status.status === 'connected';
+      } catch {
+        connected = false;
+      }
+      if (!active) return;
+      setReadiness(connected ? 'ready' : 'needs_connection');
+    })();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load admin config only once past the gate.
+  useEffect(() => {
+    if (readiness !== 'ready') return;
     let active = true;
     load(() => active);
     return () => {
       active = false;
     };
-  }, [load]);
+  }, [load, readiness]);
 
   const reload = () => load(() => true);
 
@@ -144,6 +215,59 @@ export function SchedulingSetup() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // ─── onboarding gate (blocks setup until org-on + calendar connected) ───────
+  if (readiness === 'loading') {
+    return (
+      <div className="flex items-center justify-center py-16" role="status" aria-live="polite">
+        <div className="w-8 h-8 rounded-full animate-spin border-4 border-primary-200 border-t-primary-500" />
+        <span className="sr-only">Checking scheduling status…</span>
+      </div>
+    );
+  }
+  if (readiness === 'needs_activation') {
+    return (
+      <div className="max-w-xl mx-auto text-center py-12" data-testid="gate-needs-activation">
+        <StepBadges current={1} />
+        <h3 className="text-base font-semibold text-slate-800 mb-1">Turn on scheduling for your organization</h3>
+        {isAdmin ? (
+          <>
+            <p className="text-sm text-slate-500 mb-5">
+              Approve scheduling, then connect your calendar to start taking bookings.
+            </p>
+            <a
+              href="?settings_tab=calendar"
+              className="inline-block px-4 py-2 text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700"
+            >
+              Go to Integrations
+            </a>
+          </>
+        ) : (
+          <p className="text-sm text-slate-500">
+            Scheduling isn't enabled for your organization yet. Ask an admin to turn it on.
+          </p>
+        )}
+      </div>
+    );
+  }
+  if (readiness === 'needs_connection') {
+    return (
+      <div className="max-w-xl mx-auto text-center py-12" data-testid="gate-needs-connection">
+        <StepBadges current={2} />
+        <h3 className="text-base font-semibold text-slate-800 mb-1">Connect your calendar</h3>
+        <p className="text-sm text-slate-500 mb-5">
+          You're set up to schedule — connect your calendar in Integrations to become bookable,
+          then come back here to finish.
+        </p>
+        <a
+          href="?settings_tab=calendar"
+          className="inline-block px-4 py-2 text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700"
+        >
+          Go to Integrations
+        </a>
+      </div>
+    );
   }
 
   // Members see only their own per-staff card — no admin Teams / Appointment Types config.
