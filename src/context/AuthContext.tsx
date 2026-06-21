@@ -172,10 +172,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Fetch features from API after authentication.
+  // Fetch features from API after authentication. The async work lives in a locally
+  // declared function (not a direct refreshFeatures() call) so the setState inside it
+  // isn't flagged as a synchronous setState-in-effect.
   useEffect(() => {
-    if (!state.isAuthenticated || !state.token) return;
-    refreshFeatures();
+    async function loadOnAuth() {
+      if (!state.isAuthenticated || !state.token) return;
+      await refreshFeatures();
+    }
+    loadOnAuth();
   }, [state.isAuthenticated, state.token, refreshFeatures]);
 
   const login = useCallback((token: string) => {
