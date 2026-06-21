@@ -153,34 +153,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.loading, state.isAuthenticated]);
 
-  // Fetch features from API after authentication
-  useEffect(() => {
-    async function loadFeatures() {
-      if (!state.isAuthenticated || !state.token) return;
-
-      try {
-        const response = await fetchFeatures();
-        setState(prev => {
-          if (!prev.user) return prev;
-          const updatedUser = {
-            ...prev.user,
-            features: response.features,
-          };
-          // Update localStorage with enriched user
-          localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
-          return {
-            ...prev,
-            user: updatedUser,
-          };
-        });
-      } catch (error) {
-        // Features fetch failed - use defaults from JWT extraction
-        console.warn('Failed to fetch features from API, using defaults:', error);
-      }
+  // Re-fetch dashboard feature entitlements and merge into the user. Used both on
+  // login (effect below) and on demand after a runtime entitlement change (e.g. an
+  // admin toggling scheduling activation) so tab visibility tracks live state rather
+  // than the login-time cache.
+  const refreshFeatures = useCallback(async () => {
+    try {
+      const response = await fetchFeatures();
+      setState(prev => {
+        if (!prev.user) return prev;
+        const updatedUser = { ...prev.user, features: response.features };
+        localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+        return { ...prev, user: updatedUser };
+      });
+    } catch (error) {
+      // Features fetch failed - keep existing (JWT-extracted / cached) values.
+      console.warn('Failed to fetch features from API, using defaults:', error);
     }
+  }, []);
 
-    loadFeatures();
-  }, [state.isAuthenticated, state.token]);
+  // Fetch features from API after authentication.
+  useEffect(() => {
+    if (!state.isAuthenticated || !state.token) return;
+    refreshFeatures();
+  }, [state.isAuthenticated, state.token, refreshFeatures]);
 
   const login = useCallback((token: string) => {
     if (isTokenExpired(token)) {
@@ -228,7 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout, refreshToken }}>
+    <AuthContext.Provider value={{ ...state, login, logout, refreshToken, refreshFeatures }}>
       {children}
     </AuthContext.Provider>
   );

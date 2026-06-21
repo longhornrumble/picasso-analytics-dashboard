@@ -111,7 +111,7 @@ const INITIAL: State = {
 };
 
 export function CalendarConnection() {
-  const { user } = useAuth();
+  const { user, refreshFeatures } = useAuth();
   const [state, setState] = useState<State>(INITIAL);
   // Org-level scheduling activation gate. null = still loading. Until scheduling is
   // enabled for the org, calendar connection is unavailable: admins (can_manage) get an
@@ -232,6 +232,9 @@ export function CalendarConnection() {
       const res = await setSchedulingActivation(true);
       setEnabling(false);
       setActivation((a) => ({ enabled: res.enabled, canManage: a?.canManage ?? true }));
+      // Sync the cached entitlement so the Scheduling tab (Settings sub-tab + top-nav)
+      // appears/disappears with the live activation state instead of going stale.
+      void refreshFeatures();
     } catch (e) {
       console.error('Enable scheduling failed:', e);
       setEnabling(false);
@@ -253,6 +256,7 @@ export function CalendarConnection() {
       await setSchedulingActivation(false);
       setEnabling(false);
       setActivation((a) => ({ enabled: false, canManage: a?.canManage ?? true }));
+      void refreshFeatures();
     } catch (e) {
       console.error('Disable scheduling failed:', e);
       setEnabling(false);

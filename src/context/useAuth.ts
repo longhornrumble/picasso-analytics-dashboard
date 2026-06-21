@@ -13,6 +13,10 @@ export interface AuthContextType extends AuthState {
   login: (token: string) => void;
   logout: () => void;
   refreshToken: () => Promise<void>;
+  /** Re-fetch dashboard feature entitlements from /features and update the user.
+   *  Call after a runtime change to entitlements (e.g. toggling scheduling
+   *  activation) so tab visibility tracks live state instead of the login cache. */
+  refreshFeatures: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
