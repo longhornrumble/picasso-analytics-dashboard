@@ -35,6 +35,9 @@ export function SettingsPage() {
   // ?calendar=connected stripping).
   const initialTab = ((): SettingsSubTab => {
     const p = new URLSearchParams(window.location.search);
+    // Team is always available, so it deep-links unconditionally (the Scheduling tab's
+    // "Invite staff" link routes here — the invite flow lives in TeamManagement).
+    if (p.get('settings_tab') === 'team') return 'team';
     // Only resolve to calendar tab when the feature is entitled; un-entitled users
     // fall through to the default tab (no blank pane).
     if (p.get('settings_tab') === 'calendar' && features.dashboard_scheduling) return 'calendar';

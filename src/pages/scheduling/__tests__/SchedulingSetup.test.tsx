@@ -69,10 +69,19 @@ describe('SchedulingSetup (E13b)', () => {
   it('lists teams + appointment types, resolving the team label by routing policy', async () => {
     render(<SchedulingSetup />);
     await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
-    // appointment-type row shows duration + resolved team label (not the raw policy id)
-    expect(screen.getByText(/30 min · volunteer_coordinators/)).toBeInTheDocument();
-    // team row
-    expect(screen.getByLabelText('Teams')).toBeInTheDocument();
+    // appointment-type row shows duration + conference modality (default Google Meet) +
+    // resolved team label (not the raw policy id)
+    expect(screen.getByText(/30 min · Google Meet · volunteer_coordinators/)).toBeInTheDocument();
+    // Teams subsection + its team row (round-robin rule blurb)
+    expect(screen.getByText('Teams')).toBeInTheDocument();
+    expect(screen.getByText(/Round-robin/)).toBeInTheDocument();
+  });
+
+  it('renders a non-default conference modality label (zoom → Zoom)', async () => {
+    api.fetchAppointmentTypes.mockResolvedValue([{ ...APPT, conference_type: 'zoom' }]);
+    render(<SchedulingSetup />);
+    await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
+    expect(screen.getByText(/30 min · Zoom · volunteer_coordinators/)).toBeInTheDocument();
   });
 
   it('surfaces modified_at on each row (AC#20)', async () => {
