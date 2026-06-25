@@ -212,11 +212,11 @@ export function StaffSchedulingSection() {
   // ---- Admin roster ----
   const shown = members.filter((m) => matchesStaffFilter(staffSchedulingStatus(m), filter));
   return (
-    <section aria-label="Staff scheduling" className="flex flex-col gap-3">
+    <section aria-label="Who handles bookings" className="flex flex-col">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold text-slate-900">Staff</h3>
-          <p className="text-xs text-slate-500">Assign staff to teams (tags), force a booking pause, or set a booking calendar email.</p>
+          <h3 className="text-[17px] font-bold text-slate-900">Who handles bookings</h3>
+          <p className="text-[13px] text-slate-500 mt-0.5">Staff who can be booked, and the calendar each booking writes to.</p>
         </div>
         <label className="flex items-center gap-1.5 text-xs text-slate-500 shrink-0">
           Show
@@ -233,36 +233,38 @@ export function StaffSchedulingSection() {
           </select>
         </label>
       </div>
-      {saveError && <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2" role="alert">{saveError}</p>}
+      {saveError && <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mt-3" role="alert">{saveError}</p>}
 
       {shown.length === 0 ? (
         <p className="text-sm text-slate-400 py-6 text-center">No staff match this filter.</p>
       ) : (
-      <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100 bg-white">
+      <div className="flex flex-col gap-2 mt-4">
         {shown.map((m) => {
           const editing = editingId === m.employee_id;
-          const warning = staffWarning(staffSchedulingStatus(m));
+          const status = staffSchedulingStatus(m);
+          const warning = staffWarning(status);
+          const calEmail = m.calendar_email_override || m.email;
           return (
-            <li key={m.employee_id} className="px-4 py-3 text-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-medium text-slate-800 truncate">{m.name || m.email}</p>
-                  <p className="text-xs text-slate-400">
-                    {(m.scheduling_tags?.length ?? 0) > 0 ? m.scheduling_tags!.join(', ') : 'No teams'}
-                    {m.bookable_override === 'off' && <span className="ml-2 text-amber-600">· Booking paused</span>}
-                  </p>
-                  {warning && (
-                    <p className="text-xs text-amber-600 mt-0.5">
-                      ⚠{' '}
-                      {/* Admin roster: show the warning TEXT only — no link, because the
-                          admin's own calendar page is at this URL and linking there from
-                          another staff member's row would be misleading. */}
-                      {warning}
-                    </p>
-                  )}
+            <div key={m.employee_id} className="border border-slate-100 rounded-xl px-[15px] py-3 text-sm">
+              <div className="flex items-center gap-3">
+                <StaffAvatar member={m} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[14.5px] font-bold text-slate-900 truncate">{m.name || m.email}</span>
+                    {m.bookable_override === 'off' ? (
+                      <Badge>Booking paused</Badge>
+                    ) : warning ? (
+                      <Badge>{warning}</Badge>
+                    ) : null}
+                  </div>
+                  <div className="text-[12.5px] text-slate-500 mt-0.5">
+                    {m.calendar_connected
+                      ? <>Google Calendar connected · {calEmail}</>
+                      : 'Calendar not connected'}
+                  </div>
                 </div>
                 {!editing && (
-                  <button onClick={() => openEdit(m)} className="shrink-0 text-sm text-primary-600 hover:text-primary-700">Edit</button>
+                  <button onClick={() => openEdit(m)} className="shrink-0 text-[13px] font-bold text-primary-700 hover:text-primary-800">Edit</button>
                 )}
               </div>
 
@@ -308,11 +310,52 @@ export function StaffSchedulingSection() {
                   </div>
                 </div>
               )}
-            </li>
+            </div>
           );
         })}
-      </ul>
+      </div>
       )}
+
+      {/* Invite staff routes to the Team sub-tab, where the invite flow lives (deep-link param
+          consumed by SettingsPage). Full-page nav is this SPA's deep-link mechanism. */}
+      <a
+        href="?settings_tab=team"
+        className="flex items-center gap-2 border border-dashed border-slate-300 rounded-xl px-[15px] py-3 text-[13.5px] font-semibold text-primary-700 hover:border-primary-400 hover:bg-primary-50/40 mt-2"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Invite staff
+      </a>
     </section>
+  );
+}
+
+/** Amber pill for a staff member's half-configured / paused state. */
+function Badge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">
+      {children}
+    </span>
+  );
+}
+
+/** Avatar — the member photo when present, else a gradient circle with initials. */
+function StaffAvatar({ member }: { member: TeamMember }) {
+  const initials = (member.name || member.email || '?')
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
+  if (member.image_url) {
+    return <img src={member.image_url} alt="" className="w-[38px] h-[38px] rounded-full object-cover shrink-0" />;
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className="w-[38px] h-[38px] rounded-full shrink-0 flex items-center justify-center text-[12px] font-bold text-white bg-gradient-to-br from-slate-300 to-slate-400"
+    >
+      {initials}
+    </span>
   );
 }

@@ -16,6 +16,8 @@ vi.mock('../../../services/schedulingApi', async () => {
     updateNotificationTemplate: (...a: unknown[]) => api.updateNotificationTemplate(...a),
   };
 });
+// org name feeds the live-preview "From {org}" line.
+vi.mock('../../../context/useAuth', () => ({ useAuth: () => ({ user: { company: 'Atlanta Angels' } }) }));
 
 import { NotificationTemplatesEditor } from '../NotificationTemplatesEditor';
 
@@ -42,118 +44,141 @@ const RESPONSE = {
   sms_footer_note: 'A STOP/HELP line is appended automatically to every SMS.',
 };
 
+// Open one moment's slide-over editor (rows are buttons named by the moment label).
+async function openMoment(name: RegExp) {
+  await userEvent.click(screen.getByRole('button', { name }));
+  return screen.getByRole('dialog');
+}
+
 beforeEach(() => api.fetchNotificationTemplates.mockResolvedValue(RESPONSE));
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
 
-describe('NotificationTemplatesEditor (E14)', () => {
-  it('renders the 3 moments, the read-only STOP note, and per-moment variables', async () => {
+describe('NotificationTemplatesEditor (E14) — message list', () => {
+  it('renders the returned moments as rows, the read-only STOP note, and Customized/Default meta', async () => {
     render(<NotificationTemplatesEditor />);
     await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
-    expect(screen.getByText('Reoffer (slot taken)')).toBeInTheDocument();
+    expect(screen.getByText('Time no longer available')).toBeInTheDocument();
     expect(screen.getByText('Cancellation notice')).toBeInTheDocument();
+    // reassurance + compliance copy
+    expect(screen.getByText(/works out of the box/i)).toBeInTheDocument();
     expect(screen.getByText(/unsubscribe \(STOP\) line is appended automatically/i)).toBeInTheDocument();
-    // there is no editable STOP field
-    expect(screen.queryByLabelText(/stop/i)).not.toBeInTheDocument();
-    // cancel_notice exposes rebook vars (per-moment)
-    const cancelCard = screen.getByText('Cancellation notice').closest('div')!.parentElement!.parentElement!;
-    expect(within(cancelCard).getByText('{{rebookHtml}}')).toBeInTheDocument();
+    // no fields are rendered until a row is opened
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // Customized (cancel_notice override) vs Default (the other two) shown inline in each row
+    expect(screen.getByText(/^Customized ·/)).toBeInTheDocument();
+    expect(screen.getAllByText(/^Default ·/).length).toBe(2);
   });
 
-  it('shows Customized vs Default badges and only offers Reset on an override', async () => {
+  it('only renders moments the API returns (graceful against an older ADA)', async () => {
     render(<NotificationTemplatesEditor />);
     await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
-    expect(screen.getAllByText('Default').length).toBe(2);   // reschedule_link + reoffer
-    expect(screen.getByText('Customized')).toBeInTheDocument(); // cancel_notice
-    expect(screen.getAllByRole('button', { name: /reset to default/i }).length).toBe(1);
+    expect(screen.queryByText('Reminder — 24 hours before')).toBeNull();
+    expect(screen.queryByText('Booking confirmation')).toBeNull();
   });
 
-  it('saves an edited subject via PATCH and reloads', async () => {
+  it('opens a slide-over seeded from the OVERRIDE only — a default moment starts blank with the default as placeholder (audit row 7)', async () => {
+    render(<NotificationTemplatesEditor />);
+    await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
+
+    const dialog = await openMoment(/Reschedule link/);
+    const subj = within(dialog).getByLabelText(/^subject$/i) as HTMLInputElement;
+    expect(subj.value).toBe('');
+    expect(subj).toHaveAttribute('placeholder', 'Default subject');
+    const sms = within(dialog).getByLabelText(/text message/i) as HTMLTextAreaElement;
+    expect(sms.value).toBe('');
+    expect(sms).toHaveAttribute('placeholder', 'Default SMS {{firstName}}');
+    // per-moment variable chips come from available_variables
+    expect(within(dialog).getByRole('button', { name: '{{firstName}}' })).toBeInTheDocument();
+  });
+
+  it('seeds an existing override INTO the field so it stays editable (audit row 7)', async () => {
+    render(<NotificationTemplatesEditor />);
+    await waitFor(() => expect(screen.getByText('Cancellation notice')).toBeInTheDocument());
+    const dialog = await openMoment(/Cancellation notice/);
+    const subj = within(dialog).getByLabelText(/^subject$/i) as HTMLInputElement;
+    expect(subj.value).toBe('Default subject'); // the override value is loaded, not blanked
+    // override moments expose the per-moment vars too
+    expect(within(dialog).getByRole('button', { name: '{{rebookHtml}}' })).toBeInTheDocument();
+  });
+
+  it('tap-to-insert appends a variable to the message body', async () => {
+    render(<NotificationTemplatesEditor />);
+    await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
+    const dialog = await openMoment(/Reschedule link/);
+    await userEvent.click(within(dialog).getByRole('button', { name: '{{firstName}}' }));
+    const body = within(dialog).getByLabelText(/^message$/i) as HTMLTextAreaElement;
+    expect(body.value).toContain('{{firstName}}');
+  });
+
+  it('Save changes PATCHes the edited copy (subject + body + html + sms) and reloads', async () => {
     api.updateNotificationTemplate.mockResolvedValue({ moment: 'reschedule_link', template: tpl({ is_override: true }) });
     render(<NotificationTemplatesEditor />);
     await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
 
-    const subj = screen.getAllByLabelText('Subject')[0];
+    const dialog = await openMoment(/Reschedule link/);
+    const subj = within(dialog).getByLabelText(/^subject$/i);
     await userEvent.clear(subj);
     await userEvent.type(subj, 'New subject');
-    await userEvent.click(screen.getAllByRole('button', { name: /^save$/i })[0]);
+    await userEvent.click(within(dialog).getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => expect(api.updateNotificationTemplate).toHaveBeenCalledTimes(1));
     expect(api.updateNotificationTemplate).toHaveBeenCalledWith(
       'reschedule_link',
       expect.objectContaining({ subject: 'New subject' }),
     );
-    // a reload follows the save (initial load + >=1 reload)
     await waitFor(() => expect(api.fetchNotificationTemplates.mock.calls.length).toBeGreaterThanOrEqual(2));
   });
 
-  it('reset clears all override fields (empty strings → default)', async () => {
+  it('offers Reset only on an override and clears every field (empty strings → default)', async () => {
     api.updateNotificationTemplate.mockResolvedValue({ moment: 'cancel_notice', template: tpl() });
     render(<NotificationTemplatesEditor />);
     await waitFor(() => expect(screen.getByText('Cancellation notice')).toBeInTheDocument());
 
-    await userEvent.click(screen.getByRole('button', { name: /reset to default/i }));
+    // a non-override moment shows no Reset…
+    let dialog = await openMoment(/Reschedule link/);
+    expect(within(dialog).queryByRole('button', { name: /reset to default/i })).toBeNull();
+    await userEvent.click(within(dialog).getByRole('button', { name: /close editor/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+    // …but the override moment does, and resetting clears all fields.
+    dialog = await openMoment(/Cancellation notice/);
+    await userEvent.click(within(dialog).getByRole('button', { name: /reset to default/i }));
     await waitFor(() => expect(api.updateNotificationTemplate).toHaveBeenCalledTimes(1));
-    expect(api.updateNotificationTemplate).toHaveBeenCalledWith('cancel_notice', { subject: '', body_text: '', body_html: '' });
+    expect(api.updateNotificationTemplate).toHaveBeenCalledWith('cancel_notice', {
+      subject: '', body_text: '', body_html: '', sms_text: '',
+    });
   });
 
-  it('renders an SMS field per moment with a segment hint + held-delivery note', async () => {
+  it('shows the SMS field with a segment hint and the held-delivery note', async () => {
     render(<NotificationTemplatesEditor />);
     await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
-    expect(screen.getAllByLabelText('SMS text').length).toBe(3);
-    expect(screen.getAllByText(/segment/i).length).toBe(3);
-    expect(screen.getAllByText(/SMS delivery isn't enabled yet/i).length).toBe(3);
+    const dialog = await openMoment(/Reschedule link/);
+    expect(within(dialog).getByLabelText(/text message/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/segment/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/SMS delivery isn't live yet/i)).toBeInTheDocument();
   });
 
-  it('Save SMS PATCHes only sms_text (never the email fields)', async () => {
-    api.updateNotificationTemplate.mockResolvedValue({ moment: 'reschedule_link', template: tpl({ sms_is_override: true }) });
+  it('renders a live preview that resolves variables with sample data', async () => {
     render(<NotificationTemplatesEditor />);
     await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
-
-    const sms = screen.getAllByLabelText('SMS text')[0];
-    await userEvent.clear(sms);
-    await userEvent.type(sms, 'New SMS copy');
-    await userEvent.click(screen.getAllByRole('button', { name: /^save sms$/i })[0]);
-
-    await waitFor(() => expect(api.updateNotificationTemplate).toHaveBeenCalledTimes(1));
-    expect(api.updateNotificationTemplate).toHaveBeenCalledWith('reschedule_link', { sms_text: 'New SMS copy' });
+    const dialog = await openMoment(/Reschedule link/);
+    const subj = within(dialog).getByLabelText(/^subject$/i);
+    await userEvent.clear(subj);
+    await userEvent.type(subj, 'Hi {{firstName}}');
+    // {{firstName}} → sample "Alex"; "From {org}" pulls the tenant company name
+    expect(within(dialog).getByText('Hi Alex')).toBeInTheDocument();
+    expect(within(dialog).getByText('Atlanta Angels')).toBeInTheDocument();
   });
 
-  it('email Save never writes the SMS field (no cross-contamination)', async () => {
-    api.updateNotificationTemplate.mockResolvedValue({ moment: 'reschedule_link', template: tpl({ is_override: true }) });
+  it('closing the editor (✕) removes the dialog', async () => {
     render(<NotificationTemplatesEditor />);
     await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
-
-    await userEvent.click(screen.getAllByRole('button', { name: /^save$/i })[0]);
-    await waitFor(() => expect(api.updateNotificationTemplate).toHaveBeenCalledTimes(1));
-    const [, body] = api.updateNotificationTemplate.mock.calls[0];
-    expect(body).not.toHaveProperty('sms_text');
-    expect(body).toHaveProperty('subject');
-  });
-
-  it('seeds editable fields from the OVERRIDE only — a default moment starts blank with the default as placeholder (audit row 7)', async () => {
-    render(<NotificationTemplatesEditor />);
-    await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
-
-    // reschedule_link is NOT an override → fields must be empty (so "Save" can't persist the
-    // platform default AS a tenant override), with the default surfaced as a placeholder.
-    const subj = screen.getAllByLabelText('Subject')[0] as HTMLInputElement;
-    expect(subj.value).toBe('');
-    expect(subj).toHaveAttribute('placeholder', 'Default subject');
-    const sms = screen.getAllByLabelText('SMS text')[0] as HTMLTextAreaElement;
-    expect(sms.value).toBe('');
-    expect(sms).toHaveAttribute('placeholder', 'Default SMS {{firstName}}');
-  });
-
-  it('seeds an existing override INTO the field so it stays editable (audit row 7)', async () => {
-    render(<NotificationTemplatesEditor />);
-    await waitFor(() => expect(screen.getByText('Cancellation notice')).toBeInTheDocument());
-    // cancel_notice is is_override:true with subject 'Default subject' (the override value here).
-    const cancelCard = screen.getByText('Cancellation notice').closest('div')!.parentElement!.parentElement!;
-    const subj = within(cancelCard).getByLabelText('Subject') as HTMLInputElement;
-    expect(subj.value).toBe('Default subject'); // the override is loaded, not blanked
+    const dialog = await openMoment(/Reschedule link/);
+    await userEvent.click(within(dialog).getByRole('button', { name: /close editor/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
   it('schema discipline: a moment missing available_variables does not crash (audit row 8)', async () => {
@@ -161,36 +186,21 @@ describe('NotificationTemplatesEditor (E14)', () => {
       ...RESPONSE,
       moments: {
         ...RESPONSE.moments,
-        // drop available_variables + sms_available_variables (old-shape row)
         reoffer: { ...tpl(), available_variables: undefined, sms_available_variables: undefined },
       },
     });
     render(<NotificationTemplatesEditor />);
-    await waitFor(() => expect(screen.getByText('Reoffer (slot taken)')).toBeInTheDocument());
-    // renders without throwing; the variables line is simply omitted for that moment
-    expect(screen.getByText('Reoffer (slot taken)')).toBeInTheDocument();
-  });
-
-  it('offers Reset SMS only on an SMS override → clears it', async () => {
-    api.fetchNotificationTemplates.mockResolvedValue({
-      ...RESPONSE,
-      moments: { ...RESPONSE.moments, reoffer: tpl({ sms_is_override: true }) },
-    });
-    api.updateNotificationTemplate.mockResolvedValue({ moment: 'reoffer', template: tpl() });
-    render(<NotificationTemplatesEditor />);
-    await waitFor(() => expect(screen.getByText('Reoffer (slot taken)')).toBeInTheDocument());
-
-    const resets = screen.getAllByRole('button', { name: /^reset sms$/i });
-    expect(resets.length).toBe(1);
-    await userEvent.click(resets[0]);
-    await waitFor(() => expect(api.updateNotificationTemplate).toHaveBeenCalledWith('reoffer', { sms_text: '' }));
+    await waitFor(() => expect(screen.getByText('Time no longer available')).toBeInTheDocument());
+    // opening it renders without throwing; the chip row is simply omitted
+    const dialog = await openMoment(/Time no longer available/);
+    expect(within(dialog).getByLabelText(/^subject$/i)).toBeInTheDocument();
   });
 });
 
 // ─── S4d: the S4 moments (reminder_24h / reminder_1h / confirmation) ──────────────────
 
 describe('S4 moments', () => {
-  it('renders the reminder + confirmation editors when the API returns them', async () => {
+  it('renders the reminder + confirmation rows when the API returns them', async () => {
     api.fetchNotificationTemplates.mockResolvedValue({
       ...RESPONSE,
       moments: {
@@ -201,17 +211,18 @@ describe('S4 moments', () => {
       },
     });
     render(<NotificationTemplatesEditor />);
-    expect(await screen.findByText('Reminder (24 hours)')).toBeInTheDocument();
-    expect(screen.getByText('Reminder (1 hour)')).toBeInTheDocument();
+    expect(await screen.findByText('Reminder — 24 hours before')).toBeInTheDocument();
+    expect(screen.getByText('Reminder — 1 hour before')).toBeInTheDocument();
     expect(screen.getByText('Booking confirmation')).toBeInTheDocument();
-    // The confirmation hint carries the can't-remove-links invariant for the admin:
-    expect(screen.getByText(/calendar invite \(\.ics\)/)).toBeInTheDocument();
+    // the confirmation editor carries the can't-remove-links invariant
+    const dialog = await openMoment(/Booking confirmation/);
+    expect(within(dialog).getByText(/calendar invite, .ics file and reschedule link are always included/i)).toBeInTheDocument();
   });
 
   it('stays graceful against an older ADA that does not return the S4 moments', async () => {
     render(<NotificationTemplatesEditor />); // RESPONSE has only the 3 v1 moments
     expect(await screen.findByText('Reschedule link')).toBeInTheDocument();
-    expect(screen.queryByText('Reminder (24 hours)')).toBeNull();
+    expect(screen.queryByText('Reminder — 24 hours before')).toBeNull();
     expect(screen.queryByText('Booking confirmation')).toBeNull();
   });
 });
