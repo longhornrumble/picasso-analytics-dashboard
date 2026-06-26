@@ -35,7 +35,7 @@ import {
   type CalendarConnectionInitResponse,
   type CalendarConnectionStatusResponse,
 } from '../../services/schedulingApi';
-import { GoogleLogo } from './IntegrationLogos';
+import { GoogleCalendarLogo } from './IntegrationLogos';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -347,7 +347,7 @@ export function CalendarConnection() {
     return (
       <section aria-label="Calendar connection" className="flex flex-col gap-4">
         <div className="flex items-center gap-2">
-          <GoogleLogo className="w-5 h-5 shrink-0" />
+          <GoogleCalendarLogo className="w-5 h-5 shrink-0" />
           <div>
             <h3 className="text-sm font-bold text-slate-900">Calendar</h3>
             <p className="text-xs text-slate-500">
@@ -431,7 +431,7 @@ export function CalendarConnection() {
   return (
     <section aria-label="Calendar connection" className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <GoogleLogo className="w-5 h-5 shrink-0" />
+        <GoogleCalendarLogo className="w-5 h-5 shrink-0" />
         <div>
           <h3 className="text-sm font-bold text-slate-900">Calendar</h3>
           <p className="text-xs text-slate-500">
