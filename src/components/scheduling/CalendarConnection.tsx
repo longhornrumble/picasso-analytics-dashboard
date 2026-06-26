@@ -427,11 +427,6 @@ export function CalendarConnection() {
   const isStale = status?.status === 'stale_connected';
   const showDisconnect = isConnected || isStale;
 
-  // Scopes: filter to strings and join (item 8 — guard against non-string entries).
-  const scopesStr = (status?.scopes ?? [])
-    .filter((s): s is string => typeof s === 'string')
-    .join(', ');
-
   return (
     <section
       aria-label="Calendar connection"
@@ -546,11 +541,6 @@ export function CalendarConnection() {
       {/* Disconnect inline error */}
       {disconnectError && (
         <p className="text-sm text-red-600 mt-3" role="alert" data-testid="disconnect-error">{disconnectError}</p>
-      )}
-
-      {/* Scope info (connected + scopes present) */}
-      {isConnected && scopesStr && (
-        <p className="text-[11px] text-slate-400 mt-3">Authorized scopes: {scopesStr}</p>
       )}
 
       {/* Org-level scheduling toggle (admin/manageable only — suppressed on the

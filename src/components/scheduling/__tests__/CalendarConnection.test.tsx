@@ -447,14 +447,13 @@ describe('CalendarConnection (Track 2 Surface 1)', () => {
     expect(screen.queryByTestId('calendar-id')).toBeNull();
   });
 
-  // item 10g (cheap add): scopes line renders when present
-  it('scopes line renders when connected with scopes', async () => {
+  // The authorized-scopes line was intentionally removed from the connected card.
+  it('does not show an authorized-scopes line when connected', async () => {
     api.initCalendarConnection.mockResolvedValue(INIT_RESP);
     api.fetchCalendarConnectionStatus.mockResolvedValue(CONNECTED_STATUS);
     render(<CalendarConnection />);
     await waitFor(() => expect(screen.getByText('Connected')).toBeInTheDocument());
-    expect(screen.getByText(/authorized scopes/i)).toBeInTheDocument();
-    expect(screen.getByText(/calendar\.events/)).toBeInTheDocument();
+    expect(screen.queryByText(/authorized scopes/i)).toBeNull();
   });
 });
 

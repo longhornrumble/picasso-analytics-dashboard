@@ -24,8 +24,10 @@ export function ZoomIntegrationCard() {
           </span>
         </div>
         <p className="text-sm text-slate-500 mt-1.5">
-          Host booked appointments on Zoom instead of Google Meet.{' '}
-          <span className="text-slate-400">Contact MyRecruiter to enable it for your organization.</span>
+          Host booked appointments on Zoom instead of Google Meet.
+        </p>
+        <p className="text-sm text-slate-400 mt-0.5">
+          Contact MyRecruiter to enable it for your organization.
         </p>
       </div>
     </section>
