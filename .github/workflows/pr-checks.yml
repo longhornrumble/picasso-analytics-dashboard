@@ -113,9 +113,16 @@ jobs:
     with:
       environment: staging
       artifact_name: dashboard-build
-      bucket: picasso-analytics-portal-staging
-      cloudfront_distribution_id: E2R9VHBON5PHMK
-      website_url: https://d2t5sxdcthprgd.cloudfront.net
+      # Staging re-home (prod acct 614 -> staging 525): the dashboard staging
+      # hosting now lives in the staging account as an OAC-hardened twin of the
+      # prod dashboard dist. Was bucket picasso-analytics-portal-staging /
+      # CF E2R9VHBON5PHMK (both in 614). See picasso#602 (twin) + #603 (role).
+      bucket: picasso-analytics-dashboard-staging
+      cloudfront_distribution_id: E72QGOSH2XUD3
+      website_url: https://diag4njrvnbeb.cloudfront.net
       comment_pr: true
     secrets:
-      deploy_role_arn: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+      # 525 least-privilege role (picasso infra iam-analytics-dashboard-deploy-staging),
+      # set as the repo secret AWS_DEPLOY_ROLE_ARN_STAGING. The prod deploy
+      # (deploy-production.yml) keeps the 614 role secret AWS_DEPLOY_ROLE_ARN.
+      deploy_role_arn: ${{ secrets.AWS_DEPLOY_ROLE_ARN_STAGING }}
