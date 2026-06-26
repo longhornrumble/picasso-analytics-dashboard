@@ -125,6 +125,8 @@ export interface AppointmentTypeWrite {
   buffer_before_minutes?: number;
   buffer_after_minutes?: number;
   lead_time_minutes?: number;
+  /** Meeting location (§B18b). Phase 1 = the two live providers; absent → 'google_meet'. */
+  conference_type?: 'google_meet' | 'zoom';
   routing_policy_id: string;
 }
 

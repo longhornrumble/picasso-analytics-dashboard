@@ -78,6 +78,7 @@ const blankAppt: AppointmentTypeWrite = {
   buffer_before_minutes: 0,
   buffer_after_minutes: 0,
   lead_time_minutes: 0,
+  conference_type: 'google_meet',
   routing_policy_id: '',
 };
 
@@ -140,7 +141,7 @@ function PageHeader() {
   );
 }
 
-function VideoIcon() {
+function MeetingIcon() {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <path d="M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -386,7 +387,7 @@ export function SchedulingSetup() {
           {appts.map((a) => (
             <div key={a.appointment_type_id} className="flex items-center gap-3 border border-slate-100 rounded-xl px-[15px] py-3">
               <span className="w-[34px] h-[34px] rounded-[9px] bg-primary-50 flex items-center justify-center shrink-0 text-primary-700">
-                <VideoIcon />
+                <MeetingIcon />
               </span>
               <div className="flex-1 min-w-0">
                 <div className="text-[14.5px] font-bold text-slate-900">{a.name}</div>
@@ -407,6 +408,7 @@ export function SchedulingSetup() {
                     buffer_before_minutes: a.buffer_before_minutes ?? 0,
                     buffer_after_minutes: a.buffer_after_minutes ?? 0,
                     lead_time_minutes: a.lead_time_minutes ?? 0,
+                    conference_type: a.conference_type ?? 'google_meet',
                     routing_policy_id: a.routing_policy_id,
                   });
                   setSaveError(null);
@@ -437,6 +439,14 @@ export function SchedulingSetup() {
               <label htmlFor="at-name" className="block text-xs font-medium text-slate-600 mb-1">Name</label>
               <input id="at-name" className={inputCls} value={apptForm.name}
                 onChange={(e) => setApptForm({ ...apptForm, name: e.target.value })} />
+            </div>
+            <div>
+              <label htmlFor="at-location" className="block text-xs font-medium text-slate-600 mb-1">Location</label>
+              <select id="at-location" className={inputCls} value={apptForm.conference_type ?? 'google_meet'}
+                onChange={(e) => setApptForm({ ...apptForm, conference_type: e.target.value as 'google_meet' | 'zoom' })}>
+                <option value="google_meet">Google Meet</option>
+                <option value="zoom">Zoom</option>
+              </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
