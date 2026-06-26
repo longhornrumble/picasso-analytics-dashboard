@@ -10,7 +10,7 @@ import { NotificationsDashboard } from './NotificationsDashboard';
 import { TeamManagement } from './TeamManagement';
 import { SchedulingSetup } from './scheduling/SchedulingSetup';
 import AdminPanel from './AdminPanel';
-import { CalendarConnection } from '../components/scheduling/CalendarConnection';
+import { IntegrationsTab } from '../components/scheduling/IntegrationsTab';
 import type { DashboardFeatures } from '../types/analytics';
 
 type SettingsSubTab = 'notifications' | 'team' | 'scheduling' | 'calendar' | 'admin';
@@ -35,6 +35,9 @@ export function SettingsPage() {
   // ?calendar=connected stripping).
   const initialTab = ((): SettingsSubTab => {
     const p = new URLSearchParams(window.location.search);
+    // Team is always available, so it deep-links unconditionally (the Scheduling tab's
+    // "Invite staff" link routes here — the invite flow lives in TeamManagement).
+    if (p.get('settings_tab') === 'team') return 'team';
     // Integrations is always available, so the deep-link always resolves there;
     // the Calendar card self-gates on org activation.
     if (p.get('settings_tab') === 'calendar') return 'calendar';
@@ -135,7 +138,7 @@ export function SettingsPage() {
       )}
 
       {activeSubTab === 'calendar' && (
-        <CalendarConnection />
+        <IntegrationsTab />
       )}
 
       {activeSubTab === 'admin' && user?.role === 'super_admin' && (

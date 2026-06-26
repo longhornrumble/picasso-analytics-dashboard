@@ -43,10 +43,10 @@ afterEach(() => {
 describe('StaffSchedulingSection — admin', () => {
   beforeEach(() => mockUser.mockReturnValue({ role: 'admin', email: 'admin@x' }));
 
-  it('renders the roster with teams + booking-paused state', async () => {
+  it('renders the roster with each member + booking-paused state', async () => {
     render(<StaffSchedulingSection />);
     await waitFor(() => expect(screen.getByText('Maya')).toBeInTheDocument());
-    expect(screen.getByText('volunteer_coordinators')).toBeInTheDocument();
+    expect(screen.getByText('Alex')).toBeInTheDocument();
     expect(screen.getByText(/Booking paused/)).toBeInTheDocument(); // Alex
   });
 
@@ -101,9 +101,9 @@ describe('StaffSchedulingSection — admin', () => {
     render(<StaffSchedulingSection />);
     await waitFor(() => expect(screen.getByText('Needs Cal')).toBeInTheDocument());
 
-    expect(within(screen.getByText('Needs Cal').closest('li')!).getByText(/Connect calendar to be bookable/)).toBeInTheDocument();
-    expect(within(screen.getByText('Needs Team').closest('li')!).getByText(/Not on any team/)).toBeInTheDocument();
-    const okRow = screen.getByText('All Set').closest('li')!;
+    expect(within(screen.getByText('Needs Cal').closest('div')!).getByText(/Connect calendar to be bookable/)).toBeInTheDocument();
+    expect(within(screen.getByText('Needs Team').closest('div')!).getByText(/Not on any team/)).toBeInTheDocument();
+    const okRow = screen.getByText('All Set').closest('div')!;
     expect(within(okRow).queryByText(/Connect calendar|Not on any team/)).toBeNull();
   });
 

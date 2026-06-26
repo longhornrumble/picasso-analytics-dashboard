@@ -96,6 +96,12 @@ export interface AppointmentType {
   buffer_before_minutes?: number;
   buffer_after_minutes?: number;
   lead_time_minutes?: number;
+  /**
+   * §B18b conferencing modality the booking joins at start — the Booking_Commit_Handler
+   * mints a Google Meet / Zoom link (or none) accordingly. Absent → defaults to
+   * 'google_meet' server-side. Read-only here (no editor yet); schema-discipline optional.
+   */
+  conference_type?: 'google_meet' | 'zoom';
   /** FK → RoutingPolicy; the router THROWS without it. */
   routing_policy_id: string;
   modified_at?: ModifiedAt; // absent on legacy/fixture rows
@@ -119,6 +125,8 @@ export interface AppointmentTypeWrite {
   buffer_before_minutes?: number;
   buffer_after_minutes?: number;
   lead_time_minutes?: number;
+  /** Meeting location (§B18b). Phase 1 = the two live providers; absent → 'google_meet'. */
+  conference_type?: 'google_meet' | 'zoom';
   routing_policy_id: string;
 }
 

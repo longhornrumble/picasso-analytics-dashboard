@@ -35,6 +35,7 @@ import {
   type CalendarConnectionInitResponse,
   type CalendarConnectionStatusResponse,
 } from '../../services/schedulingApi';
+import { GoogleCalendarLogo } from './IntegrationLogos';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -75,6 +76,14 @@ function parseOAuthReturn(search: string): { isReturn: boolean; watchOk: boolean
     watchOk: watch === 'ok',
   };
 }
+
+// Pill buttons (per the Integrations design import).
+const PILL_OUTLINE =
+  'font-semibold text-sm text-slate-600 bg-white border border-slate-200 rounded-full px-[18px] py-2.5 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 disabled:opacity-50';
+const PILL_DANGER =
+  'font-semibold text-sm text-red-600 bg-white border-[1.5px] border-[#F4C7C2] rounded-full px-[18px] py-2.5 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1 disabled:opacity-50';
+const PILL_PRIMARY =
+  'font-semibold text-sm text-white bg-primary-500 rounded-full px-[22px] py-3 shadow-[0_8px_24px_rgba(80,200,120,0.28)] hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 disabled:opacity-50 whitespace-nowrap';
 
 // ─── component ──────────────────────────────────────────────────────────────
 
@@ -345,11 +354,14 @@ export function CalendarConnection() {
   if (!activation.enabled) {
     return (
       <section aria-label="Calendar connection" className="flex flex-col gap-4">
-        <div>
-          <h3 className="text-sm font-bold text-slate-900">Calendar</h3>
-          <p className="text-xs text-slate-500">
-            Connect your Google Calendar to become bookable. Picasso writes confirmed appointments to your primary calendar.
-          </p>
+        <div className="flex items-center gap-2">
+          <GoogleCalendarLogo className="w-5 h-5 shrink-0" />
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Calendar</h3>
+            <p className="text-xs text-slate-500">
+              Connect your Google Calendar to become bookable. Picasso writes confirmed appointments to your primary calendar.
+            </p>
+          </div>
         </div>
 
         {activation.canManage ? (
@@ -376,10 +388,6 @@ export function CalendarConnection() {
             </p>
           </div>
         )}
-
-        <p className="text-xs text-slate-400">
-          Only your primary calendar is used. Picasso never reads email, contacts, or other calendar data.
-        </p>
       </section>
     );
   }
@@ -419,24 +427,50 @@ export function CalendarConnection() {
   const isStale = status?.status === 'stale_connected';
   const showDisconnect = isConnected || isStale;
 
-  // Scopes: filter to strings and join (item 8 — guard against non-string entries).
-  const scopesStr = (status?.scopes ?? [])
-    .filter((s): s is string => typeof s === 'string')
-    .join(', ');
-
   return (
-    <section aria-label="Calendar connection" className="flex flex-col gap-4">
-      <div>
-        <h3 className="text-sm font-bold text-slate-900">Calendar</h3>
-        <p className="text-xs text-slate-500">
-          Connect your Google Calendar to become bookable. Picasso writes confirmed appointments to your primary calendar.
-        </p>
+    <section
+      aria-label="Calendar connection"
+      className="bg-white border border-slate-200 rounded-[18px] shadow-sm px-[26px] py-6"
+    >
+      {/* header: logo + title + status badge + description */}
+      <div className="flex items-start gap-[15px]">
+        <GoogleCalendarLogo className="w-12 h-12 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-wrap" aria-live="polite">
+            <h2 className="text-[17px] font-semibold text-slate-900">Google Calendar</h2>
+            {isConnected ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-primary-50 text-primary-700">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                {statusLabel('connected')}
+              </span>
+            ) : isStale ? (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">
+                {statusLabel('stale_connected')}
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500">
+                {statusLabel('disconnected')}
+              </span>
+            )}
+            {status?.status === 'disconnected' && status.reason === 'revoked' && (
+              <span className="text-xs text-amber-600">(access was revoked — please reconnect)</span>
+            )}
+            {isStale && (
+              <span className="text-xs text-amber-600">(could not verify — connect again if bookings fail)</span>
+            )}
+          </div>
+          <p className="text-sm text-slate-500 mt-1.5 max-w-[60ch]">
+            Connect your Google Calendar to become bookable. MyRecruiter writes confirmed appointments to your primary calendar.
+          </p>
+        </div>
       </div>
 
       {/* OAuth return success banner — persists until the user navigates away */}
       {oauthBanner && (
         <div
-          className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700"
+          className="mt-[18px] rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700"
           role="status"
           aria-live="polite"
           data-testid="oauth-success-banner"
@@ -450,7 +484,7 @@ export function CalendarConnection() {
       {/* Disconnect success banner */}
       {disconnectBanner && (
         <div
-          className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-700"
+          className="mt-[18px] rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-700"
           role="status"
           aria-live="polite"
           data-testid="disconnect-success-banner"
@@ -459,115 +493,78 @@ export function CalendarConnection() {
         </div>
       )}
 
-      {/* Status card */}
-      <div className="rounded-xl border border-slate-100 bg-white p-4 flex flex-col gap-3">
-        {/* Status row */}
-        <div className="flex items-center gap-2" aria-live="polite">
-          {/* Status dot */}
-          <span
-            aria-hidden="true"
-            className={[
-              'inline-block w-2.5 h-2.5 rounded-full shrink-0',
-              isConnected ? 'bg-green-500' : isStale ? 'bg-amber-400' : 'bg-slate-300',
-            ].join(' ')}
-          />
-          <span className="text-sm font-medium text-slate-800">
-            {status ? statusLabel(status.status) : 'Unknown'}
-          </span>
-          {status?.status === 'disconnected' && status.reason === 'revoked' && (
-            <span className="text-xs text-amber-600">(access was revoked — please reconnect)</span>
-          )}
-          {isStale && (
-            <span className="text-xs text-amber-600">(could not verify — connect again if bookings fail)</span>
-          )}
-        </div>
-
-        {/* Connected detail — only rendered when calendar_id is present */}
-        {isConnected && status?.calendar_id && (
-          <div className="flex flex-col gap-1">
-            <p className="text-xs text-slate-500">
-              <span className="font-medium text-slate-700">Calendar:</span>{' '}
-              <span data-testid="calendar-id">{status.calendar_id}</span>
-            </p>
-            <p className="text-xs text-slate-400">Provider: Google</p>
+      {isConnected ? (
+        <>
+          {/* connected detail — mint info grid */}
+          <div className="mt-[18px] bg-primary-50 rounded-xl px-5 py-[17px] grid grid-cols-2 gap-x-7 gap-y-[15px]">
+            {status?.calendar_id && (
+              <div>
+                <div className="text-[11px] font-semibold tracking-[0.06em] uppercase text-primary-700 mb-1.5">Calendar</div>
+                <div className="text-sm font-semibold text-slate-900" data-testid="calendar-id">{status.calendar_id}</div>
+              </div>
+            )}
+            <div>
+              <div className="text-[11px] font-semibold tracking-[0.06em] uppercase text-primary-700 mb-1.5">Provider</div>
+              <div className="text-sm font-semibold text-slate-900">Google</div>
+            </div>
           </div>
-        )}
 
-        {/* Connect / Reconnect button — stale_connected shows "Connect" (not "Reconnect") */}
-        <div className="flex flex-wrap gap-2 items-center">
-          <button
-            onClick={handleConnect}
-            disabled={connecting || disconnecting}
-            aria-label={isConnected ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
-            className={[
-              'px-4 py-2 text-sm font-medium rounded-lg',
-              'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1',
-              'disabled:opacity-50',
-              isConnected
-                ? 'text-slate-600 border border-slate-200 hover:bg-slate-50'
-                : 'text-white bg-primary-600 hover:bg-primary-700',
-            ].join(' ')}
-          >
-            {connecting ? 'Connecting…' : isConnected ? 'Reconnect' : 'Connect Google Calendar'}
-          </button>
-
-          {/* Disconnect button — only visible when connected or stale_connected */}
-          {showDisconnect && (
-            <button
-              onClick={handleDisconnect}
-              disabled={disconnecting || connecting}
-              aria-label="Disconnect Google Calendar"
-              className={[
-                'px-4 py-2 text-sm font-medium rounded-lg',
-                'text-red-600 border border-red-200 hover:bg-red-50',
-                'focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1',
-                'disabled:opacity-50',
-              ].join(' ')}
-            >
+          {/* actions */}
+          <div className="mt-[18px] flex items-center gap-2.5 flex-wrap">
+            <button onClick={handleConnect} disabled={connecting || disconnecting} aria-label="Reconnect Google Calendar" className={PILL_OUTLINE}>
+              {connecting ? 'Connecting…' : 'Reconnect'}
+            </button>
+            <button onClick={handleDisconnect} disabled={disconnecting || connecting} aria-label="Disconnect Google Calendar" className={PILL_DANGER}>
               {disconnecting ? 'Disconnecting…' : 'Disconnect'}
             </button>
-          )}
+          </div>
+        </>
+      ) : (
+        /* disconnected / stale_connected — sign-in prompt + connect (stale also offers disconnect) */
+        <div className="mt-[18px] flex items-center justify-between gap-4 flex-wrap">
+          <p className="text-[13px] text-slate-400 max-w-[46ch]">
+            Sign in with Google to make your availability bookable.
+          </p>
+          <div className="flex items-center gap-2.5">
+            {showDisconnect && (
+              <button onClick={handleDisconnect} disabled={disconnecting || connecting} aria-label="Disconnect Google Calendar" className={PILL_DANGER}>
+                {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+              </button>
+            )}
+            <button onClick={handleConnect} disabled={connecting || disconnecting} aria-label="Connect Google Calendar" className={PILL_PRIMARY}>
+              {connecting ? 'Connecting…' : 'Connect Google Calendar'}
+            </button>
+          </div>
         </div>
+      )}
 
-        {/* Disconnect inline error */}
-        {disconnectError && (
-          <p
-            className="text-sm text-red-600"
-            role="alert"
-            data-testid="disconnect-error"
-          >
-            {disconnectError}
-          </p>
-        )}
+      {/* Disconnect inline error */}
+      {disconnectError && (
+        <p className="text-sm text-red-600 mt-3" role="alert" data-testid="disconnect-error">{disconnectError}</p>
+      )}
 
-        {/* Scope info (connected + scopes present) */}
-        {isConnected && scopesStr && (
-          <p className="text-[11px] text-slate-400">
-            Authorized scopes: {scopesStr}
-          </p>
-        )}
-      </div>
-
-      {/* Admin org-level control: scheduling is on; allow turning it back off.
-          Only when manageable (real activation endpoint) — suppressed on the
-          backward-compat fallback so old backends never show a control that 404s. */}
+      {/* Org-level scheduling toggle (admin/manageable only — suppressed on the
+          backward-compat fallback so old backends never show a control that 404s).
+          Shown in both connected and disconnected ready states: scheduling is org-wide,
+          independent of this viewer's own calendar connection. */}
       {activation.canManage && (
-        <p className="text-xs text-slate-500" data-testid="org-scheduling-on">
-          Scheduling is on for your organization ·{' '}
+        <div className="mt-5 pt-4 border-t border-slate-100 flex items-center gap-2.5" data-testid="org-scheduling-on">
+          <span className="text-[13px] font-medium text-slate-500">Organization scheduling</span>
+          <div className="flex-1" />
           <button
+            type="button"
+            role="switch"
+            aria-checked="true"
+            aria-label="Turn off organization scheduling"
             onClick={handleDisableOrg}
             disabled={enabling}
-            className="text-red-600 hover:underline disabled:opacity-50"
+            className="relative w-10 h-[23px] rounded-full bg-primary-500 disabled:opacity-50 transition-colors"
           >
-            {enabling ? 'Working…' : 'Disable'}
+            <span className="absolute top-[2px] right-[2px] w-[19px] h-[19px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.2)]" />
           </button>
-        </p>
+        </div>
       )}
-      {enableError && <p className="text-sm text-red-600" role="alert">{enableError}</p>}
-
-      <p className="text-xs text-slate-400">
-        Only your primary calendar is used. Picasso never reads email, contacts, or other calendar data.
-      </p>
+      {enableError && <p className="text-sm text-red-600 mt-2" role="alert">{enableError}</p>}
     </section>
   );
 }

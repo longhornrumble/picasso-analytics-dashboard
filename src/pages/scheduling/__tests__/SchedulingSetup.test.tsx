@@ -108,10 +108,19 @@ describe('SchedulingSetup (E13b)', () => {
   it('lists teams + appointment types, resolving the team label by routing policy', async () => {
     render(<SchedulingSetup />);
     await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
-    // appointment-type row shows duration + resolved team label (not the raw policy id)
-    expect(screen.getByText(/30 min · volunteer_coordinators/)).toBeInTheDocument();
-    // team row
-    expect(screen.getByLabelText('Teams')).toBeInTheDocument();
+    // appointment-type row shows duration + conference modality (default Google Meet) +
+    // resolved team label (not the raw policy id)
+    expect(screen.getByText(/30 min · Google Meet · volunteer_coordinators/)).toBeInTheDocument();
+    // Teams subsection + its team row (round-robin rule blurb)
+    expect(screen.getByText('Teams')).toBeInTheDocument();
+    expect(screen.getByText(/Round-robin/)).toBeInTheDocument();
+  });
+
+  it('renders a non-default conference modality label (zoom → Zoom)', async () => {
+    api.fetchAppointmentTypes.mockResolvedValue([{ ...APPT, conference_type: 'zoom' }]);
+    render(<SchedulingSetup />);
+    await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
+    expect(screen.getByText(/30 min · Zoom · volunteer_coordinators/)).toBeInTheDocument();
   });
 
   it('surfaces modified_at on each row (AC#20)', async () => {
@@ -133,9 +142,27 @@ describe('SchedulingSetup (E13b)', () => {
 
     await waitFor(() => expect(api.createAppointmentType).toHaveBeenCalledTimes(1));
     expect(api.createAppointmentType).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Interview', routing_policy_id: 'rp1', duration_minutes: 30 }),
+      // Location defaults to Google Meet when the admin doesn't change it.
+      expect.objectContaining({ name: 'Interview', routing_policy_id: 'rp1', duration_minutes: 30, conference_type: 'google_meet' }),
     );
     expect(api.fetchAppointmentTypes).toHaveBeenCalledTimes(2); // initial + reload
+  });
+
+  it('creates an appointment type with the chosen Location (Zoom)', async () => {
+    api.createAppointmentType.mockResolvedValue({ ...APPT, appointment_type_id: 'a2', name: 'Consult', conference_type: 'zoom' });
+    render(<SchedulingSetup />);
+    await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: /add appointment type/i }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Consult');
+    await userEvent.selectOptions(screen.getByLabelText('Location'), 'zoom');
+    await userEvent.selectOptions(screen.getByLabelText('Handled by team'), 'rp1');
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => expect(api.createAppointmentType).toHaveBeenCalledTimes(1));
+    expect(api.createAppointmentType).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Consult', conference_type: 'zoom', routing_policy_id: 'rp1' }),
+    );
   });
 
   it('edits an appointment type with its If-Match optimistic-lock token', async () => {
@@ -149,7 +176,8 @@ describe('SchedulingSetup (E13b)', () => {
     await waitFor(() => expect(api.updateAppointmentType).toHaveBeenCalledTimes(1));
     expect(api.updateAppointmentType).toHaveBeenCalledWith(
       'a1',
-      expect.objectContaining({ name: 'Discovery', routing_policy_id: 'rp1' }),
+      // edit seeds conference_type from the row (absent → google_meet) and sends it back
+      expect.objectContaining({ name: 'Discovery', routing_policy_id: 'rp1', conference_type: 'google_meet' }),
       '2026-06-06T00:00:00.000002Z', // ifMatchToken(APPT)
     );
   });
