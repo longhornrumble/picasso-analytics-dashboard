@@ -34,28 +34,13 @@ export function GoogleCalendarLogo({ className }: { className?: string }) {
   );
 }
 
-/**
- * Zoom logo lockup — camera-in-circle mark + "zoom" wordmark (typeset stand-in in Zoom Blue).
- * Recreating Zoom's custom letterforms exactly isn't worth hand-pathing; swap for the official
- * lockup SVG for brand-perfect fidelity. aria-label carries the name since it acts as a title.
- */
+/** Zoom app icon — white video camera on a rounded blue square (per the design's zoom_icon). */
 export function ZoomLogo({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 140 40" className={className} role="img" aria-label="Zoom">
-      <circle cx="20" cy="20" r="18" fill="#4087FC" />
-      <rect x="11" y="14.5" width="12.5" height="11" rx="2.5" fill="#fff" />
-      <path d="M24 18 29.7 14.6V25.4L24 22z" fill="#fff" />
-      <text
-        x="44"
-        y="28"
-        fontFamily="'Helvetica Neue', Arial, sans-serif"
-        fontSize="23"
-        fontWeight="800"
-        letterSpacing="-1.2"
-        fill="#4087FC"
-      >
-        zoom
-      </text>
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true" focusable="false">
+      <rect width="48" height="48" rx="12" fill="#4087FC" />
+      <rect x="11" y="17" width="16" height="14" rx="3" fill="#fff" />
+      <path d="M29 21 36 16.6c.6-.4 1.5 0 1.5.8v13.2c0 .8-.9 1.2-1.5.8L29 27z" fill="#fff" />
     </svg>
   );
 }

@@ -207,7 +207,8 @@ describe('CalendarConnection — org activation gate', () => {
 
     const user = userEvent.setup();
     render(<CalendarConnection />);
-    await user.click(await screen.findByRole('button', { name: /^disable$/i }));
+    // The org-scheduling affordance is a toggle switch (Integrations design); ON → click disables.
+    await user.click(await screen.findByRole('switch', { name: /organization scheduling/i }));
 
     expect(api.setSchedulingActivation).toHaveBeenCalledWith(false);
     // Flips back to the enable panel (off state).

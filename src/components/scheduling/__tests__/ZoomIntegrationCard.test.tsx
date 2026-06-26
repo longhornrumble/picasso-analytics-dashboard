@@ -3,10 +3,9 @@ import { render, screen } from '@testing-library/react';
 import { ZoomIntegrationCard } from '../ZoomIntegrationCard';
 
 describe('ZoomIntegrationCard (placeholder)', () => {
-  it('renders the Zoom placeholder with a not-connected / coming-soon state', () => {
+  it('renders the Zoom placeholder with a coming-soon badge', () => {
     render(<ZoomIntegrationCard />);
     expect(screen.getByRole('heading', { name: 'Zoom' })).toBeInTheDocument();
-    expect(screen.getByText('Not connected')).toBeInTheDocument();
     expect(screen.getByText('Coming soon')).toBeInTheDocument();
   });
 
