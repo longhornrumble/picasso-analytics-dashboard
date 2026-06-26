@@ -56,8 +56,6 @@ function teamRule(p: RoutingPolicy): string {
 const CONFERENCE_LABELS: Record<string, string> = {
   google_meet: 'Google Meet',
   zoom: 'Zoom',
-  phone: 'Phone call',
-  in_person: 'In person',
 };
 function conferenceLabel(a: AppointmentType): string {
   return CONFERENCE_LABELS[a.conference_type ?? 'google_meet'] ?? 'Google Meet';
