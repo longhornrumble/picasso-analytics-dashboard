@@ -30,7 +30,7 @@ import type { Column } from '../../components/shared/DataTable';
 type EmployeeRow = AdminEmployee & { companyName?: string };
 
 const STATUS_COLORS: Record<string, string> = {
-  active: 'bg-emerald-100 text-emerald-700',
+  active: 'bg-primary-100 text-primary-700',
   inactive: 'bg-slate-100 text-slate-500',
   pending: 'bg-amber-100 text-amber-700',
 };
@@ -229,7 +229,7 @@ export default function EmployeeManagement() {
             Contact
           </span>
         ) : (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
             Portal User
           </span>
         )
@@ -377,7 +377,7 @@ export default function EmployeeManagement() {
       {/* Success alert */}
       {successMessage && (
         <div
-          className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-sm"
+          className="mb-4 p-3 bg-primary-50 border border-primary-200 rounded-lg text-primary-700 text-sm"
           role="status"
           aria-live="polite"
         >

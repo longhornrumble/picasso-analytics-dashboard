@@ -36,7 +36,7 @@ interface FunnelProps {
   rateLabel?: string;
   /** Bottom stats (up to 3 recommended) */
   stats?: FunnelStat[];
-  /** Bar color - uses Tailwind class (default: bg-green-400) */
+  /** Bar color - uses Tailwind class (default: bg-primary-400) */
   barColor?: string;
   /** Badge variant for rate display */
   badgeVariant?: 'success' | 'info' | 'warning';

@@ -37,26 +37,26 @@ export function AttributionEmpty() {
       </div>
 
       <div
-        className="bg-emerald-50 border border-emerald-100 rounded-2xl px-8 py-5 max-w-md text-left"
+        className="bg-primary-50 border border-primary-100 rounded-2xl px-8 py-5 max-w-md text-left"
       >
-        <p className="text-xs font-bold uppercase tracking-widest text-emerald-700 mb-3">
+        <p className="text-xs font-bold uppercase tracking-widest text-primary-700 mb-3">
           What you'll see here
         </p>
         <ul className="space-y-2 text-sm text-slate-600">
           <li className="flex items-start gap-2">
-            <span className="text-emerald-500 mt-0.5" aria-hidden="true">&#x2713;</span>
+            <span className="text-primary-500 mt-0.5" aria-hidden="true">&#x2713;</span>
             Channel ecosystem — where conversations come from
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-emerald-500 mt-0.5" aria-hidden="true">&#x2713;</span>
+            <span className="text-primary-500 mt-0.5" aria-hidden="true">&#x2713;</span>
             Conversion funnel — reached to lead
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-emerald-500 mt-0.5" aria-hidden="true">&#x2713;</span>
+            <span className="text-primary-500 mt-0.5" aria-hidden="true">&#x2713;</span>
             After-hours coverage — staff-hours not hired
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-emerald-500 mt-0.5" aria-hidden="true">&#x2713;</span>
+            <span className="text-primary-500 mt-0.5" aria-hidden="true">&#x2713;</span>
             Per-channel drill with entry points and trends
           </li>
         </ul>

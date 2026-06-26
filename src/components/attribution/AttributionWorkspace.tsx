@@ -239,7 +239,7 @@ export function AttributionWorkspace() {
         <div className="mt-4 bg-white border border-slate-200 rounded-2xl p-8 text-center">
           <p className="text-slate-500 mb-4">{error}</p>
           <button
-            className="text-emerald-700 font-semibold text-sm underline"
+            className="text-primary-700 font-semibold text-sm underline"
             onClick={() => setMonth((m) => m)} // re-trigger effect
           >
             Try again

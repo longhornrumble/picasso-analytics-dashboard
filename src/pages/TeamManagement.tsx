@@ -226,9 +226,9 @@ export function TeamManagement() {
         </div>
       )}
       {successMsg && (
-        <div className="flex items-center justify-between px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg" role="status">
-          <p className="text-sm text-emerald-700">{successMsg}</p>
-          <button onClick={() => setSuccessMsg(null)} className="text-emerald-400 hover:text-emerald-600">
+        <div className="flex items-center justify-between px-4 py-3 bg-primary-50 border border-primary-200 rounded-lg" role="status">
+          <p className="text-sm text-primary-700">{successMsg}</p>
+          <button onClick={() => setSuccessMsg(null)} className="text-primary-400 hover:text-primary-600">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -282,7 +282,7 @@ export function TeamManagement() {
                     {/* Type */}
                     <td className="px-6 py-4">
                       {isClerkUser ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
                           Portal User
                         </span>
                       ) : (
@@ -318,7 +318,7 @@ export function TeamManagement() {
                       ) : (
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                           member.role === 'admin'
-                            ? 'bg-emerald-50 text-emerald-700'
+                            ? 'bg-primary-50 text-primary-700'
                             : 'bg-slate-100 text-slate-600'
                         }`}>
                           {member.role === 'admin' ? 'Admin' : 'Member'}
@@ -722,7 +722,7 @@ function InviteModal({
                 onChange={e => setFirstName(e.target.value)}
                 placeholder="Jane"
                 autoFocus
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
@@ -735,7 +735,7 @@ function InviteModal({
                 value={lastName}
                 onChange={e => setLastName(e.target.value)}
                 placeholder="Doe"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
           </div>

@@ -243,7 +243,7 @@ function isValidEmail(email: string): boolean {
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     send: 'bg-blue-100 text-blue-700',
-    delivery: 'bg-emerald-100 text-emerald-700',
+    delivery: 'bg-primary-100 text-primary-700',
     bounce: 'bg-red-100 text-red-700',
     complaint: 'bg-orange-100 text-orange-700',
     open: 'bg-purple-100 text-purple-700',
@@ -325,7 +325,7 @@ function InlineMessage({
 }) {
   const styles =
     type === 'success'
-      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+      ? 'bg-primary-50 border-primary-200 text-primary-800'
       : 'bg-red-50 border-red-200 text-red-800';
 
   return (
@@ -634,7 +634,7 @@ function EventDetailModal({
 
   const eventTypeColors: Record<string, string> = {
     send: 'bg-blue-100 text-blue-700',
-    delivery: 'bg-green-100 text-green-700',
+    delivery: 'bg-primary-100 text-primary-700',
     bounce: 'bg-red-100 text-red-700',
     complaint: 'bg-amber-100 text-amber-700',
     open: 'bg-purple-100 text-purple-700',
@@ -703,7 +703,7 @@ function EventDetailModal({
                     {/* Timeline dot */}
                     <div className="flex flex-col items-center pt-1">
                       <div className={`w-2.5 h-2.5 rounded-full ${
-                        evt.event_type === 'delivery' ? 'bg-green-500' :
+                        evt.event_type === 'delivery' ? 'bg-primary-500' :
                         evt.event_type === 'bounce' ? 'bg-red-500' :
                         evt.event_type === 'complaint' ? 'bg-amber-500' :
                         'bg-slate-400'
@@ -1500,7 +1500,7 @@ function RecipientsTab() {
                     {emp.phone ? formatPhoneDisplay(emp.phone) : '\u2014'}
                   </p>
                   {smsOptedIn ? (
-                    <span className="text-[10px] text-emerald-600 font-medium">SMS opted in</span>
+                    <span className="text-[10px] text-primary-600 font-medium">SMS opted in</span>
                   ) : (
                     <span className="text-[10px] text-slate-400">Email only</span>
                   )}

@@ -108,7 +108,7 @@ export function EcosystemDonut({ totalConversations, afterHoursPct, channels }: 
         </span>
         {afterHoursDisplay && (
           <span
-            className="font-extrabold text-emerald-700 bg-emerald-50 rounded-full px-3 mt-2"
+            className="font-extrabold text-primary-700 bg-primary-50 rounded-full px-3 mt-2"
             style={{ fontSize: '0.68rem', padding: '3px 10px' }}
           >
             {afterHoursDisplay}

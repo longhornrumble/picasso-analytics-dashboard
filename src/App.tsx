@@ -545,7 +545,7 @@ function AppContent() {
           {window.location.pathname.startsWith('/sign-up') || window.location.search.includes('__clerk_ticket') ? (() => {
             const { firstName, lastName } = signUpNameRef.current!;
             return (
-            <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex items-center justify-center p-8">
+            <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-50 flex items-center justify-center p-8">
               <div className="flex gap-12 max-w-[960px] w-full items-start">
                 {/* Left panel — branding + steps */}
                 <div className="flex-1 max-w-[400px] pt-4 hidden md:block">
@@ -558,21 +558,21 @@ function AppContent() {
                   <p className="text-sm text-slate-500 leading-relaxed mb-8">Your organization has invited you to join their workspace. Here's what to expect:</p>
                   <ol className="space-y-6">
                     <li className="flex gap-4">
-                      <span className="shrink-0 w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center text-sm font-bold">1</span>
+                      <span className="shrink-0 w-9 h-9 rounded-full bg-primary-500 text-white flex items-center justify-center text-sm font-bold">1</span>
                       <div>
                         <h3 className="text-sm font-semibold text-slate-800 mb-0.5">Create your account</h3>
                         <p className="text-xs text-slate-500 leading-relaxed">Set up your login with Google or a password. It only takes a moment.</p>
                       </div>
                     </li>
                     <li className="flex gap-4">
-                      <span className="shrink-0 w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center text-sm font-bold">2</span>
+                      <span className="shrink-0 w-9 h-9 rounded-full bg-primary-500 text-white flex items-center justify-center text-sm font-bold">2</span>
                       <div>
                         <h3 className="text-sm font-semibold text-slate-800 mb-0.5">Land on your dashboard</h3>
                         <p className="text-xs text-slate-500 leading-relaxed">See conversation analytics, review form submissions, manage leads, and set your notification preferences.</p>
                       </div>
                     </li>
                     <li className="flex gap-4">
-                      <span className="shrink-0 w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center text-sm font-bold">3</span>
+                      <span className="shrink-0 w-9 h-9 rounded-full bg-primary-500 text-white flex items-center justify-center text-sm font-bold">3</span>
                       <div>
                         <h3 className="text-sm font-semibold text-slate-800 mb-0.5">Come back anytime</h3>
                         <p className="text-xs text-slate-500 leading-relaxed">Your dashboard is always available at <strong>login.myrecruiter.ai</strong> whenever you need insights.</p>

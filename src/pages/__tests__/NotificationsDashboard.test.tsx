@@ -1287,7 +1287,7 @@ describe('StatusBadge color mapping', () => {
   });
 
   const cases: Array<{ status: string; expectedBg: string; expectedText: string }> = [
-    { status: 'delivery', expectedBg: 'bg-emerald-100', expectedText: 'text-emerald-700' },
+    { status: 'delivery', expectedBg: 'bg-primary-100', expectedText: 'text-primary-700' },
     { status: 'bounce', expectedBg: 'bg-red-100', expectedText: 'text-red-700' },
     { status: 'complaint', expectedBg: 'bg-orange-100', expectedText: 'text-orange-700' },
     { status: 'open', expectedBg: 'bg-purple-100', expectedText: 'text-purple-700' },

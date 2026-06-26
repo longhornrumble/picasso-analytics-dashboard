@@ -11,7 +11,7 @@ import type { AdminTenant } from '../../types/analytics';
 import type { Column } from '../../components/shared/DataTable';
 
 const STATUS_COLORS: Record<string, string> = {
-  active: 'bg-emerald-100 text-emerald-700',
+  active: 'bg-primary-100 text-primary-700',
   suspended: 'bg-amber-100 text-amber-700',
   churned: 'bg-red-100 text-red-700',
 };
@@ -77,7 +77,7 @@ export default function TenantManagement() {
       header: 'Stripe',
       render: (row) => (
         <span
-          className={`inline-block w-2.5 h-2.5 rounded-full ${row.has_stripe ? 'bg-emerald-500' : 'bg-slate-300'}`}
+          className={`inline-block w-2.5 h-2.5 rounded-full ${row.has_stripe ? 'bg-primary-500' : 'bg-slate-300'}`}
           title={row.has_stripe ? 'Connected' : 'Not connected'}
           aria-label={`Stripe ${row.has_stripe ? 'connected' : 'not connected'}`}
         />
@@ -88,7 +88,7 @@ export default function TenantManagement() {
       header: 'Clerk',
       render: (row) => (
         <span
-          className={`inline-block w-2.5 h-2.5 rounded-full ${row.has_clerk ? 'bg-emerald-500' : 'bg-slate-300'}`}
+          className={`inline-block w-2.5 h-2.5 rounded-full ${row.has_clerk ? 'bg-primary-500' : 'bg-slate-300'}`}
           title={row.has_clerk ? 'Connected' : 'Not connected'}
           aria-label={`Clerk ${row.has_clerk ? 'connected' : 'not connected'}`}
         />
@@ -155,7 +155,7 @@ export default function TenantManagement() {
       )}
       {successMessage && (
         <div
-          className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-sm"
+          className="mb-4 p-3 bg-primary-50 border border-primary-200 rounded-lg text-primary-700 text-sm"
           role="status"
           aria-live="polite"
         >
