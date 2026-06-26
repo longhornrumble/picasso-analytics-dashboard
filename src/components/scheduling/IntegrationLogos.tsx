@@ -35,21 +35,24 @@ export function GoogleCalendarLogo({ className }: { className?: string }) {
 }
 
 /**
- * Zoom wordmark — typeset stand-in in Zoom Blue (#0B5CFF). Recreating Zoom's custom
- * letterforms exactly isn't worth hand-pathing; swap for the official wordmark SVG when
- * brand-perfect fidelity is needed. aria-label carries the name since it acts as a title.
+ * Zoom logo lockup — camera-in-circle mark + "zoom" wordmark (typeset stand-in in Zoom Blue).
+ * Recreating Zoom's custom letterforms exactly isn't worth hand-pathing; swap for the official
+ * lockup SVG for brand-perfect fidelity. aria-label carries the name since it acts as a title.
  */
-export function ZoomWordmark({ className }: { className?: string }) {
+export function ZoomLogo({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 100 26" className={className} role="img" aria-label="Zoom">
+    <svg viewBox="0 0 140 40" className={className} role="img" aria-label="Zoom">
+      <circle cx="20" cy="20" r="18" fill="#4087FC" />
+      <rect x="11" y="14.5" width="12.5" height="11" rx="2.5" fill="#fff" />
+      <path d="M24 18 29.7 14.6V25.4L24 22z" fill="#fff" />
       <text
-        x="0"
-        y="21"
+        x="44"
+        y="28"
         fontFamily="'Helvetica Neue', Arial, sans-serif"
-        fontSize="25"
+        fontSize="23"
         fontWeight="800"
         letterSpacing="-1.2"
-        fill="#0B5CFF"
+        fill="#4087FC"
       >
         zoom
       </text>

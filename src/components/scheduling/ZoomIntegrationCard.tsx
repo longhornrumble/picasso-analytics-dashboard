@@ -8,7 +8,7 @@
  * (a published OAuth app + connect/callback, mirroring CalendarConnection), this becomes a real
  * connect card.
  */
-import { ZoomWordmark } from './IntegrationLogos';
+import { ZoomLogo } from './IntegrationLogos';
 
 export function ZoomIntegrationCard() {
   return (
@@ -16,7 +16,7 @@ export function ZoomIntegrationCard() {
       <div>
         {/* The wordmark IS the title — its aria-label gives the heading its "Zoom" name. */}
         <h3 className="flex items-center">
-          <ZoomWordmark className="h-[18px] w-auto" />
+          <ZoomLogo className="h-6 w-auto" />
         </h3>
         <p className="text-xs text-slate-500 mt-1.5">
           Host booked appointments on Zoom instead of Google Meet.
