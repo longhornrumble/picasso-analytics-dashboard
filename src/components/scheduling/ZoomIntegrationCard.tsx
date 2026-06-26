@@ -8,19 +8,19 @@
  * (a published OAuth app + connect/callback, mirroring CalendarConnection), this becomes a real
  * connect card.
  */
-import { ZoomLogo } from './IntegrationLogos';
+import { ZoomWordmark } from './IntegrationLogos';
 
 export function ZoomIntegrationCard() {
   return (
     <section aria-label="Zoom integration" className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <ZoomLogo className="w-5 h-5 shrink-0" />
-        <div>
-          <h3 className="text-sm font-bold text-slate-900">Zoom</h3>
-          <p className="text-xs text-slate-500">
-            Host booked appointments on Zoom instead of Google Meet.
-          </p>
-        </div>
+      <div>
+        {/* The wordmark IS the title — its aria-label gives the heading its "Zoom" name. */}
+        <h3 className="flex items-center">
+          <ZoomWordmark className="h-[18px] w-auto" />
+        </h3>
+        <p className="text-xs text-slate-500 mt-1.5">
+          Host booked appointments on Zoom instead of Google Meet.
+        </p>
       </div>
 
       <div className="rounded-xl border border-slate-100 bg-white p-4 flex flex-col gap-3">

@@ -34,13 +34,25 @@ export function GoogleCalendarLogo({ className }: { className?: string }) {
   );
 }
 
-/** Zoom's video-camera mark on its brand blue. */
-export function ZoomLogo({ className }: { className?: string }) {
+/**
+ * Zoom wordmark — typeset stand-in in Zoom Blue (#0B5CFF). Recreating Zoom's custom
+ * letterforms exactly isn't worth hand-pathing; swap for the official wordmark SVG when
+ * brand-perfect fidelity is needed. aria-label carries the name since it acts as a title.
+ */
+export function ZoomWordmark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 48 48" className={className} aria-hidden="true" focusable="false">
-      <rect width="48" height="48" rx="11" fill="#2D8CFF" />
-      <rect x="11" y="17" width="17" height="14" rx="3.5" fill="#fff" />
-      <path d="M30 22.2 36.2 18c.6-.4 1.3 0 1.3.7v10.6c0 .7-.7 1.1-1.3.7L30 25.8z" fill="#fff" />
+    <svg viewBox="0 0 100 26" className={className} role="img" aria-label="Zoom">
+      <text
+        x="0"
+        y="21"
+        fontFamily="'Helvetica Neue', Arial, sans-serif"
+        fontSize="25"
+        fontWeight="800"
+        letterSpacing="-1.2"
+        fill="#0B5CFF"
+      >
+        zoom
+      </text>
     </svg>
   );
 }
