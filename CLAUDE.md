@@ -322,10 +322,22 @@ aws s3 sync dist/ s3://app-myrecruiter-ai/ --delete --profile chris-admin
 aws cloudfront create-invalidation --distribution-id EJ0Y6ZUIUBSAT --paths "/*"
 ```
 
-**Infrastructure:**
+**Production infrastructure (account 614):**
 - **S3 Bucket**: `app-myrecruiter-ai`
 - **CloudFront Distribution**: `EJ0Y6ZUIUBSAT`
 - **S3 Versioning**: Enabled (30-day retention)
+
+### Staging environment (account 525 — account-isolated, OAC-hardened)
+
+Staging is hosted in the **staging AWS account (525409062831)**, NOT prod. Deploys happen automatically via CI (`.github/workflows/pr-checks.yml` `deploy-staging` job) on every PR to `main` — no manual `aws s3 sync` needed.
+
+- **URL**: `https://staging.app.myrecruiter.ai`
+- **S3 Bucket**: `picasso-analytics-dashboard-staging` (private; served only via CloudFront OAC, not public-read)
+- **CloudFront Distribution**: `E72QGOSH2XUD3`
+- **Deploy role**: `picasso-analytics-dashboard-deploy-staging` (least-privilege; repo secret `AWS_DEPLOY_ROLE_ARN_STAGING`)
+- **API origin** (`/api/*`): the 525 `Analytics_Dashboard_API` Function URL
+
+Managed by Terraform in the picasso repo (`infra/modules/{s3,cloudfront,acm,iam}-*analytics-dashboard*-staging`, `count = var.env == "staging"`). Re-homed 2026-06-26 from the legacy prod-account (614) hosting (`picasso-analytics-portal-staging` / `E2R9VHBON5PHMK`), which is being decommissioned.
 
 ### Rollback to Previous Version
 
