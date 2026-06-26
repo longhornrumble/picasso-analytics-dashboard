@@ -35,6 +35,7 @@ import {
   type CalendarConnectionInitResponse,
   type CalendarConnectionStatusResponse,
 } from '../../services/schedulingApi';
+import { GoogleLogo } from './IntegrationLogos';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -345,11 +346,14 @@ export function CalendarConnection() {
   if (!activation.enabled) {
     return (
       <section aria-label="Calendar connection" className="flex flex-col gap-4">
-        <div>
-          <h3 className="text-sm font-bold text-slate-900">Calendar</h3>
-          <p className="text-xs text-slate-500">
-            Connect your Google Calendar to become bookable. Picasso writes confirmed appointments to your primary calendar.
-          </p>
+        <div className="flex items-center gap-2">
+          <GoogleLogo className="w-5 h-5 shrink-0" />
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Calendar</h3>
+            <p className="text-xs text-slate-500">
+              Connect your Google Calendar to become bookable. Picasso writes confirmed appointments to your primary calendar.
+            </p>
+          </div>
         </div>
 
         {activation.canManage ? (
@@ -426,11 +430,14 @@ export function CalendarConnection() {
 
   return (
     <section aria-label="Calendar connection" className="flex flex-col gap-4">
-      <div>
-        <h3 className="text-sm font-bold text-slate-900">Calendar</h3>
-        <p className="text-xs text-slate-500">
-          Connect your Google Calendar to become bookable. Picasso writes confirmed appointments to your primary calendar.
-        </p>
+      <div className="flex items-center gap-2">
+        <GoogleLogo className="w-5 h-5 shrink-0" />
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">Calendar</h3>
+          <p className="text-xs text-slate-500">
+            Connect your Google Calendar to become bookable. Picasso writes confirmed appointments to your primary calendar.
+          </p>
+        </div>
       </div>
 
       {/* OAuth return success banner — persists until the user navigates away */}

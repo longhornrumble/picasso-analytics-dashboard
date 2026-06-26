@@ -11,6 +11,7 @@ import { TeamManagement } from './TeamManagement';
 import { SchedulingSetup } from './scheduling/SchedulingSetup';
 import AdminPanel from './AdminPanel';
 import { CalendarConnection } from '../components/scheduling/CalendarConnection';
+import { ZoomIntegrationCard } from '../components/scheduling/ZoomIntegrationCard';
 import type { DashboardFeatures } from '../types/analytics';
 
 type SettingsSubTab = 'notifications' | 'team' | 'scheduling' | 'calendar' | 'admin';
@@ -138,7 +139,10 @@ export function SettingsPage() {
       )}
 
       {activeSubTab === 'calendar' && (
-        <CalendarConnection />
+        <div className="flex flex-col gap-8">
+          <CalendarConnection />
+          <ZoomIntegrationCard />
+        </div>
       )}
 
       {activeSubTab === 'admin' && user?.role === 'super_admin' && (
