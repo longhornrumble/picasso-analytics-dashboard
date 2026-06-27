@@ -1,7 +1,7 @@
 /**
  * SchedulingPage — Customer Portal "Scheduling" tab container (WS-E-PORTAL, E12 + E15).
  *
- * Wires the orphaned render slices (MyBookings = Surface 2, SchedulingAnalytics =
+ * Wires the render slices (MyAppointments = Surface 2 employee view, SchedulingAnalytics =
  * Surface 8) into the app: derives the viewer from Clerk/JWT auth, loads bookings via
  * the §E7-backed useBookings hook, and presents them under sub-tabs (mirrors the
  * SettingsPage sub-tab pattern). Behind the default-off `dashboard_scheduling` feature
@@ -12,7 +12,7 @@ import { useAuth } from '../../context/useAuth';
 import type { SchedulingViewer } from '../../types/scheduling';
 import { useBookings } from '../../lib/scheduling/useBookings';
 import { useAppointmentTypeNames } from '../../lib/scheduling/useAppointmentTypeNames';
-import { MyBookings } from './MyBookings';
+import { MyAppointments } from './MyAppointments';
 import { SchedulingAnalytics } from './SchedulingAnalytics';
 
 type SchedulingSubTab = 'bookings' | 'analytics';
@@ -32,7 +32,7 @@ export function SchedulingPage() {
   const [activeSubTab, setActiveSubTab] = useState<SchedulingSubTab>('bookings');
 
   const subTabs: { id: SchedulingSubTab; label: string }[] = [
-    { id: 'bookings', label: 'My Bookings' },
+    { id: 'bookings', label: 'My Appointments' },
     { id: 'analytics', label: 'Analytics' },
   ];
 
@@ -75,7 +75,7 @@ export function SchedulingPage() {
           Couldn't load bookings: {error}
         </p>
       ) : activeSubTab === 'bookings' ? (
-        <MyBookings bookings={bookings} viewer={viewer} appointmentTypeNames={appointmentTypeNames} onActionComplete={reload} />
+        <MyAppointments bookings={bookings} viewer={viewer} appointmentTypeNames={appointmentTypeNames} onActionComplete={reload} />
       ) : (
         <SchedulingAnalytics bookings={bookings} viewer={viewer} appointmentTypeNames={appointmentTypeNames} />
       )}

@@ -335,6 +335,34 @@ body {
   }
 }
 
+/* ========================================
+   LEAD WORKSPACE PANEL (scheduling) — slide-up bottom sheet on mobile,
+   slide-in-right slide-over on desktop. Mounts on open; enter animation only.
+   ======================================== */
+@keyframes lwp-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes lwp-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes lwp-slide-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.lwp-backdrop {
+  animation: lwp-fade-in 0.24s ease both;
+}
+.lwp-sheet {
+  animation: lwp-slide-up 0.30s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@media (min-width: 1024px) {
+  .lwp-sheet {
+    animation: lwp-slide-right 0.30s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+}
+
 @media (max-width: 640px) {
   .lead-workspace-drawer {
     width: 90vw;
