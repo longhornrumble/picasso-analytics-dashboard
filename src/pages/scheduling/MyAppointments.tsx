@@ -134,6 +134,8 @@ export function MyAppointments({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerLeadId, setDrawerLeadId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Mobile only: the preview is a bottom sheet, hidden until a card is tapped (desktop shows it inline).
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const visible = useMemo(() => visibleBookings(bookings, viewer), [bookings, viewer]);
 
@@ -336,7 +338,10 @@ export function MyAppointments({
                         >
                           <button
                             type="button"
-                            onClick={() => setSelectedId(b.booking_id)}
+                            onClick={() => {
+                              setSelectedId(b.booking_id);
+                              setDetailOpen(true);
+                            }}
                             aria-pressed={active}
                             className="flex min-w-0 flex-1 items-center gap-3.5 text-left"
                           >
@@ -411,7 +416,31 @@ export function MyAppointments({
               const qaCls =
                 'flex flex-col items-center gap-2 rounded-xl border border-slate-200 px-2 py-3.5 text-[11px] font-bold text-primary-700 hover:border-primary-200 hover:bg-primary-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:border-slate-200 disabled:hover:bg-transparent';
               return (
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white lg:sticky lg:top-6">
+                <>
+                  {/* Mobile backdrop — tap to dismiss the bottom sheet (hidden on desktop). */}
+                  <div
+                    onClick={() => setDetailOpen(false)}
+                    aria-hidden="true"
+                    className={`fixed inset-0 z-40 bg-slate-900/40 transition-opacity duration-300 lg:hidden ${
+                      detailOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+                    }`}
+                  />
+                  {/* Preview — inline sticky pane on desktop; slide-up bottom sheet on mobile. */}
+                  <div
+                    className={`fixed inset-x-0 bottom-0 z-50 max-h-[92vh] overflow-y-auto rounded-t-2xl border border-slate-200 bg-white shadow-[0_-12px_44px_rgba(15,27,45,0.22)] transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                      detailOpen ? 'translate-y-0' : 'translate-y-full'
+                    } lg:inset-x-auto lg:bottom-auto lg:z-auto lg:max-h-none lg:translate-y-0 lg:overflow-hidden lg:rounded-2xl lg:shadow-none lg:transition-none lg:sticky lg:top-6`}
+                  >
+                  {/* Mobile-only back bar */}
+                  <div className="sticky top-0 z-10 flex items-center border-b border-slate-100 bg-white px-5 py-3 lg:hidden">
+                    <button
+                      type="button"
+                      onClick={() => setDetailOpen(false)}
+                      className="inline-flex items-center gap-1.5 text-sm font-bold text-primary-700"
+                    >
+                      ← Back to list
+                    </button>
+                  </div>
                   <div className="border-b border-slate-100 px-6 py-5" style={{ background: pc.bg }}>
                     <div className="mb-3 flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-bold" style={{ color: pc.fg }}>
@@ -500,6 +529,7 @@ export function MyAppointments({
                     </div>
                   </div>
                 </div>
+                </>
               );
             })()}
         </div>

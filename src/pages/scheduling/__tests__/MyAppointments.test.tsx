@@ -153,6 +153,19 @@ describe('MyAppointments (employee scheduling view)', () => {
     expect(within(list).queryByText('Intro Person')).toBeNull();
   });
 
+  it('mobile: the preview sheet is hidden until a card is tapped, then "Back to list" closes it', async () => {
+    render(<MyAppointments bookings={bookings} viewer={admin} appointmentTypeNames={names} now={NOW} />);
+    const back = screen.getByRole('button', { name: /back to list/i });
+    const sheet = back.closest('div')!.parentElement as HTMLElement;
+    // `translate-y-full` (off-screen) appears only in the closed state — the base toggle,
+    // not the always-present `lg:translate-y-0`.
+    expect(sheet.className).toMatch(/translate-y-full/);
+    await userEvent.click(within(screen.getByRole('list', { name: /appointments/i })).getByText('Lena Cho'));
+    expect(sheet.className).not.toMatch(/translate-y-full/); // slid up
+    await userEvent.click(back);
+    expect(sheet.className).toMatch(/translate-y-full/); // slid back down
+  });
+
   it('shows a derived "Booked ·" last-touch from created_at', () => {
     const withCreated: Booking[] = [
       { booking_id: 'lt', status: 'booked', start_at: '2026-06-16T16:00:00Z', created_at: '2026-06-13T12:00:00Z', coordinator_email: 'alice@example.invalid', appointment_type_id: 'intro', attendee: { name: 'Timed Person', email: 'tp@example.invalid' } },
