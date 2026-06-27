@@ -97,6 +97,38 @@ describe('MyAppointments (employee scheduling view)', () => {
     expect(screen.queryByRole('dialog', { name: /lead workspace/i })).toBeNull();
   });
 
+  it('renders the joined lead data (note inline + app name / form fields in the panel)', async () => {
+    const withLead: Booking[] = [
+      {
+        booking_id: 'L',
+        status: 'booked',
+        start_at: '2026-06-15T16:00:00Z',
+        coordinator_email: 'alice@example.invalid',
+        appointment_type_id: 'intro',
+        attendee: { name: 'Marcus Bell', email: 'marcus@example.invalid' },
+        lead: {
+          app_name: 'Mentor Application',
+          note: 'Recently retired; wants to mentor students.',
+          phase: 'Reviewing',
+          submitted_at: '2026-06-10T00:00:00Z',
+          fields: [
+            { label: 'Name', value: 'Marcus Bell' },
+            { label: 'Why', value: 'Mentoring' },
+          ],
+        },
+      },
+    ];
+    render(<MyAppointments bookings={withLead} viewer={admin} appointmentTypeNames={names} now={NOW} />);
+    // The note shows inline in the desktop preview.
+    expect(screen.getByText(/recently retired; wants to mentor students/i)).toBeInTheDocument();
+    // …and the panel shows the form's app name + the joined form responses.
+    await userEvent.click(screen.getByRole('button', { name: /open contact/i }));
+    const panel = screen.getByRole('dialog', { name: /lead workspace/i });
+    expect(within(panel).getByText('Mentor Application')).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole('tab', { name: /form responses/i }));
+    expect(within(panel).getByText(/2 fields submitted/i)).toBeInTheDocument();
+  });
+
   it('permission filter: a staff member sees only their own bookings (empty for an unmatched email)', () => {
     render(
       <MyAppointments

@@ -55,7 +55,9 @@ export async function fetchBookings(
   const override = getTenantOverride();
   if (override) headers['X-Tenant-Override'] = override;
 
-  const url = `${API_BASE_URL}/scheduling/bookings?scope=${encodeURIComponent(scope)}`;
+  // include_lead=1 attaches each booking's lead summary (best-effort server-side join) for
+  // the Lead Workspace panel; the server degrades silently when no submission is linked.
+  const url = `${API_BASE_URL}/scheduling/bookings?scope=${encodeURIComponent(scope)}&include_lead=1`;
   const response = await fetch(url, { method: 'GET', headers });
 
   if (!response.ok) {

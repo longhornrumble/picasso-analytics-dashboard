@@ -237,18 +237,30 @@ export function MyAppointments({
     setSelectedId(next.booking_id);
   }
 
-  // The Lead Workspace panel's data, built from the selected booking + derived fields.
-  // Lead-only fields (note, form fields, activity, phase) populate once the booking→lead
-  // join lands; until then the panel shows honest empty states for them.
+  // The Lead Workspace panel's data: the selected booking + its server-joined lead summary
+  // (note / phase / form fields / app name), with empty states for whatever the join lacks.
   const panelLead: LeadWorkspaceLead | null = selected
     ? {
         name: selected.attendee?.name?.trim() || 'Guest',
         relationship: relationshipOf(selected),
-        appName: appointmentTypeLabel(selected.appointment_type_id, appointmentTypeNames),
+        appName: selected.lead?.app_name ?? appointmentTypeLabel(selected.appointment_type_id, appointmentTypeNames),
         program: appointmentTypeLabel(selected.appointment_type_id, appointmentTypeNames),
         programColor: programColor(appointmentTypeLabel(selected.appointment_type_id, appointmentTypeNames)),
         phone: selected.attendee?.phone,
         email: selected.attendee?.email,
+        note: selected.lead?.note,
+        phase: selected.lead?.phase,
+        fields: selected.lead?.fields,
+        activity: (() => {
+          const acts: { label: string; meta: string }[] = [];
+          if (selected.lead?.submitted_at)
+            acts.push({
+              label: 'Form submitted',
+              meta: `${selected.lead.app_name ?? 'Application'} · ${agoLabel(selected.lead.submitted_at, ref)}`,
+            });
+          if (selected.created_at) acts.push({ label: 'Appointment booked', meta: agoLabel(selected.created_at, ref) });
+          return acts;
+        })(),
         appointments: [
           {
             dow: dowLabel(Date.parse(selected.start_at)),
@@ -491,9 +503,15 @@ export function MyAppointments({
                     </div>
                     <div className="sm:col-span-2">
                       <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">What they want to talk about</div>
-                      <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3.5 text-sm leading-relaxed text-slate-400">
-                        Conversation context appears here once this booking is linked to the lead's profile.
-                      </div>
+                      {selected.lead?.note ? (
+                        <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3.5 text-sm leading-relaxed text-slate-700">
+                          “{selected.lead.note}”
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3.5 text-sm leading-relaxed text-slate-400">
+                          Conversation context appears here once this booking is linked to the lead's profile.
+                        </div>
+                      )}
                     </div>
                   </div>
 

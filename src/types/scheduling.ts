@@ -57,13 +57,30 @@ export interface Booking {
   /** Native Google Calendar event link, when present ("Open in Google Calendar"). */
   html_link?: string;
   /**
-   * Form-submission id of the lead this booking was made for, when the booking row
-   * carries it. Forward-compat (absent on rows the projection hasn't surfaced yet):
-   * present → "Open Contact" can open the Lead Workspace drawer for the lead; absent →
-   * that action self-disables. The booking↔lead link is `session_id` in DynamoDB; the
-   * read projection must surface it (as submission_id) before this lights up.
+   * Lead summary, joined server-side from the booking's form submission (via session_id)
+   * when the request opts in with `include_lead=1`. Best-effort + forward-compat: ABSENT
+   * when no submission is linked or the join is unavailable — every reader must tolerate
+   * its absence (the Lead Workspace then shows empty states for these fields).
    */
+  lead?: BookingLead;
+}
+
+/** Compact lead summary attached to a Booking by the §E7 read-join (all fields optional). */
+export interface BookingLead {
+  /** Form-submission id of the linked lead. */
   submission_id?: string;
+  /** The form's title (e.g. "Mentor Application") — shown as the workspace subtitle. */
+  app_name?: string;
+  /** Heuristic free-text "what they want to talk about". */
+  note?: string;
+  /** Capitalized pipeline status (New / Reviewing / Contacted / Disqualified / Advancing). */
+  phase?: string;
+  /** Most recent touch (contacted_at, else submitted_at) — ISO8601. */
+  last_touch?: string;
+  /** When the lead's form was submitted — ISO8601. */
+  submitted_at?: string;
+  /** The lead's form responses, label/value. */
+  fields?: { label: string; value: string }[];
 }
 
 /** Minimal AppointmentType projection used to label a booking's type by id. */
