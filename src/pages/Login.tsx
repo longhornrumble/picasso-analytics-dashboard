@@ -158,7 +158,7 @@ export function Login() {
                   value={manualToken}
                   onChange={(e) => setManualToken(e.target.value)}
                   placeholder="Paste your JWT token here..."
-                  className="w-full px-4 py-3 border-2 border-slate-100 text-sm focus:border-emerald-300 focus:outline-none resize-none h-28 font-mono text-slate-700 placeholder-slate-300 transition-colors duration-200"
+                  className="w-full px-4 py-3 border-2 border-slate-100 text-sm focus:border-primary-300 focus:outline-none resize-none h-28 font-mono text-slate-700 placeholder-slate-300 transition-colors duration-200"
                   style={{ borderRadius: '1rem' }}
                 />
               </div>

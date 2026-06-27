@@ -187,7 +187,7 @@ export function NotificationPreferences() {
         </div>
       )}
       {successMsg && (
-        <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">
+        <div className="rounded-lg bg-primary-50 border border-primary-200 px-4 py-3 text-sm text-primary-700">
           {successMsg}
         </div>
       )}
@@ -202,7 +202,7 @@ export function NotificationPreferences() {
               <span className="font-medium text-slate-700">{user?.email || '—'}</span>
             </p>
           </div>
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
             Always on
           </span>
         </div>

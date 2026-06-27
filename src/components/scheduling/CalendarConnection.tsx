@@ -470,7 +470,7 @@ export function CalendarConnection() {
       {/* OAuth return success banner — persists until the user navigates away */}
       {oauthBanner && (
         <div
-          className="mt-[18px] rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700"
+          className="mt-[18px] rounded-lg bg-primary-50 border border-primary-200 px-4 py-3 text-sm text-primary-700"
           role="status"
           aria-live="polite"
           data-testid="oauth-success-banner"

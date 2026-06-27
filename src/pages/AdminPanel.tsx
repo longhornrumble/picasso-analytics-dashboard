@@ -24,7 +24,7 @@ export default function AdminPanel() {
           onClick={() => setActiveSection('tenants')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeSection === 'tenants'
-              ? 'bg-emerald-100 text-emerald-700'
+              ? 'bg-primary-100 text-primary-700'
               : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
@@ -37,7 +37,7 @@ export default function AdminPanel() {
           onClick={() => setActiveSection('employees')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeSection === 'employees'
-              ? 'bg-emerald-100 text-emerald-700'
+              ? 'bg-primary-100 text-primary-700'
               : 'text-slate-600 hover:bg-slate-100'
           }`}
         >

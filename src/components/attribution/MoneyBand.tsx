@@ -45,7 +45,7 @@ function Cell({ kicker, value, description, last }: CellProps) {
         {value}
       </div>
       <div
-        className="text-emerald-100"
+        className="text-primary-100"
         style={{ fontSize: '0.8rem', marginTop: 6, lineHeight: 1.5 }}
       >
         {description}

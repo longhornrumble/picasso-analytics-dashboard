@@ -99,7 +99,7 @@ function StepBadges({ current }: { current: 1 | 2 | 3 }) {
               active
                 ? 'border-primary-300 bg-primary-50 text-primary-700 font-semibold'
                 : done
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  ? 'border-primary-200 bg-primary-50 text-primary-700'
                   : 'border-slate-200 bg-slate-50 text-slate-400',
             ].join(' ')}
           >

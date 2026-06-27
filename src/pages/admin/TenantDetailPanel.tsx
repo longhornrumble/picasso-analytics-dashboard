@@ -242,7 +242,7 @@ export default function TenantDetailPanel({ tenantId, onClose, onUpdated }: Prop
               id={`status-${tenantId}`}
               value={editStatus}
               onChange={e => setEditStatus(e.target.value as TenantStatus)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="active">Active</option>
               <option value="suspended">Suspended</option>
@@ -258,7 +258,7 @@ export default function TenantDetailPanel({ tenantId, onClose, onUpdated }: Prop
               id={`tier-${tenantId}`}
               value={editTier}
               onChange={e => setEditTier(e.target.value as SubscriptionTier)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="free">Free</option>
               <option value="standard">Standard</option>
@@ -277,7 +277,7 @@ export default function TenantDetailPanel({ tenantId, onClose, onUpdated }: Prop
               value={editNetworkId}
               onChange={e => setEditNetworkId(e.target.value)}
               placeholder="e.g., NET001"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
 
@@ -291,7 +291,7 @@ export default function TenantDetailPanel({ tenantId, onClose, onUpdated }: Prop
               value={editNetworkName}
               onChange={e => setEditNetworkName(e.target.value)}
               placeholder="e.g., Partner Network"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
 
@@ -301,7 +301,7 @@ export default function TenantDetailPanel({ tenantId, onClose, onUpdated }: Prop
             aria-disabled={!hasChanges || saving}
             className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               hasChanges && !saving
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2'
+                ? 'bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
                 : 'bg-slate-100 text-slate-400 cursor-not-allowed'
             }`}
           >
@@ -417,8 +417,8 @@ export default function TenantDetailPanel({ tenantId, onClose, onUpdated }: Prop
                   const amount = d.amount_paid || d.amount_due;
                   const currency = (d.currency || 'usd').toUpperCase();
                   const statusColors: Record<string, string> = {
-                    paid: 'bg-emerald-100 text-emerald-700',
-                    active: 'bg-emerald-100 text-emerald-700',
+                    paid: 'bg-primary-100 text-primary-700',
+                    active: 'bg-primary-100 text-primary-700',
                     open: 'bg-blue-100 text-blue-700',
                     draft: 'bg-slate-100 text-slate-600',
                     past_due: 'bg-red-100 text-red-700',

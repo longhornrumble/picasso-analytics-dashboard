@@ -135,7 +135,7 @@ export default function InviteEmployeeModal({ tenants, onClose, onInvited }: Pro
                 value={firstName}
                 onChange={e => setFirstName(e.target.value)}
                 placeholder="Jane"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
@@ -148,7 +148,7 @@ export default function InviteEmployeeModal({ tenants, onClose, onInvited }: Pro
                 value={lastName}
                 onChange={e => setLastName(e.target.value)}
                 placeholder="Doe"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
           </div>
