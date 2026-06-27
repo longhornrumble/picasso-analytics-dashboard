@@ -4,14 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { MyAppointments } from '../MyAppointments';
 import type { Booking, SchedulingViewer } from '../../../types/scheduling';
 
-// The Lead Workspace overlay is reused from the Forms page; stub it so we can assert how
-// MyAppointments opens it (leadId/isOpen) without its fetch/focus-trap machinery.
-vi.mock('../../../components/lead-workspace', () => ({
-  LeadWorkspaceDrawer: ({ leadId, isOpen }: { leadId: string | null; isOpen: boolean }) => (
-    <div data-testid="lead-drawer" data-leadid={leadId ?? ''} data-open={String(isOpen)} />
-  ),
-}));
-
 // BookingActions is separately tested and self-gates; stub it out of these render tests.
 vi.mock('../../../components/scheduling/BookingActions', () => ({
   BookingActions: () => null,
@@ -30,7 +22,6 @@ const bookings: Booking[] = [
     appointment_type_id: 'intro',
     attendee: { name: 'Marcus Bell', email: 'marcus@example.invalid', phone: '(404) 555-0109' },
     html_link: 'https://calendar.google.com/event?id=a',
-    submission_id: 'sub-1',
   },
   {
     booking_id: 'b',
@@ -40,7 +31,6 @@ const bookings: Booking[] = [
     coordinator_email: 'alice@example.invalid',
     appointment_type_id: 'intro',
     attendee: { name: 'Lena Cho', email: 'lena@example.invalid' },
-    // no submission_id → "Open Contact" must self-disable
   },
   {
     booking_id: 'c',
@@ -94,22 +84,17 @@ describe('MyAppointments (employee scheduling view)', () => {
     expect(within(list).queryByText('Marcus Bell')).toBeNull();
   });
 
-  it('"Open Contact" is enabled only when the booking carries a lead link, and opens the reused drawer', async () => {
+  it('"Open Contact" opens the Lead Workspace panel for the selected appointment', async () => {
     render(<MyAppointments bookings={bookings} viewer={admin} appointmentTypeNames={names} now={NOW} />);
-    // First selection = Marcus (has submission_id) → enabled.
-    const openContact = screen.getByRole('button', { name: /open contact/i });
-    expect(openContact).toBeEnabled();
-    await userEvent.click(openContact);
-    const drawer = screen.getByTestId('lead-drawer');
-    expect(drawer).toHaveAttribute('data-open', 'true');
-    expect(drawer).toHaveAttribute('data-leadid', 'sub-1');
-  });
-
-  it('"Open Contact" self-disables for a booking with no lead link', async () => {
-    render(<MyAppointments bookings={bookings} viewer={admin} appointmentTypeNames={names} now={NOW} />);
-    const list = screen.getByRole('list', { name: /appointments/i });
-    await userEvent.click(within(list).getByText('Lena Cho')); // no submission_id
-    expect(screen.getByRole('button', { name: /open contact/i })).toBeDisabled();
+    // Panel mounts only when open.
+    expect(screen.queryByRole('dialog', { name: /lead workspace/i })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /open contact/i }));
+    const panel = screen.getByRole('dialog', { name: /lead workspace/i });
+    // Default selection is the first shown appointment (Marcus).
+    expect(within(panel).getByText('Marcus Bell')).toBeInTheDocument();
+    // Closing the panel unmounts it.
+    await userEvent.click(within(panel).getByRole('button', { name: /close lead workspace/i }));
+    expect(screen.queryByRole('dialog', { name: /lead workspace/i })).toBeNull();
   });
 
   it('permission filter: a staff member sees only their own bookings (empty for an unmatched email)', () => {
@@ -151,19 +136,6 @@ describe('MyAppointments (employee scheduling view)', () => {
     const list = screen.getByRole('list', { name: /appointments/i });
     expect(within(list).getByText('Tour Person')).toBeInTheDocument();
     expect(within(list).queryByText('Intro Person')).toBeNull();
-  });
-
-  it('mobile: the preview sheet is hidden until a card is tapped, then "Back to list" closes it', async () => {
-    render(<MyAppointments bookings={bookings} viewer={admin} appointmentTypeNames={names} now={NOW} />);
-    const back = screen.getByRole('button', { name: /back to list/i });
-    const sheet = back.closest('div')!.parentElement as HTMLElement;
-    // `translate-y-full` (off-screen) appears only in the closed state — the base toggle,
-    // not the always-present `lg:translate-y-0`.
-    expect(sheet.className).toMatch(/translate-y-full/);
-    await userEvent.click(within(screen.getByRole('list', { name: /appointments/i })).getByText('Lena Cho'));
-    expect(sheet.className).not.toMatch(/translate-y-full/); // slid up
-    await userEvent.click(back);
-    expect(sheet.className).toMatch(/translate-y-full/); // slid back down
   });
 
   it('shows a derived "Booked ·" last-touch from created_at', () => {

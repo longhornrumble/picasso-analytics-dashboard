@@ -30,7 +30,7 @@ import {
   type TimeRange,
 } from '../../lib/scheduling/bookingLogic';
 import { BookingActions } from '../../components/scheduling/BookingActions';
-import { LeadWorkspaceDrawer } from '../../components/lead-workspace';
+import { LeadWorkspacePanel, type LeadWorkspaceLead } from '../../components/scheduling/LeadWorkspacePanel';
 
 const SCOPES: { id: TimeRange; label: string }[] = [
   { id: 'today', label: 'Today' },
@@ -132,10 +132,9 @@ export function MyAppointments({
   const [staffFilter, setStaffFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [drawerLeadId, setDrawerLeadId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  // Mobile only: the preview is a bottom sheet, hidden until a card is tapped (desktop shows it inline).
-  const [detailOpen, setDetailOpen] = useState(false);
+  // The Lead Workspace panel (slide-over). Desktop: opened from the preview's "Open Contact".
+  // Mobile: opened directly by tapping a card (no inline preview on small screens).
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const visible = useMemo(() => visibleBookings(bookings, viewer), [bookings, viewer]);
 
@@ -217,15 +216,52 @@ export function MyAppointments({
     [shown, selectedId],
   );
 
-  function openContact(b: Booking | null) {
-    if (!b?.submission_id) return;
-    setDrawerLeadId(b.submission_id);
-    setDrawerOpen(true);
+  function openPanel() {
+    setPanelOpen(true);
   }
-  function closeDrawer() {
-    setDrawerOpen(false);
-    setTimeout(() => setDrawerLeadId(null), 300);
+  // Tapping a card always selects it; on mobile (no inline preview) it also opens the panel.
+  function selectCard(b: Booking) {
+    setSelectedId(b.booking_id);
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(max-width: 1023px)').matches
+    ) {
+      setPanelOpen(true);
+    }
   }
+  const selectedIdx = shown.findIndex((b) => b.booking_id === selected?.booking_id);
+  function stepRecord(delta: number) {
+    if (shown.length === 0) return;
+    const next = shown[(selectedIdx + delta + shown.length) % shown.length];
+    setSelectedId(next.booking_id);
+  }
+
+  // The Lead Workspace panel's data, built from the selected booking + derived fields.
+  // Lead-only fields (note, form fields, activity, phase) populate once the booking→lead
+  // join lands; until then the panel shows honest empty states for them.
+  const panelLead: LeadWorkspaceLead | null = selected
+    ? {
+        name: selected.attendee?.name?.trim() || 'Guest',
+        relationship: relationshipOf(selected),
+        appName: appointmentTypeLabel(selected.appointment_type_id, appointmentTypeNames),
+        program: appointmentTypeLabel(selected.appointment_type_id, appointmentTypeNames),
+        programColor: programColor(appointmentTypeLabel(selected.appointment_type_id, appointmentTypeNames)),
+        phone: selected.attendee?.phone,
+        email: selected.attendee?.email,
+        appointments: [
+          {
+            dow: dowLabel(Date.parse(selected.start_at)),
+            day: dayNum(Date.parse(selected.start_at)),
+            title: appointmentTypeLabel(selected.appointment_type_id, appointmentTypeNames),
+            time: formatSlotLabel(selected.start_at, selected.end_at),
+            dispo: statusMeta(selected.status).label,
+            joinable: !!safeExternalHref(selected.html_link) && selected.status === 'booked' && Date.parse(selected.start_at) >= ref,
+            joinHref: safeExternalHref(selected.html_link),
+          },
+        ],
+      }
+    : null;
 
   const ddCls =
     'rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -338,10 +374,7 @@ export function MyAppointments({
                         >
                           <button
                             type="button"
-                            onClick={() => {
-                              setSelectedId(b.booking_id);
-                              setDetailOpen(true);
-                            }}
+                            onClick={() => selectCard(b)}
                             aria-pressed={active}
                             className="flex min-w-0 flex-1 items-center gap-3.5 text-left"
                           >
@@ -411,36 +444,11 @@ export function MyAppointments({
               const meta = statusMeta(selected.status);
               const calHref = safeExternalHref(selected.html_link);
               const joinable = !!calHref && selected.status === 'booked' && Date.parse(selected.start_at) >= ref;
-              const linkable = !!selected.submission_id;
-              const linkTitle = linkable ? undefined : 'Lead profile link not available for this booking yet';
               const qaCls =
-                'flex flex-col items-center gap-2 rounded-xl border border-slate-200 px-2 py-3.5 text-[11px] font-bold text-primary-700 hover:border-primary-200 hover:bg-primary-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:border-slate-200 disabled:hover:bg-transparent';
+                'flex flex-col items-center gap-2 rounded-xl border border-slate-200 px-2 py-3.5 text-[11px] font-bold text-primary-700 hover:border-primary-200 hover:bg-primary-50';
               return (
-                <>
-                  {/* Mobile backdrop — tap to dismiss the bottom sheet (hidden on desktop). */}
-                  <div
-                    onClick={() => setDetailOpen(false)}
-                    aria-hidden="true"
-                    className={`fixed inset-0 z-40 bg-slate-900/40 transition-opacity duration-300 lg:hidden ${
-                      detailOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
-                    }`}
-                  />
-                  {/* Preview — inline sticky pane on desktop; slide-up bottom sheet on mobile. */}
-                  <div
-                    className={`fixed inset-x-0 bottom-0 z-50 max-h-[92vh] overflow-y-auto rounded-t-2xl border border-slate-200 bg-white shadow-[0_-12px_44px_rgba(15,27,45,0.22)] transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-                      detailOpen ? 'translate-y-0' : 'translate-y-full'
-                    } lg:inset-x-auto lg:bottom-auto lg:z-auto lg:max-h-none lg:translate-y-0 lg:overflow-hidden lg:rounded-2xl lg:shadow-none lg:transition-none lg:sticky lg:top-6`}
-                  >
-                  {/* Mobile-only back bar */}
-                  <div className="sticky top-0 z-10 flex items-center border-b border-slate-100 bg-white px-5 py-3 lg:hidden">
-                    <button
-                      type="button"
-                      onClick={() => setDetailOpen(false)}
-                      className="inline-flex items-center gap-1.5 text-sm font-bold text-primary-700"
-                    >
-                      ← Back to list
-                    </button>
-                  </div>
+                /* Desktop-only inline preview; on mobile a card tap opens the full Lead Workspace panel instead. */
+                <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white lg:sticky lg:top-6 lg:block">
                   <div className="border-b border-slate-100 px-6 py-5" style={{ background: pc.bg }}>
                     <div className="mb-3 flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-bold" style={{ color: pc.fg }}>
@@ -514,11 +522,11 @@ export function MyAppointments({
                           Calendar
                         </button>
                       )}
-                      <button type="button" onClick={() => openContact(selected)} disabled={!linkable} title={linkTitle} className={qaCls}>
+                      <button type="button" onClick={openPanel} className={qaCls}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 4h10l4 4v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" /><path d="M14 4v4h4M8 13h8M8 16.5h5" /></svg>
                         Add Note
                       </button>
-                      <button type="button" onClick={() => openContact(selected)} disabled={!linkable} title={linkTitle} className={qaCls}>
+                      <button type="button" onClick={openPanel} className={qaCls}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5" /><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" /></svg>
                         Open Contact
                       </button>
@@ -529,14 +537,20 @@ export function MyAppointments({
                     </div>
                   </div>
                 </div>
-                </>
               );
             })()}
         </div>
       )}
 
-      {/* Reused Lead Workspace overlay (from the Forms page) — opens for the selected lead. */}
-      <LeadWorkspaceDrawer leadId={drawerLeadId} isOpen={drawerOpen} onClose={closeDrawer} />
+      {/* Lead Workspace panel (to-spec component) — opens from "Open Contact" (desktop) or a card tap (mobile). */}
+      <LeadWorkspacePanel
+        lead={panelLead}
+        isOpen={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        onNext={() => stepRecord(1)}
+        onPrev={() => stepRecord(-1)}
+        queueCount={Math.max(0, shown.length - 1)}
+      />
     </div>
   );
 }
