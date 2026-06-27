@@ -123,4 +123,42 @@ describe('MyAppointments (employee scheduling view)', () => {
     );
     expect(screen.getByText(/no appointments match these filters/i)).toBeInTheDocument();
   });
+
+  it('marks an attendee "Returning" when their email recurs across bookings', () => {
+    const recurring: Booking[] = [
+      ...bookings,
+      {
+        booking_id: 'd',
+        status: 'booked',
+        start_at: '2026-06-17T15:00:00Z',
+        coordinator_email: 'alice@example.invalid',
+        appointment_type_id: 'intro',
+        attendee: { name: 'Marcus Bell', email: 'marcus@example.invalid' }, // 2nd Marcus booking → Returning
+      },
+    ];
+    render(<MyAppointments bookings={recurring} viewer={admin} appointmentTypeNames={names} now={NOW} />);
+    const list = screen.getByRole('list', { name: /appointments/i });
+    expect(within(list).getAllByText('Returning').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('the program filter narrows the list to one appointment type', async () => {
+    const mixed: Booking[] = [
+      { booking_id: 'p1', status: 'booked', start_at: '2026-06-15T16:00:00Z', coordinator_email: 'alice@example.invalid', appointment_type_id: 'intro', attendee: { name: 'Intro Person', email: 'i@example.invalid' } },
+      { booking_id: 'p2', status: 'booked', start_at: '2026-06-16T16:00:00Z', coordinator_email: 'alice@example.invalid', appointment_type_id: 'tour', attendee: { name: 'Tour Person', email: 't@example.invalid' } },
+    ];
+    render(<MyAppointments bookings={mixed} viewer={admin} appointmentTypeNames={{ intro: 'Intro Call', tour: 'Facility Tour' }} now={NOW} />);
+    await userEvent.selectOptions(screen.getByLabelText(/filter by program/i), 'tour');
+    const list = screen.getByRole('list', { name: /appointments/i });
+    expect(within(list).getByText('Tour Person')).toBeInTheDocument();
+    expect(within(list).queryByText('Intro Person')).toBeNull();
+  });
+
+  it('shows a derived "Booked ·" last-touch from created_at', () => {
+    const withCreated: Booking[] = [
+      { booking_id: 'lt', status: 'booked', start_at: '2026-06-16T16:00:00Z', created_at: '2026-06-13T12:00:00Z', coordinator_email: 'alice@example.invalid', appointment_type_id: 'intro', attendee: { name: 'Timed Person', email: 'tp@example.invalid' } },
+    ];
+    render(<MyAppointments bookings={withCreated} viewer={admin} appointmentTypeNames={names} now={NOW} />);
+    // NOW = 2026-06-15, created 2026-06-13 → "2 days ago" (rendered in the row and the preview).
+    expect(screen.getAllByText(/Booked · 2 days ago/i).length).toBeGreaterThanOrEqual(1);
+  });
 });
