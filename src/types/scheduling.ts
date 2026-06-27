@@ -56,6 +56,14 @@ export interface Booking {
   last_calendar_mutation_at?: string;
   /** Native Google Calendar event link, when present ("Open in Google Calendar"). */
   html_link?: string;
+  /**
+   * Form-submission id of the lead this booking was made for, when the booking row
+   * carries it. Forward-compat (absent on rows the projection hasn't surfaced yet):
+   * present → "Open Contact" can open the Lead Workspace drawer for the lead; absent →
+   * that action self-disables. The booking↔lead link is `session_id` in DynamoDB; the
+   * read projection must surface it (as submission_id) before this lights up.
+   */
+  submission_id?: string;
 }
 
 /** Minimal AppointmentType projection used to label a booking's type by id. */

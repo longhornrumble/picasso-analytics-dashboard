@@ -22,14 +22,14 @@ afterEach(() => {
 });
 
 describe('SchedulingPage (E12 + E15 container)', () => {
-  it('renders the My Bookings sub-tab by default (admin viewer)', async () => {
+  it('renders the My Appointments sub-tab by default (admin viewer)', async () => {
     mockUser.mockReturnValue({ role: 'admin', email: 'admin@example.invalid' });
     render(<SchedulingPage />);
 
     // Spinner first, then content once the (stubbed) fetch resolves.
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: /my bookings/i }),
+        screen.getByRole('heading', { name: /my appointments/i }),
       ).toBeInTheDocument(),
     );
     expect(screen.getByRole('list')).toBeInTheDocument();
@@ -40,7 +40,7 @@ describe('SchedulingPage (E12 + E15 container)', () => {
     render(<SchedulingPage />);
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: /my bookings/i }),
+        screen.getByRole('heading', { name: /my appointments/i }),
       ).toBeInTheDocument(),
     );
 
@@ -56,10 +56,10 @@ describe('SchedulingPage (E12 + E15 container)', () => {
     render(<SchedulingPage />);
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: /my bookings/i }),
+        screen.getByRole('heading', { name: /my appointments/i }),
       ).toBeInTheDocument(),
     );
-    expect(screen.getByText(/no bookings match these filters/i)).toBeInTheDocument();
+    expect(screen.getByText(/no appointments match these filters/i)).toBeInTheDocument();
   });
 
   it('renders an error state (not a crash) when the load fails', async () => {
