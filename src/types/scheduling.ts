@@ -57,6 +57,13 @@ export interface Booking {
   /** Native Google Calendar event link, when present ("Open in Google Calendar"). */
   html_link?: string;
   /**
+   * The attendee's free-text answer to the form-configured "what would you like to talk about?"
+   * question, asked AFTER the booking confirms (§B post-booking amendment). First-class on the
+   * booking row. PREFERRED over the heuristic `lead.note` for "what they want to talk about".
+   * ABSENT on bookings where no question was configured/answered — readers tolerate its absence.
+   */
+  prep_note?: string;
+  /**
    * Lead summary, joined server-side from the booking's form submission (via session_id)
    * when the request opts in with `include_lead=1`. Best-effort + forward-compat: ABSENT
    * when no submission is linked or the join is unavailable — every reader must tolerate
