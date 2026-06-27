@@ -248,7 +248,9 @@ export function MyAppointments({
         programColor: programColor(appointmentTypeLabel(selected.appointment_type_id, appointmentTypeNames)),
         phone: selected.attendee?.phone,
         email: selected.attendee?.email,
-        note: selected.lead?.note,
+        // Prefer the post-booking answer (asked, first-class on the booking) over the
+        // heuristic form-derived note (§B post-booking amendment).
+        note: selected.prep_note ?? selected.lead?.note,
         phase: selected.lead?.phase,
         fields: selected.lead?.fields,
         activity: (() => {
@@ -503,9 +505,10 @@ export function MyAppointments({
                     </div>
                     <div className="sm:col-span-2">
                       <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">What they want to talk about</div>
-                      {selected.lead?.note ? (
+                      {/* Prefer the post-booking answer (asked) over the heuristic lead note. */}
+                      {(selected.prep_note ?? selected.lead?.note) ? (
                         <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3.5 text-sm leading-relaxed text-slate-700">
-                          “{selected.lead.note}”
+                          “{selected.prep_note ?? selected.lead?.note}”
                         </div>
                       ) : (
                         <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3.5 text-sm leading-relaxed text-slate-400">

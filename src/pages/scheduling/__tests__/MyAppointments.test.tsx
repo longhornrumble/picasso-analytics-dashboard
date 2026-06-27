@@ -129,6 +129,26 @@ describe('MyAppointments (employee scheduling view)', () => {
     expect(within(panel).getByText(/2 fields submitted/i)).toBeInTheDocument();
   });
 
+  it('prefers the post-booking prep_note over the heuristic lead.note (§B post-booking amendment)', () => {
+    const withPrepNote: Booking[] = [
+      {
+        booking_id: 'P',
+        status: 'booked',
+        start_at: '2026-06-15T16:00:00Z',
+        coordinator_email: 'alice@example.invalid',
+        appointment_type_id: 'intro',
+        attendee: { name: 'Marcus Bell', email: 'marcus@example.invalid' },
+        prep_note: 'I want to discuss weekend respite options.',
+        lead: { app_name: 'Mentor Application', note: 'Recently retired; wants to mentor students.' },
+      },
+    ];
+    render(<MyAppointments bookings={withPrepNote} viewer={admin} appointmentTypeNames={names} now={NOW} />);
+    // The asked answer wins in the preview…
+    expect(screen.getByText(/weekend respite options/i)).toBeInTheDocument();
+    // …and the heuristic lead note is NOT shown.
+    expect(screen.queryByText(/recently retired; wants to mentor students/i)).toBeNull();
+  });
+
   it('permission filter: a staff member sees only their own bookings (empty for an unmatched email)', () => {
     render(
       <MyAppointments
