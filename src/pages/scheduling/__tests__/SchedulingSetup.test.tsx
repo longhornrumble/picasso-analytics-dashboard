@@ -211,11 +211,11 @@ describe('SchedulingSetup (E13b)', () => {
     await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole('button', { name: /add team/i }));
-    await userEvent.type(screen.getByLabelText('Team tag'), 'typo');
+    await userEvent.type(screen.getByLabelText('Team Name'), 'typo');
     await userEvent.click(screen.getByRole('button', { name: /save team/i }));
 
     await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent(/Unknown team tag\(s\): typo/i),
+      expect(screen.getByRole('alert')).toHaveTextContent(/Unknown team name\(s\): typo/i),
     );
   });
 

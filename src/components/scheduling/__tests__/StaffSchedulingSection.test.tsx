@@ -80,7 +80,7 @@ describe('StaffSchedulingSection — admin', () => {
     await waitFor(() => expect(screen.getByText('Maya')).toBeInTheDocument());
     await userEvent.click(screen.getAllByRole('button', { name: /^edit$/i })[0]);
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/Unknown tag\(s\): typo/i));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/Unknown team name\(s\): typo/i));
   });
 
   it('shows a load error without crashing', async () => {

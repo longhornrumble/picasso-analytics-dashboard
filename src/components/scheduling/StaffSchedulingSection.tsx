@@ -29,7 +29,7 @@ import {
 
 function errMessage(e: unknown): string {
   if (e instanceof SchedulingApiError) {
-    if (e.status === 422 && e.unknownTags?.length) return `Unknown tag(s): ${e.unknownTags.join(', ')}.`;
+    if (e.status === 422 && e.unknownTags?.length) return `Unknown team name(s): ${e.unknownTags.join(', ')}.`;
     if (e.status === 403) return "You don't have permission to change that.";
     return e.message;
   }
@@ -273,7 +273,7 @@ export function StaffSchedulingSection() {
                   <div>
                     <span className="block text-xs font-medium text-slate-600 mb-1">Teams</span>
                     {vocab.length === 0 ? (
-                      <p className="text-xs text-slate-400">No team tags defined in the tenant vocabulary.</p>
+                      <p className="text-xs text-slate-400">No team names set up yet.</p>
                     ) : (
                       <div className="flex flex-wrap gap-2">
                         {vocab.map((tag) => (
