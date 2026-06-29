@@ -140,24 +140,22 @@ export interface RoutingPolicyWrite {
 }
 
 /**
- * Typed scheduling-write error so the UI can branch on the §E13b status codes:
- *   422 vocab fail-closed → `unknownTags`; 422 FK → message; 409 stale/dup; 428 missing If-Match.
+ * Typed scheduling-write error so the UI can branch on status codes:
+ *   422 staff-tag fail-closed → `unknownTags`; 409 stale-lock / duplicate-name / team-in-use
+ *   (message is user-facing); 428 missing If-Match.
  */
 export class SchedulingApiError extends Error {
   status: number;
   unknownTags?: string[];
-  /** 422 from the Team Name delete-guard (F6): names still referenced by a team or staffer. */
-  inUseTags?: string[];
-  constructor(status: number, message: string, unknownTags?: string[], inUseTags?: string[]) {
+  constructor(status: number, message: string, unknownTags?: string[]) {
     super(message);
     this.name = 'SchedulingApiError';
     this.status = status;
     this.unknownTags = unknownTags;
-    this.inUseTags = inUseTags;
   }
 }
 
-type WriteMethod = 'POST' | 'PATCH' | 'PUT';
+type WriteMethod = 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
 /**
  * Authed write against an Analytics_Dashboard_API scheduling endpoint. On a non-2xx,
@@ -185,7 +183,8 @@ async function schedulingWrite<T>(
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
     headers,
-    body: JSON.stringify(body),
+    // DELETE carries no body; JSON.stringify(undefined) === undefined → fetch sends none.
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
 
   const data = await response.json().catch(() => ({}));
@@ -194,7 +193,6 @@ async function schedulingWrite<T>(
       response.status,
       data.error || `API error: ${response.status}`,
       Array.isArray(data.unknownTags) ? data.unknownTags : undefined,
-      Array.isArray(data.inUseTags) ? data.inUseTags : undefined,
     );
   }
   return data as T;
@@ -302,6 +300,20 @@ export async function updateRoutingPolicy(
   return data.routing_policy;
 }
 
+/**
+ * Delete a team (routing policy). Optimistic-locked via If-Match. The server BLOCKS with 409 if
+ * any appointment type still routes to it (message: "team is in use by appointment type(s)…")
+ * and cascade-untags the team's name from all staff on success.
+ */
+export async function deleteRoutingPolicy(routingPolicyId: string, ifMatch: string): Promise<void> {
+  await schedulingWrite<{ deleted: boolean }>(
+    'DELETE',
+    `/scheduling/routing-policies/${encodeURIComponent(routingPolicyId)}`,
+    undefined,
+    ifMatch,
+  );
+}
+
 // --- Booking actions (§E12-actions / G6; lambda#269) -----------------------
 // ADA is the Clerk-authed entry; it proxies the side effect to BCH. §8 own-or-admin
 // is enforced server-side (404 — not 403 — for a non-owner, so existence isn't leaked).
@@ -350,24 +362,13 @@ export function ifMatchToken(row: { modified_at?: ModifiedAt }): string {
 // NOTE: deliberately NO optimistic lock (the registry has no commit-owned state — §E13c).
 // ===========================================================================
 
-/** Closed scheduling-tag vocabulary (config S3); ADMIN-only read. Dropdown source. */
+/**
+ * The team-name list (ADMIN-only). Post-unification it's DERIVED server-side from the tenant's
+ * teams — the set of names a staffer can be tagged with (StaffSchedulingSection checkbox source).
+ */
 export async function fetchTagVocabulary(): Promise<string[]> {
   const data = await schedulingGet<{ scheduling_tag_vocabulary?: string[] }>(
     '/scheduling/tag-vocabulary',
-  );
-  return data.scheduling_tag_vocabulary ?? [];
-}
-
-/**
- * Admin-only (F6): author the closed Team Name vocabulary. Single replace-list PUT — send the
- * FULL list; the server persists it to the tenant config. A 422 carries `inUseTags` when a
- * removed name is still referenced by a team's routing rule or a staffer's tags (delete-guard).
- */
-export async function setTagVocabulary(vocabulary: string[]): Promise<string[]> {
-  const data = await schedulingWrite<{ scheduling_tag_vocabulary?: string[] }>(
-    'PUT',
-    '/scheduling/tag-vocabulary',
-    { scheduling_tag_vocabulary: vocabulary },
   );
   return data.scheduling_tag_vocabulary ?? [];
 }

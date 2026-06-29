@@ -6,14 +6,14 @@
  *   2. Who handles bookings — the per-staff roster (StaffSchedulingSection)
  *   3. Messages we send     — lifecycle-notice copy (NotificationTemplatesEditor slide-over)
  *
- * Tenant admins manage Appointment Types + Teams via the locked §E13b Analytics_Dashboard_API
- * endpoints (lambda#258), ADMIN-only (also enforced server-side). Optimistic-locked via If-Match;
- * vocab-validation is server-side (422 → unknownTags surfaced here). Members see only their own
- * per-staff self-card (StaffSchedulingSection), no spine.
+ * Tenant admins manage Appointment Types + Teams via the locked Analytics_Dashboard_API
+ * endpoints, ADMIN-only (also enforced server-side). Optimistic-locked via If-Match. Members see
+ * only their own per-staff self-card (StaffSchedulingSection), no spine.
  *
- * Team Names (the scheduling tag vocabulary) are authored here too (F6): an admin adds/removes
- * the names that teams and staff can be tagged with. Deferred (v2 per §E13b): routing-policy /
- * appointment-type deletion (orphan-FK risk).
+ * Teams unification (2026-06-29): a team IS its name — naming a team here is the only place a
+ * team name is authored (the separate "Team Names" vocabulary manager is retired). A team can be
+ * deleted (blocked while an appointment type still routes to it); deleting/renaming cascades to
+ * staff tags server-side.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../context/useAuth';
@@ -24,9 +24,8 @@ import {
   updateAppointmentType,
   createRoutingPolicy,
   updateRoutingPolicy,
+  deleteRoutingPolicy,
   fetchSchedulingActivation,
-  fetchTagVocabulary,
-  setTagVocabulary,
   initCalendarConnection,
   fetchCalendarConnectionStatus,
   ifMatchToken,
@@ -67,16 +66,9 @@ function conferenceLabel(a: AppointmentType): string {
 }
 
 function errMessage(e: unknown): string {
-  if (e instanceof SchedulingApiError) {
-    if (e.status === 409) return 'This was changed by someone else — reload and retry.';
-    if (e.status === 422 && e.inUseTags?.length) {
-      return `Can't remove ${e.inUseTags.join(', ')} — still assigned to a team or a staff member. Reassign first, then remove.`;
-    }
-    if (e.status === 422 && e.unknownTags?.length) {
-      return `Unknown team name(s): ${e.unknownTags.join(', ')}. Use a team name set up for your organization.`;
-    }
-    return e.message;
-  }
+  // The scheduling endpoints return specific, user-facing messages (duplicate name,
+  // "Everyone" already exists, "team is in use by appointment type(s)…", stale lock).
+  if (e instanceof SchedulingApiError) return e.message;
   return e instanceof Error ? e.message : 'Something went wrong';
 }
 
@@ -169,16 +161,12 @@ export function SchedulingSetup() {
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [appts, setAppts] = useState<AppointmentType[]>([]);
   const [policies, setPolicies] = useState<RoutingPolicy[]>([]);
-  const [vocab, setVocab] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
-  // F6 — Team Name vocabulary authoring (the scheduling tag vocabulary).
-  const [newTeamName, setNewTeamName] = useState('');
-  const [vocabBusy, setVocabBusy] = useState(false);
-  const [vocabError, setVocabError] = useState<string | null>(null);
+  // Inline delete-confirm: the routing_policy_id awaiting confirmation, or null.
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // 3-step onboarding gate — the setup is blocked until both prerequisites are met:
   //   (1) admin approves scheduling for the org  (2) connect your calendar  (3) set up
@@ -204,15 +192,10 @@ export function SchedulingSetup() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [a, p, v] = await Promise.all([
-        fetchAppointmentTypes(),
-        fetchRoutingPolicies(),
-        fetchTagVocabulary(),
-      ]);
+      const [a, p] = await Promise.all([fetchAppointmentTypes(), fetchRoutingPolicies()]);
       if (!isActive()) return;
       setAppts(a);
       setPolicies(p);
-      setVocab(v);
     } catch (e) {
       if (isActive()) setLoadError(errMessage(e));
     } finally {
@@ -282,37 +265,21 @@ export function SchedulingSetup() {
     }
   }
 
-  // F6 — replace-list write of the Team Name vocabulary. Returns true on success (state
-  // updated to the server's canonical list); on failure leaves `vocab` untouched and shows why.
-  async function saveVocab(next: string[]): Promise<boolean> {
-    setVocabBusy(true);
-    setVocabError(null);
+  // Delete a team. The server blocks (409) if an appointment type still routes to it
+  // ("team is in use by appointment type(s)…") and cascade-untags its name from staff on success.
+  async function deleteTeam(p: RoutingPolicy) {
+    setSaving(true);
+    setSaveError(null);
     try {
-      const saved = await setTagVocabulary(next);
-      setVocab(saved);
-      return true;
+      await deleteRoutingPolicy(p.routing_policy_id, ifMatchToken(p));
+      setConfirmDeleteId(null);
+      await reload();
     } catch (e) {
-      setVocabError(errMessage(e));
-      return false;
+      setConfirmDeleteId(null);
+      setSaveError(errMessage(e));
     } finally {
-      setVocabBusy(false);
+      setSaving(false);
     }
-  }
-
-  async function addTeamName() {
-    const name = newTeamName.trim();
-    if (!name) return;
-    if (vocab.includes(name)) {
-      setVocabError(`"${name}" is already a team name.`);
-      return;
-    }
-    if (await saveVocab([...vocab, name])) setNewTeamName('');
-  }
-
-  // Removing an in-use name is blocked server-side (422 inUseTags) — saveVocab surfaces that
-  // and leaves the name in place.
-  async function removeTeamName(name: string) {
-    await saveVocab(vocab.filter((n) => n !== name));
   }
 
   async function saveTeam() {
@@ -540,66 +507,7 @@ export function SchedulingSetup() {
           </div>
         )}
 
-        {/* Team Names — the authored vocabulary teams + staff are tagged with (F6) */}
-        <div className={`${sectionLabel} mt-5 mb-2.5`}>Team Names</div>
-        <div className="rounded-xl border border-slate-100 p-[15px] flex flex-col gap-2.5">
-          <p className="text-[12.5px] text-slate-500">
-            Names you can assign to a team or a staff member (e.g. “Volunteer Coordinators”). Add the
-            names your organization uses, then pick them when you set up a team or tag staff.
-          </p>
-          {vocab.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {vocab.map((name) => (
-                <span
-                  key={name}
-                  className="inline-flex items-center gap-1 pl-3 pr-1 py-1 rounded-full bg-primary-50 text-primary-700 text-[13px] font-medium"
-                >
-                  {name}
-                  <button
-                    type="button"
-                    onClick={() => removeTeamName(name)}
-                    disabled={vocabBusy}
-                    aria-label={`Remove team name ${name}`}
-                    className="w-5 h-5 rounded-full flex items-center justify-center text-primary-700 hover:bg-primary-100 disabled:opacity-40"
-                  >
-                    <span aria-hidden="true">×</span>
-                  </button>
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="text-[13px] text-slate-400">No team names yet. “Everyone” teams work without one.</p>
-          )}
-          <div className="flex items-center gap-2">
-            <input
-              aria-label="New team name"
-              className={inputCls}
-              value={newTeamName}
-              maxLength={50}
-              placeholder="Add a team name…"
-              onChange={(e) => setNewTeamName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  void addTeamName();
-                }
-              }}
-            />
-            <button
-              type="button"
-              onClick={addTeamName}
-              disabled={vocabBusy || !newTeamName.trim()}
-              className="px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg disabled:opacity-50 shrink-0"
-            >
-              Add
-            </button>
-          </div>
-          {vocabError && (
-            <p className="text-[12.5px] text-red-700" role="alert">{vocabError}</p>
-          )}
-        </div>
-
-        {/* Teams */}
+        {/* Teams (a team = its name + how it assigns; naming a team authors the name) */}
         <div className={`${sectionLabel} mt-5 mb-2.5`}>Teams</div>
         <div className="flex flex-col gap-2">
           {policies.map((p) => (
@@ -611,27 +519,56 @@ export function SchedulingSetup() {
                   <div className="text-[11px] text-slate-400">{lastEditedLabel(p.modified_at)}</div>
                 )}
               </div>
-              <button
-                onClick={() => {
-                  setTeamForm({
-                    _id: p.routing_policy_id,
-                    _ifMatch: ifMatchToken(p),
-                    tag: p.tag_conditions?.[0]?.values?.[0] ?? '',
-                    tie_breaker: p.tie_breaker ?? 'round_robin',
-                  });
-                  setSaveError(null);
-                }}
-                aria-label={`Edit team ${teamLabel(p)}`}
-                className={editLink}
-              >
-                Edit
-              </button>
+              {confirmDeleteId === p.routing_policy_id ? (
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <span className="text-[12.5px] text-slate-500">Delete this team?</span>
+                  <button
+                    onClick={() => deleteTeam(p)}
+                    disabled={saving}
+                    className="text-[13px] font-bold text-red-600 hover:text-red-700 disabled:opacity-50"
+                  >
+                    {saving ? 'Deleting…' : 'Yes, delete'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteId(null)}
+                    className="text-[13px] text-slate-500 hover:text-slate-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 shrink-0">
+                  <button
+                    onClick={() => {
+                      setTeamForm({
+                        _id: p.routing_policy_id,
+                        _ifMatch: ifMatchToken(p),
+                        tag: p.tag_conditions?.[0]?.values?.[0] ?? '',
+                        tie_breaker: p.tie_breaker ?? 'round_robin',
+                      });
+                      setConfirmDeleteId(null);
+                      setSaveError(null);
+                    }}
+                    aria-label={`Edit team ${teamLabel(p)}`}
+                    className={editLink}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => { setConfirmDeleteId(p.routing_policy_id); setTeamForm(null); setSaveError(null); }}
+                    aria-label={`Delete team ${teamLabel(p)}`}
+                    className="text-[13px] font-bold text-red-600 hover:text-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
             </div>
           ))}
           {policies.length === 0 && !teamForm && (
             <p className="text-sm text-slate-400">No teams yet. Add one so appointment types have somewhere to route.</p>
           )}
-          <button onClick={() => { setTeamForm({ tag: '', tie_breaker: 'round_robin' }); setSaveError(null); }} className={addRow}>
+          <button onClick={() => { setTeamForm({ tag: '', tie_breaker: 'round_robin' }); setConfirmDeleteId(null); setSaveError(null); }} className={addRow}>
             <PlusIcon />
             Add team
           </button>
@@ -639,20 +576,21 @@ export function SchedulingSetup() {
 
         {teamForm && (
           <div className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-3 mt-2">
-            <Select
-              label="Team Name"
-              value={teamForm.tag}
-              onChange={(v) => setTeamForm({ ...teamForm, tag: v })}
-              options={[
-                { value: '', label: 'Everyone (all bookable staff)' },
-                // Defensive: keep an off-vocabulary current value selectable so editing never silently re-scopes a team.
-                ...(teamForm.tag && !vocab.includes(teamForm.tag) ? [{ value: teamForm.tag, label: teamForm.tag }] : []),
-                ...vocab.map((name) => ({ value: name, label: name })),
-              ]}
-              hint={vocab.length === 0
-                ? 'Add a Team Name above to route to specific staff — or leave as Everyone.'
-                : 'Pick a Team Name, or Everyone to include all bookable staff.'}
-            />
+            <div>
+              <label htmlFor="team-name" className="block text-[11.5px] font-bold tracking-[0.03em] uppercase text-slate-600 mb-[7px]">Team name</label>
+              <input
+                id="team-name"
+                className={inputCls}
+                value={teamForm.tag}
+                maxLength={50}
+                placeholder="e.g. Volunteer Coordinators"
+                onChange={(e) => setTeamForm({ ...teamForm, tag: e.target.value })}
+              />
+              <p className="text-[12px] text-slate-400 mt-[8px]">
+                Leave blank for an “Everyone” team (all bookable staff). Staff are tagged with this
+                name to join the team.
+              </p>
+            </div>
             <Select
               label="Assignment"
               value={teamForm.tie_breaker}

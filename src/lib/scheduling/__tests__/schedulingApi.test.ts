@@ -4,10 +4,10 @@ import {
   createAppointmentType,
   updateAppointmentType,
   createRoutingPolicy,
+  deleteRoutingPolicy,
   cancelBooking,
   sendRescheduleLink,
   disconnectCalendarConnection,
-  setTagVocabulary,
   SchedulingApiError,
   ifMatchToken,
   type AppointmentType,
@@ -127,29 +127,31 @@ describe('schedulingApi §E12-actions client', () => {
   });
 });
 
-describe('schedulingApi §F6 setTagVocabulary client', () => {
-  it('PUT /scheduling/tag-vocabulary sends the FULL list and unwraps the response', async () => {
-    fetchMock.mockResolvedValue(okJson(200, { scheduling_tag_vocabulary: ['A', 'B'] }));
-    const res = await setTagVocabulary(['A', 'B']);
-    expect(res).toEqual(['A', 'B']);
+describe('schedulingApi deleteRoutingPolicy client', () => {
+  it('DELETE /scheduling/routing-policies/{id} with the If-Match header and no body', async () => {
+    fetchMock.mockResolvedValue(okJson(200, { deleted: true, routing_policy_id: 'rp1' }));
+    await deleteRoutingPolicy('rp1', '2026-06-06T00:00:00.000001Z');
     const [url, opts] = fetchMock.mock.calls[0];
-    expect(url).toMatch(/\/scheduling\/tag-vocabulary$/);
-    expect(opts.method).toBe('PUT');
-    expect(opts.headers.Authorization).toBe('Bearer tkn');
-    expect(JSON.parse(opts.body)).toEqual({ scheduling_tag_vocabulary: ['A', 'B'] });
+    expect(url).toMatch(/\/scheduling\/routing-policies\/rp1$/);
+    expect(opts.method).toBe('DELETE');
+    expect(opts.headers['If-Match']).toBe('2026-06-06T00:00:00.000001Z');
+    expect(opts.body).toBeUndefined(); // DELETE carries no body
   });
 
-  it('422 delete-guard surfaces inUseTags on the SchedulingApiError', async () => {
-    fetchMock.mockResolvedValue(okJson(422, { error: 'in use', inUseTags: ['Mentors'] }));
-    const err = await setTagVocabulary([]).catch((e) => e);
+  it('surfaces the 409 in-use (appointment-type FK) block as a SchedulingApiError', async () => {
+    fetchMock.mockResolvedValue(okJson(409, {
+      error: 'team is in use by appointment type(s); reassign them first',
+      appointmentTypes: [{ appointment_type_id: 'at1', name: 'Intro Call' }],
+    }));
+    const err = await deleteRoutingPolicy('rp1', 'tok').catch((e) => e);
     expect(err).toBeInstanceOf(SchedulingApiError);
-    expect(err.status).toBe(422);
-    expect(err.inUseTags).toEqual(['Mentors']);
+    expect(err.status).toBe(409);
+    expect(err.message).toMatch(/in use by appointment type/i);
   });
 
   it('throws 401 SchedulingApiError when unauthenticated (never calls fetch)', async () => {
     localStorage.clear();
-    const err = await setTagVocabulary(['A']).catch((e) => e);
+    const err = await deleteRoutingPolicy('rp1', 'tok').catch((e) => e);
     expect(err).toBeInstanceOf(SchedulingApiError);
     expect(err.status).toBe(401);
     expect(fetchMock).not.toHaveBeenCalled();
