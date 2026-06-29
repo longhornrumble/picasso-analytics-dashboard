@@ -35,10 +35,10 @@ import { StaffSchedulingSection } from '../../components/scheduling/StaffSchedul
 import { NotificationTemplatesEditor } from '../../components/scheduling/NotificationTemplatesEditor';
 import { lastEditedLabel } from '../../lib/scheduling/formatModifiedAt';
 
-/** A routing policy's team label = its first tag value, or "Everyone (solo)" when unconditioned. */
+/** A routing policy's team label = its first tag value, or "Everyone" when unconditioned. */
 function teamLabel(p: RoutingPolicy): string {
   const tag = p.tag_conditions?.[0]?.values?.[0];
-  return tag ?? 'Everyone (solo)';
+  return tag ?? 'Everyone';
 }
 
 /** Human blurb for a team's assignment rule. */
@@ -65,7 +65,7 @@ function errMessage(e: unknown): string {
   if (e instanceof SchedulingApiError) {
     if (e.status === 409) return 'This was changed by someone else — reload and retry.';
     if (e.status === 422 && e.unknownTags?.length) {
-      return `Unknown team tag(s): ${e.unknownTags.join(', ')}. Tags must be in the tenant vocabulary.`;
+      return `Unknown team name(s): ${e.unknownTags.join(', ')}. Use a team name set up for your organization.`;
     }
     return e.message;
   }
@@ -451,22 +451,22 @@ export function SchedulingSetup() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="at-duration" className="block text-xs font-medium text-slate-600 mb-1">Duration (min)</label>
-                <input id="at-duration" type="number" min={1} max={480} className={inputCls} value={apptForm.duration_minutes}
+                <input id="at-duration" type="number" min={15} max={480} step={15} className={inputCls} value={apptForm.duration_minutes}
                   onChange={(e) => setApptForm({ ...apptForm, duration_minutes: Number(e.target.value) })} />
               </div>
               <div>
                 <label htmlFor="at-lead" className="block text-xs font-medium text-slate-600 mb-1">Min lead time (min)</label>
-                <input id="at-lead" type="number" min={0} className={inputCls} value={apptForm.lead_time_minutes}
+                <input id="at-lead" type="number" min={0} step={15} className={inputCls} value={apptForm.lead_time_minutes}
                   onChange={(e) => setApptForm({ ...apptForm, lead_time_minutes: Number(e.target.value) })} />
               </div>
               <div>
                 <label htmlFor="at-bb" className="block text-xs font-medium text-slate-600 mb-1">Buffer before (min)</label>
-                <input id="at-bb" type="number" min={0} className={inputCls} value={apptForm.buffer_before_minutes}
+                <input id="at-bb" type="number" min={0} step={15} className={inputCls} value={apptForm.buffer_before_minutes}
                   onChange={(e) => setApptForm({ ...apptForm, buffer_before_minutes: Number(e.target.value) })} />
               </div>
               <div>
                 <label htmlFor="at-ba" className="block text-xs font-medium text-slate-600 mb-1">Buffer after (min)</label>
-                <input id="at-ba" type="number" min={0} className={inputCls} value={apptForm.buffer_after_minutes}
+                <input id="at-ba" type="number" min={0} step={15} className={inputCls} value={apptForm.buffer_after_minutes}
                   onChange={(e) => setApptForm({ ...apptForm, buffer_after_minutes: Number(e.target.value) })} />
               </div>
             </div>
@@ -531,15 +531,15 @@ export function SchedulingSetup() {
         {teamForm && (
           <div className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-3 mt-2">
             <div>
-              <label htmlFor="team-tag" className="block text-xs font-medium text-slate-600 mb-1">Team tag</label>
+              <label htmlFor="team-tag" className="block text-xs font-medium text-slate-600 mb-1">Team Name</label>
               <input
                 id="team-tag"
                 className={inputCls}
                 value={teamForm.tag}
-                placeholder="e.g. volunteer_coordinators (leave blank = everyone)"
+                placeholder="e.g. Volunteer Coordinators (leave blank = Everyone)"
                 onChange={(e) => setTeamForm({ ...teamForm, tag: e.target.value })}
               />
-              <p className="text-[11px] text-slate-400 mt-1">Must match a tag in the tenant vocabulary; validated on save.</p>
+              <p className="text-[11px] text-slate-400 mt-1">Must match a team name set up for your organization; checked when you save.</p>
             </div>
             <div>
               <label htmlFor="team-tie" className="block text-xs font-medium text-slate-600 mb-1">Assignment</label>
