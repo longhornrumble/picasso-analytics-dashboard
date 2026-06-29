@@ -37,6 +37,7 @@ import {
 } from '../../services/schedulingApi';
 import { StaffSchedulingSection } from '../../components/scheduling/StaffSchedulingSection';
 import { NotificationTemplatesEditor } from '../../components/scheduling/NotificationTemplatesEditor';
+import { Select } from '../../components/shared/Select';
 import { lastEditedLabel } from '../../lib/scheduling/formatModifiedAt';
 
 /** A routing policy's team label = its first tag value, or "Everyone" when unconditioned. */
@@ -491,14 +492,15 @@ export function SchedulingSetup() {
               <input id="at-name" className={inputCls} value={apptForm.name}
                 onChange={(e) => setApptForm({ ...apptForm, name: e.target.value })} />
             </div>
-            <div>
-              <label htmlFor="at-location" className="block text-xs font-medium text-slate-600 mb-1">Location</label>
-              <select id="at-location" className={inputCls} value={apptForm.conference_type ?? 'google_meet'}
-                onChange={(e) => setApptForm({ ...apptForm, conference_type: e.target.value as 'google_meet' | 'zoom' })}>
-                <option value="google_meet">Google Meet</option>
-                <option value="zoom">Zoom</option>
-              </select>
-            </div>
+            <Select
+              label="Location"
+              value={apptForm.conference_type ?? 'google_meet'}
+              onChange={(v) => setApptForm({ ...apptForm, conference_type: v as 'google_meet' | 'zoom' })}
+              options={[
+                { value: 'google_meet', label: 'Google Meet' },
+                { value: 'zoom', label: 'Zoom' },
+              ]}
+            />
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="at-duration" className="block text-xs font-medium text-slate-600 mb-1">Duration (min)</label>
@@ -521,16 +523,13 @@ export function SchedulingSetup() {
                   onChange={(e) => setApptForm({ ...apptForm, buffer_after_minutes: Number(e.target.value) })} />
               </div>
             </div>
-            <div>
-              <label htmlFor="at-team" className="block text-xs font-medium text-slate-600 mb-1">Handled by team</label>
-              <select id="at-team" className={inputCls} value={apptForm.routing_policy_id}
-                onChange={(e) => setApptForm({ ...apptForm, routing_policy_id: e.target.value })}>
-                <option value="">Select a team…</option>
-                {policies.map((p) => (
-                  <option key={p.routing_policy_id} value={p.routing_policy_id}>{teamLabel(p)}</option>
-                ))}
-              </select>
-            </div>
+            <Select
+              label="Handled by team"
+              placeholder="Select a team…"
+              value={apptForm.routing_policy_id}
+              onChange={(v) => setApptForm({ ...apptForm, routing_policy_id: v })}
+              options={policies.map((p) => ({ value: p.routing_policy_id, label: teamLabel(p) }))}
+            />
             <div className="flex gap-2">
               <button onClick={saveAppt} disabled={saving || !apptForm.name.trim() || !apptForm.routing_policy_id}
                 className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg disabled:opacity-50">
@@ -640,41 +639,29 @@ export function SchedulingSetup() {
 
         {teamForm && (
           <div className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-3 mt-2">
-            <div>
-              <label htmlFor="team-tag" className="block text-xs font-medium text-slate-600 mb-1">Team Name</label>
-              <select
-                id="team-tag"
-                className={inputCls}
-                value={teamForm.tag}
-                onChange={(e) => setTeamForm({ ...teamForm, tag: e.target.value })}
-              >
-                <option value="">Everyone (all bookable staff)</option>
-                {/* Defensive: keep an off-vocabulary current value selectable so editing never silently re-scopes a team. */}
-                {teamForm.tag && !vocab.includes(teamForm.tag) && (
-                  <option value={teamForm.tag}>{teamForm.tag}</option>
-                )}
-                {vocab.map((name) => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-              <p className="text-[11px] text-slate-400 mt-1">
-                {vocab.length === 0
-                  ? 'Add a Team Name above to route to specific staff — or leave as Everyone.'
-                  : 'Pick a Team Name, or Everyone to include all bookable staff.'}
-              </p>
-            </div>
-            <div>
-              <label htmlFor="team-tie" className="block text-xs font-medium text-slate-600 mb-1">Assignment</label>
-              <select
-                id="team-tie"
-                className={inputCls}
-                value={teamForm.tie_breaker}
-                onChange={(e) => setTeamForm({ ...teamForm, tie_breaker: e.target.value as 'round_robin' | 'first_available' })}
-              >
-                <option value="round_robin">Round-robin (share evenly)</option>
-                <option value="first_available">First available</option>
-              </select>
-            </div>
+            <Select
+              label="Team Name"
+              value={teamForm.tag}
+              onChange={(v) => setTeamForm({ ...teamForm, tag: v })}
+              options={[
+                { value: '', label: 'Everyone (all bookable staff)' },
+                // Defensive: keep an off-vocabulary current value selectable so editing never silently re-scopes a team.
+                ...(teamForm.tag && !vocab.includes(teamForm.tag) ? [{ value: teamForm.tag, label: teamForm.tag }] : []),
+                ...vocab.map((name) => ({ value: name, label: name })),
+              ]}
+              hint={vocab.length === 0
+                ? 'Add a Team Name above to route to specific staff — or leave as Everyone.'
+                : 'Pick a Team Name, or Everyone to include all bookable staff.'}
+            />
+            <Select
+              label="Assignment"
+              value={teamForm.tie_breaker}
+              onChange={(v) => setTeamForm({ ...teamForm, tie_breaker: v as 'round_robin' | 'first_available' })}
+              options={[
+                { value: 'round_robin', label: 'Round-robin (share evenly)' },
+                { value: 'first_available', label: 'First available' },
+              ]}
+            />
             <div className="flex gap-2">
               <button onClick={saveTeam} disabled={saving} className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg disabled:opacity-50">
                 {saving ? 'Saving…' : teamForm._id ? 'Save changes' : 'Save team'}

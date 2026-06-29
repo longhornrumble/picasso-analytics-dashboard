@@ -82,6 +82,13 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// The form selects are now the custom <Select> (role=combobox + role=option), not native
+// <select> — open the combobox (found via its label) then click the option.
+async function chooseFromSelect(labelText: string, optionName: string | RegExp) {
+  await userEvent.click(screen.getByLabelText(labelText));
+  await userEvent.click(screen.getByRole('option', { name: optionName }));
+}
+
 describe('SchedulingSetup — onboarding gate', () => {
   it('blocks with the Step 1 (approve) overlay when scheduling is not enabled for the org', async () => {
     api.fetchSchedulingActivation.mockResolvedValue({ enabled: false, can_manage: true });
@@ -141,7 +148,7 @@ describe('SchedulingSetup (E13b)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /add appointment type/i }));
     await userEvent.type(screen.getByLabelText('Name'), 'Interview');
-    await userEvent.selectOptions(screen.getByLabelText('Handled by team'), 'rp1');
+    await chooseFromSelect('Handled by team', 'volunteer_coordinators'); // value rp1
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => expect(api.createAppointmentType).toHaveBeenCalledTimes(1));
@@ -159,8 +166,8 @@ describe('SchedulingSetup (E13b)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /add appointment type/i }));
     await userEvent.type(screen.getByLabelText('Name'), 'Consult');
-    await userEvent.selectOptions(screen.getByLabelText('Location'), 'zoom');
-    await userEvent.selectOptions(screen.getByLabelText('Handled by team'), 'rp1');
+    await chooseFromSelect('Location', 'Zoom');
+    await chooseFromSelect('Handled by team', 'volunteer_coordinators'); // value rp1
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => expect(api.createAppointmentType).toHaveBeenCalledTimes(1));
@@ -192,7 +199,7 @@ describe('SchedulingSetup (E13b)', () => {
     await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole('button', { name: /edit team volunteer_coordinators/i }));
-    await userEvent.selectOptions(screen.getByLabelText('Assignment'), 'first_available');
+    await chooseFromSelect('Assignment', 'First available');
     await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => expect(api.updateRoutingPolicy).toHaveBeenCalledTimes(1));
@@ -213,8 +220,8 @@ describe('SchedulingSetup (E13b)', () => {
     await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole('button', { name: /add team/i }));
-    // The Team Name field is a SELECT sourced from the vocabulary — pick, don't type.
-    await userEvent.selectOptions(screen.getByLabelText('Team Name'), 'volunteer_coordinators');
+    // The Team Name field is a custom Select sourced from the vocabulary — pick, don't type.
+    await chooseFromSelect('Team Name', 'volunteer_coordinators');
     await userEvent.click(screen.getByRole('button', { name: /save team/i }));
 
     await waitFor(() => expect(api.createRoutingPolicy).toHaveBeenCalledTimes(1));
