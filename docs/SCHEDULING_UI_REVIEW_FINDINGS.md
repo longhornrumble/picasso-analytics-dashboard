@@ -58,16 +58,20 @@ edit paths broken.
 `update-function-code` → `LastUpdateStatus: Successful`. Rollback artifact saved.
 **Still open:** commit + PR the code/test to the `Lambdas/lambda` submodule (staging-first).
 
-### 🟡 F6 — No authoring surface for Team Names (the "create vocabulary on this page" feature)
-Team Names (`scheduling_tag_vocabulary`) live in the tenant config JSON in S3 and are
-**read-only** from every tool: the dashboard only `GET`s them, `deploy_tenant_stack` doesn't
-seed them, and config-builder validates but has no editor. So today they can only be
-hand-edited in config — most tenants have `[]`, meaning admins can only make "Everyone" teams.
-**Decision (user):** authoring belongs on this page; entries called "Team Name"; value-is-label
-model (no separate slug). **Build:** new ADMIN-only ADA write endpoint that does a
-read-modify-write on `scheduling.scheduling_tag_vocabulary` (config-builder also writes the
-config — don't clobber the whole doc) + UI. **Recommended IA:** fold into the "Teams" section
-(naming a team creates the Team Name) so there's one list, not two.
+### ✅ F6 — Team Names authoring (the "create vocabulary on this page" feature) — SHIPPED
+Team Names (`scheduling_tag_vocabulary`) lived in the tenant config JSON in S3, **read-only**
+from every tool, so admins could only make "Everyone" teams. **Built (value-is-label model):**
+- **Backend (lambda#353):** new ADMIN-only `PUT /scheduling/tag-vocabulary` — replace-list write
+  via an S3 read-modify-write of *only* `scheduling.scheduling_tag_vocabulary` (modeled on
+  `update_tenant_scheduling_activation`; ETag optimistic lock; siblings preserved). FAIL-CLOSED
+  **delete-guard**: removing a name still referenced by a routing policy's `tag_conditions` OR a
+  staffer's `scheduling_tags` → `422 {inUseTags, references}`. Validation: ≤50 chars, deduped,
+  ≤100 names. Full ADA suite 497 passed; deployed + smoke-tested on staging.
+- **Frontend (dashboard#47):** a **"Team Names" manager** at the top of the Teams subsection
+  (chips + remove + inline add; each add/remove is a replace-list PUT; 422 in-use surfaces a
+  "reassign first" message and keeps the name; duplicate adds blocked client-side).
+**IA note:** kept as a distinct "Team Names" block above "Teams" (clearer than one merged list,
+since a name can be used by staff tagging independent of any routing policy).
 
 ### 🟡 F9 — Section 1 needs help text
 No guidance anywhere on what duration / lead time / buffers / location / "Handled by team"
@@ -82,10 +86,11 @@ it is silently restricted to the new name. No guard, no warning. Decide: guard/c
 or make "Everyone" a non-editable implicit policy. (Note: while F8 is unfixed this edit 502s
 anyway, but the footgun stands once F8 is fixed.)
 
-### 🔵 F3 — Team Name field should be a picker, not free text
-The team form uses a free-text input + server 422-on-typo, while `StaffSchedulingSection`
-already renders the same vocabulary as a checkbox picker (`StaffSchedulingSection.tsx:279`).
-Inconsistent within the same page. Folds into F6 (author once, select everywhere).
+### ✅ F3 — Team Name field is a picker, not free text — SHIPPED (with F6, dashboard#47)
+The team form's "Team Name" field was a free-text input (server 422-on-typo). **Fixed:** it is
+now a `<select>` sourced from the authored vocabulary (author once, select everywhere; no typos),
+matching `StaffSchedulingSection`'s checkbox picker. Blank = Everyone; a defensive off-vocabulary
+option keeps an existing team's value selectable so editing never silently re-scopes it.
 
 ### 🔵 F5 — New tenants start with zero teams (possible onboarding gap)
 "Add appointment type" is disabled until a team exists ("Add a team first",

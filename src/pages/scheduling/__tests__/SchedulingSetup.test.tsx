@@ -11,6 +11,7 @@ const api = {
   createRoutingPolicy: vi.fn(),
   updateRoutingPolicy: vi.fn(),
   fetchTagVocabulary: vi.fn(),
+  setTagVocabulary: vi.fn(),
   fetchNotificationTemplates: vi.fn(),
   fetchSchedulingActivation: vi.fn(),
   initCalendarConnection: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock('../../../services/schedulingApi', async () => {
     createRoutingPolicy: (...a: unknown[]) => api.createRoutingPolicy(...a),
     updateRoutingPolicy: (...a: unknown[]) => api.updateRoutingPolicy(...a),
     fetchTagVocabulary: () => api.fetchTagVocabulary(),
+    setTagVocabulary: (...a: unknown[]) => api.setTagVocabulary(...a),
     fetchNotificationTemplates: () => api.fetchNotificationTemplates(),
     fetchSchedulingActivation: () => api.fetchSchedulingActivation(),
     initCalendarConnection: () => api.initCalendarConnection(),
@@ -64,6 +66,8 @@ beforeEach(() => {
   api.fetchAppointmentTypes.mockResolvedValue([APPT]);
   api.fetchRoutingPolicies.mockResolvedValue([POLICY]);
   api.fetchTagVocabulary.mockResolvedValue(['volunteer_coordinators']);
+  // Default: replace-list write echoes back what it was given (server-canonical list).
+  api.setTagVocabulary.mockImplementation((next: string[]) => Promise.resolve(next));
   api.fetchNotificationTemplates.mockResolvedValue({ moments: {}, stop_footer_note: '' });
   // Default: past the onboarding gate (org activated + viewer's calendar connected),
   // so the existing setup-render tests apply. Gate tests override these.
@@ -203,19 +207,21 @@ describe('SchedulingSetup (E13b)', () => {
     expect(api.fetchRoutingPolicies).toHaveBeenCalledTimes(2); // initial + reload
   });
 
-  it('surfaces a 422 fail-closed unknown-tag error from a team save', async () => {
-    api.createRoutingPolicy.mockRejectedValue(
-      new SchedulingApiError(422, 'unknown tags', ['typo']),
-    );
+  it('creates a team by SELECTING an authored Team Name (no free-typing — F3)', async () => {
+    api.createRoutingPolicy.mockResolvedValue({ ...POLICY, routing_policy_id: 'rp2' });
     render(<SchedulingSetup />);
     await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole('button', { name: /add team/i }));
-    await userEvent.type(screen.getByLabelText('Team Name'), 'typo');
+    // The Team Name field is a SELECT sourced from the vocabulary — pick, don't type.
+    await userEvent.selectOptions(screen.getByLabelText('Team Name'), 'volunteer_coordinators');
     await userEvent.click(screen.getByRole('button', { name: /save team/i }));
 
-    await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent(/Unknown team name\(s\): typo/i),
+    await waitFor(() => expect(api.createRoutingPolicy).toHaveBeenCalledTimes(1));
+    expect(api.createRoutingPolicy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tag_conditions: [{ operator: 'in_any', values: ['volunteer_coordinators'] }],
+      }),
     );
   });
 
@@ -225,5 +231,67 @@ describe('SchedulingSetup (E13b)', () => {
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(/couldn't load scheduling setup: boom/i),
     );
+  });
+});
+
+describe('SchedulingSetup — Team Names authoring (F6)', () => {
+  it('renders the authored Team Names and the add control', async () => {
+    render(<SchedulingSetup />);
+    await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
+    expect(screen.getByText('Team Names')).toBeInTheDocument();
+    // the authored name renders with a remove affordance
+    expect(screen.getByRole('button', { name: /remove team name volunteer_coordinators/i })).toBeInTheDocument();
+    expect(screen.getByLabelText('New team name')).toBeInTheDocument();
+  });
+
+  it('adds a Team Name via a replace-list PUT (full list sent)', async () => {
+    render(<SchedulingSetup />);
+    await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
+
+    await userEvent.type(screen.getByLabelText('New team name'), 'ESL Tutors');
+    await userEvent.click(screen.getByRole('button', { name: /^add$/i }));
+
+    await waitFor(() => expect(api.setTagVocabulary).toHaveBeenCalledTimes(1));
+    // replace-list: the EXISTING name plus the new one, in order
+    expect(api.setTagVocabulary).toHaveBeenCalledWith(['volunteer_coordinators', 'ESL Tutors']);
+  });
+
+  it('blocks adding a duplicate Team Name without calling the API', async () => {
+    render(<SchedulingSetup />);
+    await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
+
+    await userEvent.type(screen.getByLabelText('New team name'), 'volunteer_coordinators');
+    await userEvent.click(screen.getByRole('button', { name: /^add$/i }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/already a team name/i);
+    expect(api.setTagVocabulary).not.toHaveBeenCalled();
+  });
+
+  it('removes a Team Name via a replace-list PUT (filtered list sent)', async () => {
+    render(<SchedulingSetup />);
+    await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: /remove team name volunteer_coordinators/i }));
+
+    await waitFor(() => expect(api.setTagVocabulary).toHaveBeenCalledTimes(1));
+    expect(api.setTagVocabulary).toHaveBeenCalledWith([]); // the only name removed
+  });
+
+  it('surfaces the 422 in-use delete-guard error and keeps the name', async () => {
+    api.setTagVocabulary.mockRejectedValue(
+      new SchedulingApiError(422, 'in use', undefined, ['volunteer_coordinators']),
+    );
+    render(<SchedulingSetup />);
+    await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: /remove team name volunteer_coordinators/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        /Can't remove volunteer_coordinators — still assigned to a team or a staff member/i,
+      ),
+    );
+    // the name is still listed (the failed remove left state untouched)
+    expect(screen.getByRole('button', { name: /remove team name volunteer_coordinators/i })).toBeInTheDocument();
   });
 });

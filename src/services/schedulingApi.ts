@@ -146,15 +146,18 @@ export interface RoutingPolicyWrite {
 export class SchedulingApiError extends Error {
   status: number;
   unknownTags?: string[];
-  constructor(status: number, message: string, unknownTags?: string[]) {
+  /** 422 from the Team Name delete-guard (F6): names still referenced by a team or staffer. */
+  inUseTags?: string[];
+  constructor(status: number, message: string, unknownTags?: string[], inUseTags?: string[]) {
     super(message);
     this.name = 'SchedulingApiError';
     this.status = status;
     this.unknownTags = unknownTags;
+    this.inUseTags = inUseTags;
   }
 }
 
-type WriteMethod = 'POST' | 'PATCH';
+type WriteMethod = 'POST' | 'PATCH' | 'PUT';
 
 /**
  * Authed write against an Analytics_Dashboard_API scheduling endpoint. On a non-2xx,
@@ -191,6 +194,7 @@ async function schedulingWrite<T>(
       response.status,
       data.error || `API error: ${response.status}`,
       Array.isArray(data.unknownTags) ? data.unknownTags : undefined,
+      Array.isArray(data.inUseTags) ? data.inUseTags : undefined,
     );
   }
   return data as T;
@@ -350,6 +354,20 @@ export function ifMatchToken(row: { modified_at?: ModifiedAt }): string {
 export async function fetchTagVocabulary(): Promise<string[]> {
   const data = await schedulingGet<{ scheduling_tag_vocabulary?: string[] }>(
     '/scheduling/tag-vocabulary',
+  );
+  return data.scheduling_tag_vocabulary ?? [];
+}
+
+/**
+ * Admin-only (F6): author the closed Team Name vocabulary. Single replace-list PUT — send the
+ * FULL list; the server persists it to the tenant config. A 422 carries `inUseTags` when a
+ * removed name is still referenced by a team's routing rule or a staffer's tags (delete-guard).
+ */
+export async function setTagVocabulary(vocabulary: string[]): Promise<string[]> {
+  const data = await schedulingWrite<{ scheduling_tag_vocabulary?: string[] }>(
+    'PUT',
+    '/scheduling/tag-vocabulary',
+    { scheduling_tag_vocabulary: vocabulary },
   );
   return data.scheduling_tag_vocabulary ?? [];
 }
