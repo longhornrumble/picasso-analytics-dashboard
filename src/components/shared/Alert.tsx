@@ -103,8 +103,8 @@ function ActionButton({ action, busy, variant, tokens }: {
   if (variant === 'solid') {
     return (
       <button type="button" onClick={action.onClick} disabled={busy}
-        className={`${common} rounded-full text-[13px] text-white`}
-        style={{ background: tokens.solid, padding: '9px 18px', boxShadow: `0 8px 20px ${tokens.solid}42` }}>
+        className={`${common} rounded-[12px] text-[13px]`}
+        style={{ background: tokens.solid, color: tokens.solidText, padding: '9px 18px' }}>
         {content}
       </button>
     );
@@ -112,7 +112,7 @@ function ActionButton({ action, busy, variant, tokens }: {
   if (variant === 'outline') {
     return (
       <button type="button" onClick={action.onClick} disabled={busy}
-        className={`${common} rounded-full text-[12.5px] bg-white border`}
+        className={`${common} rounded-[12px] text-[12.5px] bg-white border`}
         style={{ color: tokens.text, borderColor: tokens.border300, padding: '7px 14px' }}>
         {content}
       </button>
@@ -172,7 +172,7 @@ export function Alert({
       <div
         role={role}
         className={`alert-enter flex items-center gap-[14px] rounded-[12px] border ${sticky ? 'sticky top-0 z-40' : ''} ${className}`}
-        style={{ background: s.surface, borderColor: s.border, padding: '13px 14px', boxShadow: `0 8px 22px ${s.accent}1A` }}
+        style={{ background: s.surface, borderColor: s.border, padding: '13px 14px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}
       >
         <span className="shrink-0 inline-flex items-center justify-center rounded-[10px]" style={{ width: 38, height: 38, background: s.tint, color: s.accent }}>
           {icon ?? <SeverityIcon paths={s.icon} size={20} />}
