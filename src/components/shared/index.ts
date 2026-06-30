@@ -61,3 +61,6 @@ export { ToastProvider } from './ToastProvider';
 export type { ToastProviderProps } from './ToastProvider';
 export { useToast } from './useToast';
 export type { ToastApi, ToastOptions } from './useToast';
+
+// ErrorBoundary — Layer 0 safety net (catches render throws → banner Alert)
+export { ErrorBoundary } from './ErrorBoundary';
