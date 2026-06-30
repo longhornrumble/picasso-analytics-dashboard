@@ -9,8 +9,26 @@
  */
 import { useState } from 'react';
 import { Alert, useToast, type AlertSeverity } from '../components/shared';
+import { errorToAlert } from '../lib/errorAlert';
 
 const SEVERITIES: AlertSeverity[] = ['error', 'warning', 'success', 'info'];
+
+/** A thrown value shaped like the real clients, for the error-mapper demo. */
+function apiErr(status: number, message: string): Error {
+  return Object.assign(new Error(message), { status });
+}
+
+// Representative throwables spanning the real error classes (see lib/errorAlert.ts).
+const SAMPLE_ERRORS: { label: string; error: unknown }[] = [
+  { label: 'network down (TypeError)', error: new TypeError('Failed to fetch') },
+  { label: '401 session', error: apiErr(401, 'Not authenticated') },
+  { label: '403 forbidden', error: apiErr(403, 'admin only') },
+  { label: '404 (status in message)', error: new Error('API error: 404') },
+  { label: '409 business rule', error: apiErr(409, 'team is in use by appointment type(s); reassign them first') },
+  { label: '409 concurrent edit', error: apiErr(409, 'stale If-Match; row was modified') },
+  { label: '429 cooldown', error: apiErr(429, 'rate_limited') },
+  { label: '500 server', error: apiErr(500, 'API error: 500') },
+];
 
 function DemoButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
@@ -174,6 +192,21 @@ export function AlertGallery() {
               onDismiss={() => hide('inline-dismiss')}
             />
           )}
+        </Section>
+
+        <Section title="Error → Alert (the central mapper)" hint="errorToAlert() turns each real error class into severity + human copy. Same function the migrated catch blocks use.">
+          {SAMPLE_ERRORS.map(({ label, error }) => {
+            const a = errorToAlert(error);
+            return (
+              <div key={label}>
+                <div className="text-[11px] font-mono text-slate-400 mb-1">{label}</div>
+                <Alert severity={a.severity} placement="inline" title={a.title} description={a.description} />
+              </div>
+            );
+          })}
+          <DemoButton onClick={() => { const a = errorToAlert(apiErr(500, 'API error: 500')); toast.error(a.title, { description: a.description }); }}>
+            toast a mapped 500 error
+          </DemoButton>
         </Section>
       </div>
     </div>

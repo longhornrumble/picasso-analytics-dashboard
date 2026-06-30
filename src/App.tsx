@@ -13,7 +13,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { SchedulingPage } from './pages/scheduling/SchedulingPage';
 import { PremiumLock } from './components/PremiumLock';
 import { AttributionWorkspace } from './components/attribution';
-import { ToastProvider } from './components/shared';
+import { ToastProvider, ErrorBoundary } from './components/shared';
 import { AlertGallery } from './pages/AlertGallery';
 import { fetchTenantList, setTenantOverride } from './services/analyticsApi';
 import type { DashboardFeatures, User, TenantOption } from './types/analytics';
@@ -729,7 +729,9 @@ function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <AppContent />
+        <ErrorBoundary>
+          <AppContent />
+        </ErrorBoundary>
       </ToastProvider>
     </AuthProvider>
   );
