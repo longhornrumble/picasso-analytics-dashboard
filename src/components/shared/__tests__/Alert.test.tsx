@@ -24,10 +24,20 @@ describe('Alert — severity axis', () => {
     expect(screen.getByRole('status')).toHaveTextContent('FYI');
   });
 
-  it('drives surface color from the ONE severity record (exact spec hex)', () => {
+  it('drives surface color from a design-system token (matches /myrecruiter-brand)', () => {
     render(<Alert severity="error" placement="inline" title="x" />);
-    // error surface = #FEF3F2 → rgb(254, 243, 242)
-    expect(screen.getByRole('alert')).toHaveStyle({ background: 'rgb(254, 243, 242)' });
+    // error → danger scale; surface bound to the DS token, not a bespoke hex
+    expect(screen.getByRole('alert').getAttribute('style')).toContain('var(--color-danger-50)');
+  });
+
+  it('action buttons match brand: 12px radius (not pills); success solid = emerald + Deep Navy text', () => {
+    render(<Alert severity="success" placement="banner" title="x" action={{ label: 'Go', onClick: () => {} }} />);
+    const btn = screen.getByRole('button', { name: 'Go' });
+    expect(btn.className).toContain('rounded-[12px]');
+    expect(btn.className).not.toContain('rounded-full');
+    const style = btn.getAttribute('style') ?? '';
+    expect(style).toContain('var(--color-primary-500)'); // brand emerald #50C878
+    expect(style).toContain('var(--color-slate-900)');   // Deep Navy text, per brand
   });
 
   it('renders a caller-supplied trailing <code> technical detail', () => {
