@@ -14,6 +14,7 @@ import { SchedulingPage } from './pages/scheduling/SchedulingPage';
 import { PremiumLock } from './components/PremiumLock';
 import { AttributionWorkspace } from './components/attribution';
 import { ToastProvider } from './components/shared';
+import { AlertGallery } from './pages/AlertGallery';
 import { fetchTenantList, setTenantOverride } from './services/analyticsApi';
 import type { DashboardFeatures, User, TenantOption } from './types/analytics';
 
@@ -520,6 +521,12 @@ function AppContent() {
   };
 
   const features = user?.features || DEFAULT_FEATURES;
+
+  // Alert system demo gallery (non-production builds only) — visit ?alerts to
+  // preview every severity × placement + toasts. Never rendered in a prod build.
+  if (import.meta.env.MODE !== 'production' && new URLSearchParams(window.location.search).has('alerts')) {
+    return <AlertGallery />;
+  }
 
   // Show loading state
   if (loading) {
