@@ -10,6 +10,8 @@
 import { useState } from 'react';
 import { Alert, useToast, type AlertSeverity } from '../components/shared';
 import { errorToAlert } from '../lib/errorAlert';
+import { calendarStatusAlert } from '../lib/calendarStatusAlert';
+import type { CalendarConnectionStatusResponse } from '../services/schedulingApi';
 
 const SEVERITIES: AlertSeverity[] = ['error', 'warning', 'success', 'info'];
 
@@ -74,6 +76,11 @@ export function AlertGallery() {
       toast.success('Google Calendar reconnected');
     }, 1800);
   };
+
+  // The flagship: real status enum → alert content (lib/calendarStatusAlert).
+  const calRevoked = calendarStatusAlert({ status: 'disconnected', reason: 'revoked' } as CalendarConnectionStatusResponse);
+  const calStale = calendarStatusAlert({ status: 'stale_connected' } as CalendarConnectionStatusResponse);
+  const reconnectAction = { label: 'Reconnect Google Calendar', onClick: () => toast.info('Demo: would start the Google OAuth reconnect') };
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4">
@@ -207,6 +214,30 @@ export function AlertGallery() {
           <DemoButton onClick={() => { const a = errorToAlert(apiErr(500, 'API error: 500')); toast.error(a.title, { description: a.description }); }}>
             toast a mapped 500 error
           </DemoButton>
+        </Section>
+
+        <Section title="Calendar connection states (the flagship)" hint="calendarStatusAlert() maps the live connection status → alert content. Same data, banner (page-wide) vs inline (section-level), with a real Reconnect action.">
+          {calRevoked && visible('cal-banner') && (
+            <Alert
+              severity={calRevoked.severity}
+              placement="banner"
+              title={calRevoked.title}
+              description={calRevoked.description}
+              action={reconnectAction}
+              dismissible
+              onDismiss={() => hide('cal-banner')}
+            />
+          )}
+          {calStale && (
+            <Alert
+              severity={calStale.severity}
+              placement="inline"
+              title={calStale.title}
+              description={<>{calStale.description} <code>(Invalid token: Token expired)</code></>}
+              action={reconnectAction}
+            />
+          )}
+          <div className="text-[12px] text-slate-400">connected and clean first-time disconnected return <span className="font-mono">null</span> — no alert (the Connect onboarding CTA is the right affordance there).</div>
         </Section>
       </div>
     </div>

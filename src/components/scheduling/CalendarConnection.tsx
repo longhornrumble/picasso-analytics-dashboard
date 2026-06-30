@@ -36,6 +36,7 @@ import {
   type CalendarConnectionStatusResponse,
 } from '../../services/schedulingApi';
 import { GoogleCalendarLogo } from './IntegrationLogos';
+import { Alert } from '../shared';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -379,7 +380,7 @@ export function CalendarConnection() {
                 {enabling ? 'Enabling…' : 'Enable scheduling'}
               </button>
             </div>
-            {enableError && <p className="text-sm text-red-600" role="alert">{enableError}</p>}
+            {enableError && <Alert severity="error" placement="inline" title={enableError} />}
           </div>
         ) : (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4" role="status" data-testid="scheduling-locked">
@@ -408,17 +409,12 @@ export function CalendarConnection() {
 
   if (state.load === 'error') {
     return (
-      <div className="flex flex-col gap-3" role="alert">
-        <p className="text-sm text-red-600">
-          {state.loadError ?? 'Could not load calendar connection status.'}
-        </p>
-        <button
-          onClick={handleRetry}
-          className="self-start px-3 py-1.5 text-sm font-medium text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
-        >
-          Retry
-        </button>
-      </div>
+      <Alert
+        severity="error"
+        placement="inline"
+        title={state.loadError ?? 'Could not load calendar connection status.'}
+        action={{ label: 'Retry', onClick: handleRetry }}
+      />
     );
   }
 
@@ -540,7 +536,9 @@ export function CalendarConnection() {
 
       {/* Disconnect inline error */}
       {disconnectError && (
-        <p className="text-sm text-red-600 mt-3" role="alert" data-testid="disconnect-error">{disconnectError}</p>
+        <div className="mt-3" data-testid="disconnect-error">
+          <Alert severity="error" placement="inline" title={disconnectError} />
+        </div>
       )}
 
       {/* Org-level scheduling toggle (admin/manageable only — suppressed on the
@@ -564,7 +562,11 @@ export function CalendarConnection() {
           </button>
         </div>
       )}
-      {enableError && <p className="text-sm text-red-600 mt-2" role="alert">{enableError}</p>}
+      {enableError && (
+        <div className="mt-2">
+          <Alert severity="error" placement="inline" title={enableError} />
+        </div>
+      )}
     </section>
   );
 }
