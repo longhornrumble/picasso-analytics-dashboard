@@ -50,3 +50,14 @@ export type { DateFilterValue, DateFilterRange } from './DateFilter';
 // Confirmation dialog (portal-based, reusable across pages)
 export { ConfirmDialog } from './ConfirmDialog';
 export type { ConfirmDialogProps } from './ConfirmDialog';
+
+// Alert — the single alert/notification primitive (banner | inline | toast)
+export { Alert } from './Alert';
+export type { AlertProps, AlertSeverity, AlertPlacement, AlertAction } from './Alert';
+export { SEVERITY, ALERT_ACCENT } from './alertTokens';
+
+// Toast — the 'toast' placement of <Alert>, via a root provider + hook
+export { ToastProvider } from './ToastProvider';
+export type { ToastProviderProps } from './ToastProvider';
+export { useToast } from './useToast';
+export type { ToastApi, ToastOptions } from './useToast';
