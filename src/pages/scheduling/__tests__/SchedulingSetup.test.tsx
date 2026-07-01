@@ -8,6 +8,7 @@ const api = {
   fetchPrograms: vi.fn(),
   createAppointmentType: vi.fn(),
   updateAppointmentType: vi.fn(),
+  deleteAppointmentType: vi.fn(),
   fetchNotificationTemplates: vi.fn(),
   fetchSchedulingActivation: vi.fn(),
   initCalendarConnection: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock('../../../services/schedulingApi', async () => {
     fetchPrograms: () => api.fetchPrograms(),
     createAppointmentType: (...a: unknown[]) => api.createAppointmentType(...a),
     updateAppointmentType: (...a: unknown[]) => api.updateAppointmentType(...a),
+    deleteAppointmentType: (...a: unknown[]) => api.deleteAppointmentType(...a),
     fetchNotificationTemplates: () => api.fetchNotificationTemplates(),
     fetchSchedulingActivation: () => api.fetchSchedulingActivation(),
     initCalendarConnection: () => api.initCalendarConnection(),
@@ -194,6 +196,30 @@ describe('SchedulingSetup — §2 What can be booked', () => {
       expect.objectContaining({ name: 'Intro Chat', program_id: 'discovery_program', routing_policy_id: 'rp1', conference_type: 'google_meet' }),
       '2026-06-06T00:00:00.000002Z', // ifMatchToken(APPT)
     );
+  });
+
+  it('deletes an appointment type from the editor after a confirm, with its If-Match token', async () => {
+    api.deleteAppointmentType.mockResolvedValue(undefined);
+    render(<SchedulingSetup />);
+    await waitFor(() => expect(screen.getByText('Discovery Call')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: /Discovery Call/i })); // open editor
+    await userEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+    expect(api.deleteAppointmentType).not.toHaveBeenCalled(); // confirm first
+    // ConfirmDialog "Delete" confirm button
+    const confirms = screen.getAllByRole('button', { name: /^delete$/i });
+    await userEvent.click(confirms[confirms.length - 1]);
+
+    await waitFor(() => expect(api.deleteAppointmentType).toHaveBeenCalledTimes(1));
+    expect(api.deleteAppointmentType).toHaveBeenCalledWith('a1', '2026-06-06T00:00:00.000002Z'); // ifMatchToken(APPT)
+    expect(api.fetchAppointmentTypes).toHaveBeenCalledTimes(2); // initial + reload
+  });
+
+  it('shows no Delete button when creating a new appointment type', async () => {
+    render(<SchedulingSetup />);
+    await waitFor(() => expect(screen.getByText('Discovery Call')).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: /add appointment type/i }));
+    expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull();
   });
 
   it('disables "Add appointment type" when no program is bookable', async () => {

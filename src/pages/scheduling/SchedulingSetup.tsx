@@ -20,6 +20,7 @@ import {
   fetchPrograms,
   createAppointmentType,
   updateAppointmentType,
+  deleteAppointmentType,
   fetchSchedulingActivation,
   initCalendarConnection,
   fetchCalendarConnectionStatus,
@@ -33,6 +34,7 @@ import {
 import { StaffSchedulingSection } from '../../components/scheduling/StaffSchedulingSection';
 import { NotificationTemplatesEditor } from '../../components/scheduling/NotificationTemplatesEditor';
 import { Select } from '../../components/shared/Select';
+import { ConfirmDialog } from '../../components/shared/ConfirmDialog';
 import { lastEditedLabel } from '../../lib/scheduling/formatModifiedAt';
 import { bookablePrograms, programColor } from '../../lib/scheduling/whoHandlesBookings';
 
@@ -163,6 +165,8 @@ export function SchedulingSetup() {
   const [apptForm, setApptForm] = useState<
     (AppointmentTypeWrite & { _id?: string; _ifMatch?: string }) | null
   >(null);
+  // Delete-confirm for the appointment type being edited.
+  const [confirmDeleteAppt, setConfirmDeleteAppt] = useState(false);
 
   const load = useCallback(async (isActive: () => boolean) => {
     if (!isAdmin) {
@@ -246,6 +250,23 @@ export function SchedulingSetup() {
       setApptForm(null);
       await reload();
     } catch (e) {
+      setSaveError(errMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteApptType() {
+    if (!apptForm?._id) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await deleteAppointmentType(apptForm._id, apptForm._ifMatch ?? '*');
+      setConfirmDeleteAppt(false);
+      setApptForm(null);
+      await reload();
+    } catch (e) {
+      setConfirmDeleteAppt(false);
       setSaveError(errMessage(e));
     } finally {
       setSaving(false);
@@ -479,14 +500,31 @@ export function SchedulingSetup() {
                 Only teams from bookable programs are listed — manage teams in “Who handles bookings”.
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <button onClick={saveAppt} disabled={saving || !apptForm.program_id || !apptForm.routing_policy_id || !apptForm.name.trim()}
                 className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg disabled:opacity-50">
                 {saving ? 'Saving…' : 'Save'}
               </button>
               <button onClick={() => { setApptForm(null); setSaveError(null); }} className="px-3 py-1.5 text-sm text-slate-500">Cancel</button>
+              {apptForm._id && (
+                <button onClick={() => setConfirmDeleteAppt(true)} disabled={saving}
+                  className="ml-auto text-[13px] font-semibold text-danger-600 hover:text-danger-700 disabled:opacity-50">
+                  Delete
+                </button>
+              )}
             </div>
           </div>
+        )}
+
+        {confirmDeleteAppt && apptForm?._id && (
+          <ConfirmDialog
+            title="Delete this appointment type?"
+            message="Prospects will no longer be able to book it. Existing bookings keep their details."
+            confirmLabel="Delete"
+            destructive
+            onConfirm={deleteApptType}
+            onCancel={() => setConfirmDeleteAppt(false)}
+          />
         )}
       </>
     );
