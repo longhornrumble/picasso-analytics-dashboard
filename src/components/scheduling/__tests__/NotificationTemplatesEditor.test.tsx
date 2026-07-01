@@ -195,6 +195,27 @@ describe('NotificationTemplatesEditor (E14) — message list', () => {
     const dialog = await openMoment(/Time no longer available/);
     expect(within(dialog).getByLabelText(/^subject$/i)).toBeInTheDocument();
   });
+
+  it('toggles a message off via its switch (PATCH {enabled:false})', async () => {
+    api.updateNotificationTemplate.mockResolvedValue({ moment: 'reoffer', template: {} });
+    render(<NotificationTemplatesEditor />);
+    await waitFor(() => expect(screen.getByText('Time no longer available')).toBeInTheDocument());
+    const sw = screen.getByRole('switch', { name: /turn off Time no longer available/i });
+    expect(sw).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(sw);
+    await waitFor(() => expect(api.updateNotificationTemplate).toHaveBeenCalledWith('reoffer', { enabled: false }));
+  });
+
+  it('shows a disabled moment as Off with its switch unchecked', async () => {
+    api.fetchNotificationTemplates.mockResolvedValue({
+      ...RESPONSE,
+      moments: { ...RESPONSE.moments, reoffer: { ...tpl(), enabled: false } },
+    });
+    render(<NotificationTemplatesEditor />);
+    await waitFor(() => expect(screen.getByText('Time no longer available')).toBeInTheDocument());
+    expect(screen.getByText(/Off — not sent/)).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /turn on Time no longer available/i })).toHaveAttribute('aria-checked', 'false');
+  });
 });
 
 // ─── S4d: the S4 moments (reminder_24h / reminder_1h / confirmation) ──────────────────

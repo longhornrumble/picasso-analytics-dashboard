@@ -176,6 +176,10 @@ export function NotificationTemplatesEditor() {
     bodyRef.current?.focus();
   }
 
+  function toggleEnabled(id: NotificationMoment, next: boolean) {
+    persist(id, { enabled: next });
+  }
+
   async function persist(id: NotificationMoment, body: NotificationTemplateWrite, flash = false) {
     setSavingMoment(id);
     setSaveError(null);
@@ -244,24 +248,41 @@ export function NotificationTemplatesEditor() {
             <div className="flex flex-col gap-2">
               {rows.map((m) => {
                 const t = moments[m.id];
+                const enabled = t.enabled !== false;
+                const busy = savingMoment === m.id;
                 return (
-                  <button
+                  <div
                     key={m.id}
-                    type="button"
-                    onClick={() => openEditor(m.id)}
-                    className="flex items-center gap-3 text-left border border-slate-200 rounded-xl px-[15px] py-3 bg-white transition-colors hover:border-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className={`flex items-center gap-3 border rounded-xl px-[15px] py-3 transition-colors ${enabled ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-50'}`}
                   >
-                    <span className="w-9 h-9 rounded-[9px] bg-slate-100 flex items-center justify-center shrink-0 text-slate-500">
-                      <MomentIcon path={m.icon} />
-                    </span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-bold text-slate-900">{m.name}</span>
-                      <span className="block text-xs text-slate-400">
-                        {t.is_override ? 'Customized' : 'Default'} · {m.desc}
+                    <button
+                      type="button"
+                      onClick={() => openEditor(m.id)}
+                      className="flex items-center gap-3 flex-1 min-w-0 text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <span className={`w-9 h-9 rounded-[9px] flex items-center justify-center shrink-0 bg-slate-100 ${enabled ? 'text-slate-500' : 'text-slate-300'}`}>
+                        <MomentIcon path={m.icon} />
                       </span>
-                    </span>
-                    <ChevronIcon className="w-[18px] h-[18px] text-slate-300 shrink-0" />
-                  </button>
+                      <span className="flex-1 min-w-0">
+                        <span className={`block text-sm font-bold ${enabled ? 'text-slate-900' : 'text-slate-400'}`}>{m.name}</span>
+                        <span className="block text-xs text-slate-400">
+                          {enabled ? (t.is_override ? 'Customized' : 'Default') : 'Off — not sent'} · {m.desc}
+                        </span>
+                      </span>
+                      <ChevronIcon className="w-[18px] h-[18px] text-slate-300 shrink-0" />
+                    </button>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={enabled}
+                      aria-label={`${enabled ? 'Turn off' : 'Turn on'} ${m.name}`}
+                      disabled={busy}
+                      onClick={() => toggleEnabled(m.id, !enabled)}
+                      className={`relative w-9 h-5 rounded-full shrink-0 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary-500 ${enabled ? 'bg-primary-500' : 'bg-slate-300'}`}
+                    >
+                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                    </button>
+                  </div>
                 );
               })}
             </div>
