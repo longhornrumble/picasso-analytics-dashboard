@@ -37,6 +37,7 @@ import {
 } from '../../services/schedulingApi';
 import { GoogleCalendarLogo } from './IntegrationLogos';
 import { Alert } from '../shared';
+import { calendarStatusAlert } from '../../lib/calendarStatusAlert';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -422,6 +423,9 @@ export function CalendarConnection() {
   const isConnected = status?.status === 'connected';
   const isStale = status?.status === 'stale_connected';
   const showDisconnect = isConnected || isStale;
+  // The not-bookable states (revoked / stale) map to a prominent, actionable alert;
+  // connected + clean first-time disconnected return null (see lib/calendarStatusAlert).
+  const statusAlert = status ? calendarStatusAlert(status) : null;
 
   return (
     <section
@@ -449,12 +453,6 @@ export function CalendarConnection() {
               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500">
                 {statusLabel('disconnected')}
               </span>
-            )}
-            {status?.status === 'disconnected' && status.reason === 'revoked' && (
-              <span className="text-xs text-amber-600">(access was revoked — please reconnect)</span>
-            )}
-            {isStale && (
-              <span className="text-xs text-amber-600">(could not verify — connect again if bookings fail)</span>
             )}
           </div>
           <p className="text-sm text-slate-500 mt-1.5 max-w-[60ch]">
@@ -515,22 +513,35 @@ export function CalendarConnection() {
             </button>
           </div>
         </>
+      ) : statusAlert ? (
+        /* revoked / stale (not bookable) — prominent status alert carrying the Reconnect CTA.
+           The status enum IS the context: calendarStatusAlert picks severity + copy. */
+        <div className="mt-[18px] flex flex-col gap-2.5">
+          <Alert
+            severity={statusAlert.severity}
+            placement="inline"
+            title={statusAlert.title}
+            description={statusAlert.description}
+            action={{ label: 'Reconnect Google Calendar', busyLabel: 'Connecting…', onClick: handleConnect }}
+            busy={connecting}
+          />
+          {showDisconnect && (
+            <div>
+              <button onClick={handleDisconnect} disabled={disconnecting || connecting} aria-label="Disconnect Google Calendar" className={PILL_DANGER}>
+                {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+              </button>
+            </div>
+          )}
+        </div>
       ) : (
-        /* disconnected / stale_connected — sign-in prompt + connect (stale also offers disconnect) */
+        /* clean / first-time disconnected — onboarding prompt + Connect (not an error) */
         <div className="mt-[18px] flex items-center justify-between gap-4 flex-wrap">
           <p className="text-[13px] text-slate-400 max-w-[46ch]">
             Sign in with Google to make your availability bookable.
           </p>
-          <div className="flex items-center gap-2.5">
-            {showDisconnect && (
-              <button onClick={handleDisconnect} disabled={disconnecting || connecting} aria-label="Disconnect Google Calendar" className={PILL_DANGER}>
-                {disconnecting ? 'Disconnecting…' : 'Disconnect'}
-              </button>
-            )}
-            <button onClick={handleConnect} disabled={connecting || disconnecting} aria-label="Connect Google Calendar" className={PILL_PRIMARY}>
-              {connecting ? 'Connecting…' : 'Connect Google Calendar'}
-            </button>
-          </div>
+          <button onClick={handleConnect} disabled={connecting || disconnecting} aria-label="Connect Google Calendar" className={PILL_PRIMARY}>
+            {connecting ? 'Connecting…' : 'Connect Google Calendar'}
+          </button>
         </div>
       )}
 

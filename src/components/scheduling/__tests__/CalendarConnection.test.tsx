@@ -255,23 +255,24 @@ describe('CalendarConnection (Track 2 Surface 1)', () => {
     expect(screen.getByRole('button', { name: /connect google calendar/i })).toBeInTheDocument();
   });
 
-  it('renders stale_connected with a verification warning', async () => {
+  it('renders stale_connected with a prominent verification-warning alert', async () => {
     api.initCalendarConnection.mockResolvedValue(INIT_RESP);
     api.fetchCalendarConnectionStatus.mockResolvedValue(STALE_STATUS);
     render(<CalendarConnection />);
     await waitFor(() => expect(screen.getByText('Connection unverified')).toBeInTheDocument());
-    expect(screen.getByText(/could not verify/i)).toBeInTheDocument();
+    // The status now drives a prominent alert (calendarStatusAlert) instead of a tiny note.
+    expect(screen.getByRole('alert')).toHaveTextContent(/confirm your Google Calendar/i);
   });
 
-  // item 10c: stale_connected shows Connect (not Reconnect)
-  it('stale_connected shows Connect button (not Reconnect)', async () => {
+  // Revises item 10c: stale now surfaces the prominent status alert whose CTA is Reconnect
+  // (the connection was established before, so "Reconnect" — not "Connect" — is correct).
+  it('stale_connected shows a Reconnect action via the status alert (not Connect)', async () => {
     api.initCalendarConnection.mockResolvedValue(INIT_RESP);
     api.fetchCalendarConnectionStatus.mockResolvedValue(STALE_STATUS);
     render(<CalendarConnection />);
     await waitFor(() => expect(screen.getByText('Connection unverified')).toBeInTheDocument());
-    // Use exact label to distinguish from "Disconnect Google Calendar" (also present for stale)
-    expect(screen.getByRole('button', { name: 'Connect Google Calendar' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /reconnect google calendar/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /reconnect google calendar/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Connect Google Calendar' })).toBeNull();
   });
 
   it('shows revocation note when status is disconnected + reason:revoked', async () => {
