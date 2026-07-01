@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/useAuth';
 import { useFocusTrap } from '../../hooks';
+import { Toggle } from '../shared/Toggle';
 import {
   fetchNotificationTemplates,
   updateNotificationTemplate,
@@ -271,17 +272,12 @@ export function NotificationTemplatesEditor() {
                       </span>
                       <ChevronIcon className="w-[18px] h-[18px] text-slate-300 shrink-0" />
                     </button>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={enabled}
-                      aria-label={`${enabled ? 'Turn off' : 'Turn on'} ${m.name}`}
+                    <Toggle
+                      checked={enabled}
                       disabled={busy}
-                      onClick={() => toggleEnabled(m.id, !enabled)}
-                      className={`relative w-9 h-5 rounded-full shrink-0 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary-500 ${enabled ? 'bg-primary-500' : 'bg-slate-300'}`}
-                    >
-                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
-                    </button>
+                      onChange={(next) => toggleEnabled(m.id, next)}
+                      ariaLabel={`${enabled ? 'Turn off' : 'Turn on'} ${m.name}`}
+                    />
                   </div>
                 );
               })}
