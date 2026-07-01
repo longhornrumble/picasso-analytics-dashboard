@@ -90,8 +90,9 @@ describe('NotificationTemplatesEditor (E14) — message list', () => {
     const sms = within(dialog).getByLabelText(/text message/i) as HTMLTextAreaElement;
     expect(sms.value).toBe('');
     expect(sms).toHaveAttribute('placeholder', 'Default SMS {{firstName}}');
-    // per-moment variable chips come from available_variables
-    expect(within(dialog).getByRole('button', { name: '{{firstName}}' })).toBeInTheDocument();
+    // per-moment variable chips come from available_variables (chips now render under each
+    // field, so the accessible name is scoped: "Insert <token> into <field>")
+    expect(within(dialog).getByRole('button', { name: 'Insert {{firstName}} into message' })).toBeInTheDocument();
   });
 
   it('seeds an existing override INTO the field so it stays editable (audit row 7)', async () => {
@@ -100,17 +101,29 @@ describe('NotificationTemplatesEditor (E14) — message list', () => {
     const dialog = await openMoment(/Cancellation notice/);
     const subj = within(dialog).getByLabelText(/^subject$/i) as HTMLInputElement;
     expect(subj.value).toBe('Default subject'); // the override value is loaded, not blanked
-    // override moments expose the per-moment vars too
-    expect(within(dialog).getByRole('button', { name: '{{rebookHtml}}' })).toBeInTheDocument();
+    // override moments expose the per-moment vars too (rebookHtml is html-only → email chips)
+    expect(within(dialog).getByRole('button', { name: 'Insert {{rebookHtml}} into message' })).toBeInTheDocument();
   });
 
   it('tap-to-insert appends a variable to the message body', async () => {
     render(<NotificationTemplatesEditor />);
     await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
     const dialog = await openMoment(/Reschedule link/);
-    await userEvent.click(within(dialog).getByRole('button', { name: '{{firstName}}' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Insert {{firstName}} into message' }));
     const body = within(dialog).getByLabelText(/^message$/i) as HTMLTextAreaElement;
     expect(body.value).toContain('{{firstName}}');
+  });
+
+  it('tap-to-insert under the SMS field appends to the SMS body (not the message)', async () => {
+    render(<NotificationTemplatesEditor />);
+    await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
+    const dialog = await openMoment(/Reschedule link/);
+    const body = within(dialog).getByLabelText(/^message$/i) as HTMLTextAreaElement;
+    const before = body.value;
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Insert {{firstName}} into SMS' }));
+    const sms = within(dialog).getByLabelText(/text message/i) as HTMLTextAreaElement;
+    expect(sms.value).toContain('{{firstName}}');
+    expect(body.value).toBe(before); // the message body is untouched
   });
 
   it('Save changes PATCHes the edited copy (subject + body + html + sms) and reloads', async () => {

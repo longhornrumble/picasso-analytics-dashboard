@@ -115,6 +115,8 @@ export function NotificationTemplatesEditor() {
   const [htmlOpen, setHtmlOpen] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const htmlRef = useRef<HTMLTextAreaElement | null>(null);
+  const smsRef = useRef<HTMLTextAreaElement | null>(null);
 
   const load = useCallback(async (isActive: () => boolean, opts?: { silent?: boolean }) => {
     // `silent` re-fetch (post-save): don't flip the full-page spinner — collapsing the whole
@@ -170,11 +172,13 @@ export function NotificationTemplatesEditor() {
     }));
   }
 
-  function insertVar(id: NotificationMoment, token: string) {
+  function insertVar(id: NotificationMoment, field: InsertField, token: string) {
     const cur = drafts[id] ?? draftOf(moments[id]);
-    const next = `${cur.body_text}${cur.body_text && !cur.body_text.endsWith(' ') ? ' ' : ''}${token}`;
-    setField(id, 'body_text', next.trim());
-    bodyRef.current?.focus();
+    const curVal = cur[field] || '';
+    const next = `${curVal}${curVal && !curVal.endsWith(' ') ? ' ' : ''}${token}`;
+    setField(id, field, next.trim());
+    const ref = field === 'body_html' ? htmlRef : field === 'sms_text' ? smsRef : bodyRef;
+    ref.current?.focus();
   }
 
   function toggleEnabled(id: NotificationMoment, next: boolean) {
@@ -299,10 +303,12 @@ export function NotificationTemplatesEditor() {
           saveError={saveError}
           panelRef={panelRef}
           bodyRef={bodyRef}
+          htmlRef={htmlRef}
+          smsRef={smsRef}
           onClose={closeEditor}
           onToggleHtml={() => setHtmlOpen((v) => !v)}
           onField={(field, value) => setField(sel.id, field, value)}
-          onInsertVar={(token) => insertVar(sel.id, token)}
+          onInsertVar={(field, token) => insertVar(sel.id, field, token)}
           onSave={(d) => persist(sel.id, { subject: d.subject, body_text: d.body_text, body_html: d.body_html, sms_text: d.sms_text }, true)}
           onReset={() => persist(sel.id, { subject: '', body_text: '', body_html: '', sms_text: '' })}
         />
@@ -335,6 +341,9 @@ function resolveSample(str: string, org: string): string {
     .trim();
 }
 
+// The three insertable text fields the tap-to-insert chips can target.
+type InsertField = 'body_text' | 'body_html' | 'sms_text';
+
 interface SlideoverProps {
   meta: MomentMeta;
   t: MomentTemplate;
@@ -347,17 +356,19 @@ interface SlideoverProps {
   saveError: string | null;
   panelRef: React.RefObject<HTMLDivElement | null>;
   bodyRef: React.RefObject<HTMLTextAreaElement | null>;
+  htmlRef: React.RefObject<HTMLTextAreaElement | null>;
+  smsRef: React.RefObject<HTMLTextAreaElement | null>;
   onClose: () => void;
   onToggleHtml: () => void;
   onField: (field: keyof EditorDraft, value: string) => void;
-  onInsertVar: (token: string) => void;
+  onInsertVar: (field: InsertField, token: string) => void;
   onSave: (d: EditorDraft) => void;
   onReset: () => void;
 }
 
 function Slideover({
   meta, t, draft, org, closing, htmlOpen, savedFlash, saving, saveError,
-  panelRef, bodyRef, onClose, onToggleHtml, onField, onInsertVar, onSave, onReset,
+  panelRef, bodyRef, htmlRef, smsRef, onClose, onToggleHtml, onField, onInsertVar, onSave, onReset,
 }: SlideoverProps) {
   // Trigger the enter transition one frame after mount.
   const [entered, setEntered] = useState(false);
@@ -381,6 +392,37 @@ function Slideover({
   const previewSms = resolveSample(smsText, org);
 
   const vars = t.available_variables ?? [];
+
+  // Tap-to-insert chips, rendered under each editable field (text / html / SMS) so a token
+  // can be dropped into whichever body is being edited, not only the plain-text one. The
+  // per-field aria-label keeps each chip's accessible name unique (a screen reader would
+  // otherwise hear "{{firstName}}" three times with no context).
+  const chipRow = (field: InsertField) => {
+    // SMS advertises the plain-text subset (no html-only tokens like {{rebookHtml}}); the
+    // text + html email bodies share the full email vocabulary.
+    const list = field === 'sms_text' ? (t.sms_available_variables ?? vars) : vars;
+    if (list.length === 0) return null;
+    const label = field === 'body_html' ? 'HTML' : field === 'sms_text' ? 'SMS' : 'message';
+    return (
+      <div className="mt-2.5">
+        <div className="text-[11px] font-semibold text-slate-400 mb-1.5">Tap to insert:</div>
+        <div className="flex flex-wrap gap-1.5">
+          {list.map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-label={`Insert ${v} into ${label}`}
+              onClick={() => onInsertVar(field, v)}
+              className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-full px-2.5 py-1 text-[11.5px] text-slate-600 font-mono hover:bg-slate-200"
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const smsLen = draft.sms_text.length;
   const smsSegments = smsLen <= 160 ? 1 : Math.ceil(smsLen / 153);
 
@@ -445,23 +487,7 @@ function Slideover({
             onChange={(e) => onField('body_text', e.target.value)}
           />
 
-          {vars.length > 0 && (
-            <div className="mt-2.5">
-              <div className="text-[11px] font-semibold text-slate-400 mb-1.5">Tap to insert:</div>
-              <div className="flex flex-wrap gap-1.5">
-                {vars.map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => onInsertVar(v)}
-                    className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-full px-2.5 py-1 text-[11.5px] text-slate-600 font-mono hover:bg-slate-200"
-                  >
-                    {v}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {chipRow('body_text')}
 
           {meta.note && (
             <div className="flex gap-2 bg-slate-50 border border-slate-100 rounded-[10px] px-3 py-2.5 mt-4 text-[12.5px] text-slate-500 leading-snug">
@@ -483,12 +509,14 @@ function Slideover({
           {htmlOpen && (
             <>
               <textarea
+                ref={htmlRef}
                 rows={4}
                 className={`${inputCls} mt-2.5 text-[12.5px] font-mono leading-snug bg-slate-50 text-slate-700`}
                 placeholder={t.default.body_html}
                 value={draft.body_html}
                 onChange={(e) => onField('body_html', e.target.value)}
               />
+              {chipRow('body_html')}
               <p className="text-[11.5px] text-slate-400 mt-1.5">
                 Most people never need this. Leave it and we'll style the message for you.
               </p>
@@ -525,6 +553,7 @@ function Slideover({
             </div>
             <textarea
               id={`sms-${meta.id}`}
+              ref={smsRef}
               rows={3}
               maxLength={SMS_MAX}
               className={`${inputCls} text-[13.5px]`}
@@ -532,6 +561,7 @@ function Slideover({
               value={draft.sms_text}
               onChange={(e) => onField('sms_text', e.target.value)}
             />
+            {chipRow('sms_text')}
             <div className="flex items-baseline justify-between gap-4 mt-2">
               <p className="text-[11.5px] text-slate-400">A STOP/HELP line is appended automatically.</p>
               <span className="text-[11.5px] text-slate-400 shrink-0 whitespace-nowrap">
