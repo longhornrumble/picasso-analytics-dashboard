@@ -321,6 +321,7 @@ function resolveSample(str: string, org: string): string {
     firstName: 'Alex',
     org,
     apptType: 'Intro Call',
+    programName: 'Family Support',
     whenLabel: 'on Sun, Jun 21 at 9:30 AM',
     when: 'on Sun, Jun 21 at 9:30 AM',
     actionUrl: '',
