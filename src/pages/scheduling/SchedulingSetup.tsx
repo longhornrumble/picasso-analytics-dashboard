@@ -70,6 +70,7 @@ const blankAppt: AppointmentTypeWrite = {
   conference_type: 'google_meet',
   routing_policy_id: '',
   program_id: '',
+  agenda: '',
 };
 
 /** 3-step onboarding progress badges (Approve → Connect → Set up). */
@@ -385,6 +386,7 @@ export function SchedulingSetup() {
                   conference_type: a.conference_type ?? 'google_meet',
                   routing_policy_id: a.routing_policy_id,
                   program_id: a.program_id ?? '',
+                  agenda: a.agenda ?? '',
                 });
                 setSaveError(null);
               }}
@@ -455,6 +457,14 @@ export function SchedulingSetup() {
               <input id="at-title" className={inputCls} value={apptForm.name} maxLength={200}
                 placeholder="What the prospect sees on their calendar invite"
                 onChange={(e) => setApptForm({ ...apptForm, name: e.target.value })} />
+            </div>
+
+            <div>
+              <label htmlFor="at-agenda" className="block text-xs font-medium text-slate-600 mb-1">Comments</label>
+              <textarea id="at-agenda" className={`${inputCls} min-h-[72px] resize-y`} rows={3} maxLength={2000}
+                value={apptForm.agenda ?? ''}
+                placeholder="Optional — added to the meeting invite the guest receives (Google Meet or Zoom)"
+                onChange={(e) => setApptForm({ ...apptForm, agenda: e.target.value })} />
             </div>
 
             <Select

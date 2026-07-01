@@ -112,6 +112,11 @@ export interface AppointmentType {
    * through the program picker.
    */
   program_id?: string;
+  /**
+   * Free-text "Comments" the Booking_Commit_Handler prepends to the calendar-invite description +
+   * the .ics, so it reaches the guest on both Google Meet and Zoom bookings. Absent on old rows.
+   */
+  agenda?: string;
   modified_at?: ModifiedAt; // absent on legacy/fixture rows
 }
 
@@ -151,6 +156,8 @@ export interface AppointmentTypeWrite {
   /** FK → config.programs `program_id`. Required on write (the program picker); the server
    *  422s if it isn't a real program in config.programs (the shared-key guarantee). */
   program_id: string;
+  /** Optional free-text "Comments"/agenda (≤2000 chars) prepended to the calendar-invite description. */
+  agenda?: string;
 }
 
 /** POST/PATCH body for a RoutingPolicy. */
