@@ -1,31 +1,39 @@
 /**
- * StaffSchedulingSection — E13 (ui_plan Surface 3): per-staff scheduling settings.
+ * StaffSchedulingSection — "Who handles bookings" (ui_plan Surface 3, v2 design).
  *
- * Assigns the §E13b Teams (= scheduling_tags) to staff, completing the routing loop
- * (candidate-resolver reads scheduling_tags off the registry). Writes via §E13c
- * PATCH /scheduling/employees/{id} (lambda#259) — NO optimistic lock by design.
+ * Admin: a glanceable read-out of which staff can take bookings, GROUPED BY PROGRAM and sorted
+ * thinnest-coverage-first so gaps jump out. Program membership is DERIVED through the routing
+ * chain (Program → appointment type.program_id → Handled-By-Team → team tag → staff
+ * scheduling_tags), so the read-out reflects who actually gets routed a program's bookings —
+ * see lib/scheduling/whoHandlesBookings. The person-scoped Edit modal writes program membership
+ * back as team tags (§E13c PATCH /scheduling/employees/{id}); "Remind to connect" is a local v1
+ * nudge (server-side lastRemindedAt + 24h cooldown is a follow-up).
  *
- * Role-aware per the §8 matrix + §E13c per-field auth (server-enforced; UI mirrors it):
- *   - admin: full roster; edit each member's tags + bookable-override + calendar-email.
- *   - member: only their OWN record's calendar_email_override (self-editable); their tags
- *     / bookable are read-only, and other members' calendar emails come back null (PII gate).
+ * Member (non-admin): only their own self-card — set the calendar email their bookings write to.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/useAuth';
 import { fetchTeamMembers } from '../../services/analyticsApi';
 import {
-  fetchTagVocabulary,
+  fetchPrograms,
+  fetchAppointmentTypes,
+  fetchRoutingPolicies,
   updateEmployeeScheduling,
   SchedulingApiError,
+  type Program,
+  type AppointmentType,
+  type RoutingPolicy,
   type EmployeeSchedulingWrite,
 } from '../../services/schedulingApi';
 import type { TeamMember } from '../../types/analytics';
+import { staffSchedulingStatus, staffWarning } from '../../lib/scheduling/staffStatus';
 import {
-  staffSchedulingStatus,
-  staffWarning,
-  matchesStaffFilter,
-  type StaffFilter,
-} from '../../lib/scheduling/staffStatus';
+  buildBookingGroups,
+  programTagMap,
+  coveragePill,
+  applyProgramSelection,
+  type MemberStatus,
+} from '../../lib/scheduling/whoHandlesBookings';
 
 function errMessage(e: unknown): string {
   if (e instanceof SchedulingApiError) {
@@ -36,11 +44,12 @@ function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : 'Something went wrong';
 }
 
-interface Draft {
-  tags: string[];
-  bookableOff: boolean;
-  calendarEmail: string;
-}
+/** Status pill styling per the v2 design (exact hues; paired with a text label). */
+const STATUS_STYLE: Record<MemberStatus, { fg: string; bg: string; dot: boolean }> = {
+  bookable: { fg: '#1C7A45', bg: '#ECFDF5', dot: true },
+  paused: { fg: '#64748B', bg: '#F1F5F9', dot: false },
+  needs_calendar: { fg: '#B54708', bg: '#FEF3C7', dot: false },
+};
 
 export function StaffSchedulingSection() {
   const { user } = useAuth();
@@ -48,27 +57,47 @@ export function StaffSchedulingSection() {
   const myEmail = user?.email?.toLowerCase();
 
   const [members, setMembers] = useState<TeamMember[]>([]);
-  const [vocab, setVocab] = useState<string[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [appts, setAppts] = useState<AppointmentType[]>([]);
+  const [policies, setPolicies] = useState<RoutingPolicy[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>({ tags: [], bookableOff: false, calendarEmail: '' });
-  const [filter, setFilter] = useState<StaffFilter>('all');
+  const [saving, setSaving] = useState(false);
+
+  // Remind-to-connect: local v1 (keyed by employee_id). The real version persists lastRemindedAt
+  // server-side so the sent/cooldown state survives reload and is shared across admins.
+  const [reminded, setReminded] = useState<Set<string>>(new Set());
+
+  // Person-scoped Edit modal (admin).
+  const [editId, setEditId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ programs: Set<string>; pause: boolean; calendarEmail: string }>({
+    programs: new Set(),
+    pause: false,
+    calendarEmail: '',
+  });
+
+  // Member self-card edit.
+  const [selfEditing, setSelfEditing] = useState(false);
+  const [selfCalEmail, setSelfCalEmail] = useState('');
 
   const load = useCallback(
     async (isActive: () => boolean) => {
       setLoading(true);
       setLoadError(null);
       try {
-        const [m, v] = await Promise.all([
-          fetchTeamMembers(),
-          isAdmin ? fetchTagVocabulary() : Promise.resolve<string[]>([]),
-        ]);
+        const m = await fetchTeamMembers();
+        let pr: Program[] = [];
+        let at: AppointmentType[] = [];
+        let po: RoutingPolicy[] = [];
+        if (isAdmin) {
+          [pr, at, po] = await Promise.all([fetchPrograms(), fetchAppointmentTypes(), fetchRoutingPolicies()]);
+        }
         if (!isActive()) return;
         setMembers(m.members);
-        setVocab(v);
+        setPrograms(pr);
+        setAppts(at);
+        setPolicies(po);
       } catch (e) {
         if (isActive()) setLoadError(errMessage(e));
       } finally {
@@ -86,42 +115,96 @@ export function StaffSchedulingSection() {
     };
   }, [load]);
 
-  function openEdit(m: TeamMember) {
-    setEditingId(m.employee_id);
+  const ptags = useMemo(() => programTagMap(appts, policies), [appts, policies]);
+  const groups = useMemo(
+    () => buildBookingGroups({ programs, appointmentTypes: appts, routingPolicies: policies, staff: members }),
+    [programs, appts, policies, members],
+  );
+  // Only programs backed by a team (appointment type) are assignable in the modal.
+  const assignablePrograms = useMemo(
+    () => programs.filter((p) => (ptags.get(p.program_id) ?? []).length > 0),
+    [programs, ptags],
+  );
+
+  function memberProgramsOf(m: TeamMember): Set<string> {
+    const tags = new Set(m.scheduling_tags ?? []);
+    const s = new Set<string>();
+    for (const p of programs) {
+      if ((ptags.get(p.program_id) ?? []).some((t) => tags.has(t))) s.add(p.program_id);
+    }
+    return s;
+  }
+
+  function openEdit(employeeId: string) {
+    const m = members.find((x) => x.employee_id === employeeId);
+    if (!m) return;
+    setEditId(employeeId);
     setSaveError(null);
     setDraft({
-      tags: m.scheduling_tags ?? [],
-      bookableOff: m.bookable_override === 'off',
+      programs: memberProgramsOf(m),
+      pause: m.bookable_override === 'off',
       calendarEmail: m.calendar_email_override ?? '',
     });
   }
 
-  function toggleTag(tag: string) {
-    setDraft((d) => ({
-      ...d,
-      tags: d.tags.includes(tag) ? d.tags.filter((t) => t !== tag) : [...d.tags, tag],
-    }));
+  function toggleProgram(pid: string) {
+    setDraft((d) => {
+      const s = new Set(d.programs);
+      if (s.has(pid)) s.delete(pid);
+      else s.add(pid);
+      return { ...d, programs: s };
+    });
   }
 
-  /** Merge the server-echoed written fields back onto the row in state. */
-  function applyWritten(employeeId: string, written: EmployeeSchedulingWrite) {
-    setMembers((prev) =>
-      prev.map((m) => (m.employee_id === employeeId ? { ...m, ...written } : m)),
-    );
+  function mergeWritten(employeeId: string, written: EmployeeSchedulingWrite) {
+    setMembers((prev) => prev.map((m) => (m.employee_id === employeeId ? { ...m, ...written } : m)));
   }
 
-  async function save(m: TeamMember, fields: EmployeeSchedulingWrite) {
-    setSavingId(m.employee_id);
+  async function saveEdit() {
+    const m = members.find((x) => x.employee_id === editId);
+    if (!m) return;
+    setSaving(true);
     setSaveError(null);
+    const scheduling_tags = applyProgramSelection(
+      m.scheduling_tags ?? [],
+      assignablePrograms.map((p) => p.program_id),
+      draft.programs,
+      ptags,
+    );
     try {
-      const res = await updateEmployeeScheduling(m.employee_id, fields);
+      const res = await updateEmployeeScheduling(m.employee_id, {
+        scheduling_tags,
+        bookable_override: draft.pause ? 'off' : null,
+        calendar_email_override: draft.calendarEmail.trim() || null,
+      });
       const { employee_id: _id, ...written } = res;
-      applyWritten(m.employee_id, written);
-      setEditingId(null);
+      mergeWritten(m.employee_id, written);
+      setEditId(null);
     } catch (e) {
       setSaveError(errMessage(e));
     } finally {
-      setSavingId(null);
+      setSaving(false);
+    }
+  }
+
+  function remind(employeeId: string) {
+    setReminded((prev) => new Set(prev).add(employeeId));
+  }
+
+  async function saveSelf(me: TeamMember) {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await updateEmployeeScheduling(me.employee_id, {
+        calendar_email_override: selfCalEmail.trim() || null,
+      });
+      const { employee_id: _id, ...written } = res;
+      mergeWritten(me.employee_id, written);
+      setSelfEditing(false);
+    } catch (e) {
+      setSaveError(errMessage(e));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -147,10 +230,7 @@ export function StaffSchedulingSection() {
   // ---- Member self-service: only their own calendar email ----
   if (!isAdmin) {
     const me = members.find((m) => m.email.toLowerCase() === myEmail);
-    if (!me) {
-      return <p className="text-sm text-slate-400">Your staff record isn't available.</p>;
-    }
-    const editing = editingId === me.employee_id;
+    if (!me) return <p className="text-sm text-slate-400">Your staff record isn't available.</p>;
     const meWarning = staffWarning(staffSchedulingStatus(me));
     return (
       <section aria-label="My scheduling" className="flex flex-col gap-3">
@@ -169,11 +249,7 @@ export function StaffSchedulingSection() {
               {meWarning === 'Connect calendar to be bookable' ? (
                 <>
                   {meWarning}.{' '}
-                  <a
-                    href="?settings_tab=calendar"
-                    className="underline hover:text-amber-700 focus:outline-none focus:ring-1 focus:ring-amber-500 rounded"
-                    aria-label="Open Integrations to connect your calendar"
-                  >
+                  <a href="?settings_tab=calendar" className="underline hover:text-amber-700 focus:outline-none focus:ring-1 focus:ring-amber-500 rounded" aria-label="Open Integrations to connect your calendar">
                     Integrations
                   </a>
                 </>
@@ -184,178 +260,178 @@ export function StaffSchedulingSection() {
           )}
           <div>
             <label htmlFor="my-cal-email" className="block text-xs font-medium text-slate-600 mb-1">Calendar email</label>
-            {editing ? (
-              <input id="my-cal-email" type="email" className={inputCls} value={draft.calendarEmail}
-                placeholder="leave blank to use your login email"
-                onChange={(e) => setDraft({ ...draft, calendarEmail: e.target.value })} />
+            {selfEditing ? (
+              <input id="my-cal-email" type="email" className={inputCls} value={selfCalEmail} placeholder="leave blank to use your login email" onChange={(e) => setSelfCalEmail(e.target.value)} />
             ) : (
               <p className="text-sm text-slate-700">{me.calendar_email_override || <span className="text-slate-400">— (login email)</span>}</p>
             )}
           </div>
-          {editing ? (
+          {selfEditing ? (
             <div className="flex gap-2">
-              <button onClick={() => save(me, { calendar_email_override: draft.calendarEmail.trim() || null })}
-                disabled={savingId === me.employee_id}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg disabled:opacity-50">
-                {savingId === me.employee_id ? 'Saving…' : 'Save'}
+              <button onClick={() => saveSelf(me)} disabled={saving} className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg disabled:opacity-50">
+                {saving ? 'Saving…' : 'Save'}
               </button>
-              <button onClick={() => { setEditingId(null); setSaveError(null); }} className="px-3 py-1.5 text-sm text-slate-500">Cancel</button>
+              <button onClick={() => { setSelfEditing(false); setSaveError(null); }} className="px-3 py-1.5 text-sm text-slate-500">Cancel</button>
             </div>
           ) : (
-            <button onClick={() => openEdit(me)} className="self-start text-sm text-primary-600 hover:text-primary-700">Edit</button>
+            <button onClick={() => { setSelfEditing(true); setSelfCalEmail(me.calendar_email_override ?? ''); setSaveError(null); }} className="self-start text-sm text-primary-600 hover:text-primary-700">Edit</button>
           )}
         </div>
       </section>
     );
   }
 
-  // ---- Admin roster ----
-  const shown = members.filter((m) => matchesStaffFilter(staffSchedulingStatus(m), filter));
+  // ---- Admin: "Who handles bookings" read-out, grouped by program ----
+  const editMember = editId ? members.find((m) => m.employee_id === editId) : null;
+
   return (
     <section aria-label="Who handles bookings" className="flex flex-col">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-[17px] font-bold text-slate-900">Who handles bookings</h3>
-          <p className="text-[13px] text-slate-500 mt-0.5">Staff who can be booked, and the calendar each booking writes to.</p>
-        </div>
-        <label className="flex items-center gap-1.5 text-xs text-slate-500 shrink-0">
-          Show
-          <select
-            aria-label="Filter staff"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as StaffFilter)}
-            className="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          >
-            <option value="all">All staff</option>
-            <option value="bookable">Bookable</option>
-            <option value="not_bookable">Not bookable</option>
-            <option value="missing_connection">Missing connection</option>
-          </select>
-        </label>
+      <div>
+        <h3 className="text-[17px] font-bold text-slate-900">Who handles bookings</h3>
+        <p className="text-[13px] text-slate-500 mt-0.5">
+          Staff who can take bookings, grouped by program so you can spot coverage gaps at a glance.
+        </p>
       </div>
-      {saveError && <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mt-3" role="alert">{saveError}</p>}
 
-      {shown.length === 0 ? (
-        <p className="text-sm text-slate-400 py-6 text-center">No staff match this filter.</p>
+      {programs.length === 0 ? (
+        <p className="text-sm text-slate-400 py-6 text-center">No programs defined for this tenant yet.</p>
       ) : (
-      <div className="flex flex-col gap-2 mt-4">
-        {shown.map((m) => {
-          const editing = editingId === m.employee_id;
-          const status = staffSchedulingStatus(m);
-          const warning = staffWarning(status);
-          const calEmail = m.calendar_email_override || m.email;
+        groups.map((g) => {
+          const pill = coveragePill(g.bookableCount, g.memberCount);
           return (
-            <div key={m.employee_id} className="border border-slate-100 rounded-xl px-[15px] py-3 text-sm">
-              <div className="flex items-center gap-3">
-                <StaffAvatar member={m} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[14.5px] font-bold text-slate-900 truncate">{m.name || m.email}</span>
-                    {m.bookable_override === 'off' ? (
-                      <Badge>Booking paused</Badge>
-                    ) : warning ? (
-                      <Badge>{warning}</Badge>
-                    ) : null}
-                  </div>
-                  <div className="text-[12.5px] text-slate-500 mt-0.5">
-                    {m.calendar_connected
-                      ? <>Google Calendar connected · {calEmail}</>
-                      : 'Calendar not connected'}
-                  </div>
-                </div>
-                {!editing && (
-                  <button onClick={() => openEdit(m)} className="shrink-0 text-[13px] font-bold text-primary-700 hover:text-primary-800">Edit</button>
-                )}
+            <div key={g.program_id} className="mt-[18px]">
+              <div className="flex items-center gap-2.5 mb-1">
+                <span aria-hidden="true" className="w-[11px] h-[11px] rounded-[3px] shrink-0" style={{ background: g.color.fg }} />
+                <span className="text-[13.5px] font-bold text-slate-900">{g.program_name}</span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold" style={{ color: pill.fg, background: pill.bg }}>
+                  {pill.label}
+                </span>
               </div>
-
-              {editing && (
-                <div className="mt-3 flex flex-col gap-3">
-                  <div>
-                    <span className="block text-xs font-medium text-slate-600 mb-1">Teams</span>
-                    {vocab.length === 0 ? (
-                      <p className="text-xs text-slate-400">No team names set up yet.</p>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {vocab.map((tag) => (
-                          <label key={tag} className="inline-flex items-center gap-1.5 text-xs text-slate-700">
-                            <input type="checkbox" checked={draft.tags.includes(tag)} onChange={() => toggleTag(tag)} />
-                            {tag}
-                          </label>
-                        ))}
+              {g.members.length === 0 ? (
+                <p className="text-[12px] text-slate-400 py-2 pl-[21px]">No staff assigned to this program.</p>
+              ) : (
+                g.members.map((m) => {
+                  const st = STATUS_STYLE[m.status];
+                  const isReminded = reminded.has(m.employee_id);
+                  return (
+                    <div key={m.employee_id} className="flex items-center gap-[11px] py-2.5 border-b border-slate-100">
+                      <StaffAvatar name={m.name} initials={m.initials} isAdmin={m.isAdmin} imageUrl={m.image_url} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[14px] font-bold text-slate-900 truncate">{m.name}</span>
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold" style={{ color: st.fg, background: st.bg }}>
+                            {st.dot && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: st.fg }} />}
+                            {m.statusLabel}
+                          </span>
+                        </div>
+                        {m.secondary && <div className="text-[12px] text-slate-400 mt-0.5">{m.secondary}</div>}
                       </div>
-                    )}
-                  </div>
-                  <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                    <input type="checkbox" checked={draft.bookableOff} onChange={(e) => setDraft({ ...draft, bookableOff: e.target.checked })} />
-                    Pause booking (force off)
-                  </label>
-                  <div>
-                    <label htmlFor={`cal-${m.employee_id}`} className="block text-xs font-medium text-slate-600 mb-1">Calendar email</label>
-                    <input id={`cal-${m.employee_id}`} type="email" className={inputCls} value={draft.calendarEmail}
-                      placeholder="optional — defaults to login email"
-                      onChange={(e) => setDraft({ ...draft, calendarEmail: e.target.value })} />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => save(m, {
-                        scheduling_tags: draft.tags,
-                        bookable_override: draft.bookableOff ? 'off' : null,
-                        calendar_email_override: draft.calendarEmail.trim() || null,
-                      })}
-                      disabled={savingId === m.employee_id}
-                      className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg disabled:opacity-50">
-                      {savingId === m.employee_id ? 'Saving…' : 'Save'}
-                    </button>
-                    <button onClick={() => { setEditingId(null); setSaveError(null); }} className="px-3 py-1.5 text-sm text-slate-500">Cancel</button>
-                  </div>
-                </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        {m.status === 'needs_calendar' &&
+                          (isReminded ? (
+                            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-400 whitespace-nowrap">
+                              <CheckIcon /> Reminder sent · just now
+                            </span>
+                          ) : (
+                            <>
+                              <button onClick={() => remind(m.employee_id)} className="text-[13px] font-semibold whitespace-nowrap" style={{ color: '#1C7A45' }}>
+                                Remind to connect
+                              </button>
+                              <span aria-hidden="true" className="w-px h-3.5 bg-slate-200" />
+                            </>
+                          ))}
+                        <button onClick={() => openEdit(m.employee_id)} className="text-[13px] font-semibold text-slate-500 hover:text-slate-700">
+                          Edit
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           );
-        })}
-      </div>
+        })
       )}
 
-      {/* Invite staff routes to the Team sub-tab, where the invite flow lives (deep-link param
-          consumed by SettingsPage). Full-page nav is this SPA's deep-link mechanism. */}
-      <a
-        href="?settings_tab=team"
-        className="flex items-center gap-2 border border-dashed border-slate-300 rounded-xl px-[15px] py-3 text-[13.5px] font-semibold text-primary-700 hover:border-primary-400 hover:bg-primary-50/40 mt-2"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        Invite staff
-      </a>
+      {/* Footer: staff are managed in the Team tab; this section is a read-out. NO invite button. */}
+      <div className="flex items-center justify-between gap-3 mt-3.5 pt-3 border-t border-slate-100">
+        <span className="text-[12.5px] text-slate-400">Staff are added in the Team tab and appear here automatically.</span>
+        <a href="?settings_tab=team" className="inline-flex items-center gap-1.5 text-[13px] font-bold whitespace-nowrap" style={{ color: '#1C7A45' }}>
+          Manage team <ArrowRightIcon />
+        </a>
+      </div>
+
+      {editMember && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-5" style={{ background: 'rgba(15,23,42,0.35)' }} onClick={() => { setEditId(null); setSaveError(null); }}>
+          <div className="bg-white rounded-2xl p-6 w-[min(440px,100%)] box-border shadow-[0_24px_60px_rgba(15,23,42,0.25)]" onClick={(e) => e.stopPropagation()}>
+            <div className="text-[17px] font-bold text-slate-900">Edit {editMember.name || editMember.email}</div>
+            <div className="text-[12.5px] text-slate-400 mt-0.5">Program assignment applies to this person across the whole section.</div>
+
+            <div className="text-[11.5px] font-bold text-slate-600 tracking-[0.05em] mt-5">PROGRAMS</div>
+            <div className="flex flex-col mt-1.5">
+              {assignablePrograms.length === 0 ? (
+                <p className="text-xs text-slate-400 py-1">No programs have a bookable appointment type yet.</p>
+              ) : (
+                assignablePrograms.map((p) => (
+                  <label key={p.program_id} className="flex items-center gap-3 py-2 cursor-pointer text-sm text-slate-700">
+                    <input type="checkbox" className="w-5 h-5 accent-primary-600" checked={draft.programs.has(p.program_id)} onChange={() => toggleProgram(p.program_id)} />
+                    {p.program_name}
+                  </label>
+                ))
+              )}
+            </div>
+
+            <label className="flex items-center gap-3 pt-3 mt-2 border-t border-slate-100 cursor-pointer text-sm text-slate-700">
+              <input type="checkbox" className="w-5 h-5 accent-primary-600" checked={draft.pause} onChange={(e) => setDraft({ ...draft, pause: e.target.checked })} />
+              Pause booking (force off)
+            </label>
+
+            <div className="text-[11.5px] font-bold text-slate-600 tracking-[0.05em] mt-[18px]">CALENDAR EMAIL</div>
+            <input className={`${inputCls} mt-2`} type="email" aria-label="Calendar email" value={draft.calendarEmail} placeholder="optional — defaults to login email" onChange={(e) => setDraft({ ...draft, calendarEmail: e.target.value })} />
+
+            {saveError && <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mt-3" role="alert">{saveError}</p>}
+
+            <div className="flex items-center gap-4 mt-5">
+              <button onClick={saveEdit} disabled={saving} className="border-none text-white font-bold text-sm px-6 py-2.5 rounded-full disabled:opacity-50" style={{ background: '#50C878', boxShadow: '0 8px 24px rgba(80,200,120,0.28)' }}>
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button onClick={() => { setEditId(null); setSaveError(null); }} className="text-sm font-semibold text-slate-500">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
 
-/** Amber pill for a staff member's half-configured / paused state. */
-function Badge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">
-      {children}
-    </span>
-  );
-}
-
 /** Avatar — the member photo when present, else a gradient circle with initials. */
-function StaffAvatar({ member }: { member: TeamMember }) {
-  const initials = (member.name || member.email || '?')
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
-  if (member.image_url) {
-    return <img src={member.image_url} alt="" className="w-[38px] h-[38px] rounded-full object-cover shrink-0" />;
+function StaffAvatar({ name, initials, isAdmin, imageUrl }: { name: string; initials: string; isAdmin: boolean; imageUrl?: string }) {
+  if (imageUrl) {
+    return <img src={imageUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />;
   }
   return (
     <span
       aria-hidden="true"
-      className="w-[38px] h-[38px] rounded-full shrink-0 flex items-center justify-center text-[12px] font-bold text-white bg-gradient-to-br from-slate-300 to-slate-400"
+      className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[12px] font-bold"
+      style={isAdmin ? { background: 'linear-gradient(135deg,#6FD89A,#3FAE72)', color: '#fff' } : { background: '#E2E8F0', color: '#475569' }}
+      title={name}
     >
       {initials}
     </span>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  );
+}
+function ArrowRightIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
   );
 }

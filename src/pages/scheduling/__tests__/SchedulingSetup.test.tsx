@@ -40,12 +40,17 @@ vi.mock('../../../services/schedulingApi', async () => {
   };
 });
 
-// Admin viewer + an empty roster so the nested StaffSchedulingSection renders inertly.
+// Admin viewer. The nested StaffSchedulingSection ("Who handles bookings") is its own unit
+// with its own tests — stub it here so its program-group headers don't collide with this
+// page's appointment-type names.
 vi.mock('../../../context/useAuth', () => ({
   useAuth: () => ({ user: { role: 'admin', email: 'admin@example.invalid' } }),
 }));
 vi.mock('../../../services/analyticsApi', () => ({
   fetchTeamMembers: () => Promise.resolve({ members: [], admin_count: 0, total: 0, can_edit: true }),
+}));
+vi.mock('../../../components/scheduling/StaffSchedulingSection', () => ({
+  StaffSchedulingSection: () => null,
 }));
 
 import { SchedulingSetup } from '../SchedulingSetup';
