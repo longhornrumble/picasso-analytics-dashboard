@@ -103,7 +103,6 @@ export function NotificationTemplatesEditor() {
 
   const [moments, setMoments] = useState<Record<string, MomentTemplate>>({});
   const [stopNote, setStopNote] = useState('');
-  const [smsNote, setSmsNote] = useState('');
   const [drafts, setDrafts] = useState<Record<string, EditorDraft>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -127,7 +126,6 @@ export function NotificationTemplatesEditor() {
       if (!isActive()) return;
       setMoments(data.moments);
       setStopNote(data.stop_footer_note);
-      setSmsNote(data.sms_footer_note ?? '');
       const d: Record<string, EditorDraft> = {};
       for (const [k, v] of Object.entries(data.moments)) d[k] = draftOf(v);
       setDrafts(d);
@@ -299,7 +297,6 @@ export function NotificationTemplatesEditor() {
           savedFlash={savedFlash}
           saving={savingMoment === sel.id}
           saveError={saveError}
-          smsNote={smsNote}
           panelRef={panelRef}
           bodyRef={bodyRef}
           onClose={closeEditor}
@@ -344,7 +341,6 @@ interface SlideoverProps {
   savedFlash: boolean;
   saving: boolean;
   saveError: string | null;
-  smsNote: string;
   panelRef: React.RefObject<HTMLDivElement | null>;
   bodyRef: React.RefObject<HTMLTextAreaElement | null>;
   onClose: () => void;
@@ -356,7 +352,7 @@ interface SlideoverProps {
 }
 
 function Slideover({
-  meta, t, draft, org, closing, htmlOpen, savedFlash, saving, saveError, smsNote,
+  meta, t, draft, org, closing, htmlOpen, savedFlash, saving, saveError,
   panelRef, bodyRef, onClose, onToggleHtml, onField, onInsertVar, onSave, onReset,
 }: SlideoverProps) {
   // Trigger the enter transition one frame after mount.
@@ -532,8 +528,8 @@ function Slideover({
               value={draft.sms_text}
               onChange={(e) => onField('sms_text', e.target.value)}
             />
-            <div className="flex items-start justify-between gap-4 mt-1.5">
-              {smsNote && <p className="text-[11.5px] text-slate-400">{smsNote}</p>}
+            <div className="flex items-baseline justify-between gap-4 mt-2">
+              <p className="text-[11.5px] text-slate-400">A STOP/HELP line is appended automatically.</p>
               <span className="text-[11.5px] text-slate-400 shrink-0 whitespace-nowrap">
                 {smsLen}/160 · {smsSegments} segment{smsSegments > 1 ? 's' : ''}
               </span>
