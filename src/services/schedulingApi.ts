@@ -307,6 +307,20 @@ export async function updateAppointmentType(
   return data.appointment_type;
 }
 
+/**
+ * Delete an appointment type. Optimistic-locked via If-Match. A leaf record — routing policies
+ * don't reference it and existing bookings keep their own snapshot — so deletion only stops NEW
+ * bookings of this type.
+ */
+export async function deleteAppointmentType(appointmentTypeId: string, ifMatch: string): Promise<void> {
+  await schedulingWrite<{ deleted: boolean }>(
+    'DELETE',
+    `/scheduling/appointment-types/${encodeURIComponent(appointmentTypeId)}`,
+    undefined,
+    ifMatch,
+  );
+}
+
 // --- Routing Policies (presented as "Teams") -------------------------------
 
 export async function fetchRoutingPolicies(): Promise<RoutingPolicy[]> {
