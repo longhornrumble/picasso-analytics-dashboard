@@ -324,7 +324,10 @@ function resolveSample(str: string, org: string): string {
     programName: 'Family Support',
     whenLabel: 'on Sun, Jun 21 at 9:30 AM',
     when: 'on Sun, Jun 21 at 9:30 AM',
-    actionUrl: '',
+    actionUrl: 'https://schedule.myrecruiter.ai/r/sample',
+    joinUrl: 'https://meet.google.com/abc-defg-hij',
+    rescheduleUrl: 'https://schedule.myrecruiter.ai/r/sample',
+    cancelUrl: 'https://schedule.myrecruiter.ai/c/sample',
   };
   return (str || '')
     .replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k: string) => (map[k] != null ? map[k] : m))
