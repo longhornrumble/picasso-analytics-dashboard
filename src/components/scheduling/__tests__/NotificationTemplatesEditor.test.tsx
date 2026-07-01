@@ -206,6 +206,23 @@ describe('NotificationTemplatesEditor (E14) — message list', () => {
     await waitFor(() => expect(api.updateNotificationTemplate).toHaveBeenCalledWith('reoffer', { enabled: false }));
   });
 
+  it('does not flash the full-page spinner while re-fetching after a toggle (no section jump)', async () => {
+    let resolveReload!: (v: unknown) => void;
+    api.updateNotificationTemplate.mockResolvedValue({ moment: 'reoffer', template: {} });
+    api.fetchNotificationTemplates
+      .mockResolvedValueOnce(RESPONSE) // initial load
+      .mockImplementationOnce(() => new Promise((r) => { resolveReload = r; })); // held-open silent reload
+    render(<NotificationTemplatesEditor />);
+    await waitFor(() => expect(screen.getByText('Time no longer available')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('switch', { name: /turn off Time no longer available/i }));
+    // reload is in flight — the section must stay mounted (no spinner remount that collapses layout)
+    expect(screen.queryByText(/Loading messages/i)).toBeNull();
+    expect(screen.getByText('Messages we send')).toBeInTheDocument();
+    resolveReload(RESPONSE);
+    await waitFor(() => expect(api.updateNotificationTemplate).toHaveBeenCalledTimes(1));
+  });
+
   it('shows a disabled moment as Off with its switch unchecked', async () => {
     api.fetchNotificationTemplates.mockResolvedValue({
       ...RESPONSE,
