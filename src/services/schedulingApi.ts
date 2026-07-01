@@ -483,6 +483,8 @@ export interface TemplateCopy {
 export interface MomentTemplate extends TemplateCopy {
   /** True when this tenant has overridden any EMAIL field (else the platform default shows). */
   is_override: boolean;
+  /** On/off toggle — false = the dispatchers skip this moment. Absent → enabled (default true). */
+  enabled?: boolean;
   /** The reset target — platform default email copy. */
   default: TemplateCopy;
   modified_at?: ModifiedAt;
@@ -506,8 +508,9 @@ export interface NotificationTemplatesResponse {
   sms_footer_note?: string;
 }
 
-/** PATCH body: any subset of the email copy + the SMS override; empty string clears that field. */
-export type NotificationTemplateWrite = Partial<TemplateCopy> & { sms_text?: string };
+/** PATCH body: any subset of the email copy + the SMS override; empty string clears that field.
+ *  `enabled` toggles the whole moment on/off (a `{enabled}`-only PATCH is valid). */
+export type NotificationTemplateWrite = Partial<TemplateCopy> & { sms_text?: string; enabled?: boolean };
 
 export async function fetchNotificationTemplates(): Promise<NotificationTemplatesResponse> {
   const data = await schedulingGet<NotificationTemplatesResponse>(
