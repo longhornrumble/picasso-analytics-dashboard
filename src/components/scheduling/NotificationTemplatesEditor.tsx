@@ -117,8 +117,10 @@ export function NotificationTemplatesEditor() {
   const [savedFlash, setSavedFlash] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const load = useCallback(async (isActive: () => boolean) => {
-    setLoading(true);
+  const load = useCallback(async (isActive: () => boolean, opts?: { silent?: boolean }) => {
+    // `silent` re-fetch (post-save): don't flip the full-page spinner — collapsing the whole
+    // section to a spinner shrinks the page and yanks the scroll to a neighboring section.
+    if (!opts?.silent) setLoading(true);
     setLoadError(null);
     try {
       const data = await fetchNotificationTemplates();
@@ -186,7 +188,7 @@ export function NotificationTemplatesEditor() {
     setSaveError(null);
     try {
       await updateNotificationTemplate(id, body);
-      await load(() => true);
+      await load(() => true, { silent: true });
       if (flash) {
         setSavedFlash(true);
         window.setTimeout(() => setSavedFlash(false), 1600);
