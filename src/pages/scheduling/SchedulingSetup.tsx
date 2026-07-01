@@ -20,6 +20,7 @@ import { useAuth } from '../../context/useAuth';
 import {
   fetchAppointmentTypes,
   fetchRoutingPolicies,
+  fetchPrograms,
   createAppointmentType,
   updateAppointmentType,
   createRoutingPolicy,
@@ -33,6 +34,7 @@ import {
   type AppointmentType,
   type RoutingPolicy,
   type AppointmentTypeWrite,
+  type Program,
 } from '../../services/schedulingApi';
 import { StaffSchedulingSection } from '../../components/scheduling/StaffSchedulingSection';
 import { NotificationTemplatesEditor } from '../../components/scheduling/NotificationTemplatesEditor';
@@ -80,6 +82,7 @@ const blankAppt: AppointmentTypeWrite = {
   lead_time_minutes: 0,
   conference_type: 'google_meet',
   routing_policy_id: '',
+  program_id: '',
 };
 
 /** 3-step onboarding progress badges (Approve → Connect → Set up). */
@@ -161,6 +164,9 @@ export function SchedulingSetup() {
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [appts, setAppts] = useState<AppointmentType[]>([]);
   const [policies, setPolicies] = useState<RoutingPolicy[]>([]);
+  // Programs from config.programs (the widget's canonical taxonomy) — feeds the appt-type
+  // program picker (value = program_id, label = program_name).
+  const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -192,10 +198,15 @@ export function SchedulingSetup() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [a, p] = await Promise.all([fetchAppointmentTypes(), fetchRoutingPolicies()]);
+      const [a, p, pr] = await Promise.all([
+        fetchAppointmentTypes(),
+        fetchRoutingPolicies(),
+        fetchPrograms(),
+      ]);
       if (!isActive()) return;
       setAppts(a);
       setPolicies(p);
+      setPrograms(pr);
     } catch (e) {
       if (isActive()) setLoadError(errMessage(e));
     } finally {
@@ -429,6 +440,7 @@ export function SchedulingSetup() {
                     lead_time_minutes: a.lead_time_minutes ?? 0,
                     conference_type: a.conference_type ?? 'google_meet',
                     routing_policy_id: a.routing_policy_id,
+                    program_id: a.program_id ?? '',
                   });
                   setSaveError(null);
                 }}
@@ -443,8 +455,8 @@ export function SchedulingSetup() {
           )}
           <button
             onClick={() => { setApptForm({ ...blankAppt }); setSaveError(null); }}
-            disabled={policies.length === 0}
-            title={policies.length === 0 ? 'Add a team first' : undefined}
+            disabled={policies.length === 0 || programs.length === 0}
+            title={policies.length === 0 ? 'Add a team first' : programs.length === 0 ? 'No programs defined in config' : undefined}
             className={`${addRow} disabled:text-slate-300 disabled:border-slate-200 disabled:hover:bg-transparent`}
           >
             <PlusIcon />
@@ -455,9 +467,25 @@ export function SchedulingSetup() {
         {apptForm && (
           <div className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-3 mt-2">
             <div>
-              <label htmlFor="at-name" className="block text-xs font-medium text-slate-600 mb-1">Name</label>
-              <input id="at-name" className={inputCls} value={apptForm.name}
-                onChange={(e) => setApptForm({ ...apptForm, name: e.target.value })} />
+              <Select
+                label="Program"
+                placeholder="Select a program…"
+                value={apptForm.program_id}
+                onChange={(v) => {
+                  const prog = programs.find((p) => p.program_id === v);
+                  // Bind the program AND adopt its name as this appointment type's display name
+                  // (kept on the row for confirmation emails + the booking snapshot). The name
+                  // shown in the read-out resolves live from config; this is the stored value.
+                  setApptForm({ ...apptForm, program_id: v, name: prog?.program_name ?? '' });
+                }}
+                options={programs.map((p) => ({ value: p.program_id, label: p.program_name }))}
+              />
+              <label htmlFor="at-program-id" className="block text-xs font-medium text-slate-600 mb-1 mt-2">Program ID</label>
+              <input id="at-program-id" className={`${inputCls} bg-slate-50 text-slate-500`}
+                value={apptForm.program_id} readOnly aria-readonly="true" placeholder="—" />
+              {programs.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">No programs defined in this tenant’s config yet.</p>
+              )}
             </div>
             <Select
               label="Location"
@@ -498,7 +526,7 @@ export function SchedulingSetup() {
               options={policies.map((p) => ({ value: p.routing_policy_id, label: teamLabel(p) }))}
             />
             <div className="flex gap-2">
-              <button onClick={saveAppt} disabled={saving || !apptForm.name.trim() || !apptForm.routing_policy_id}
+              <button onClick={saveAppt} disabled={saving || !apptForm.program_id || !apptForm.routing_policy_id}
                 className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg disabled:opacity-50">
                 {saving ? 'Saving…' : 'Save'}
               </button>

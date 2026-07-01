@@ -106,6 +106,12 @@ export interface AppointmentType {
   conference_type?: 'google_meet' | 'zoom';
   /** FK → RoutingPolicy; the router THROWS without it. */
   routing_policy_id: string;
+  /**
+   * FK → config.programs `program_id` (the widget's canonical program taxonomy). Optional on
+   * READ — pre-binding rows lack it (forward-compat); they render as unbound until re-saved
+   * through the program picker.
+   */
+  program_id?: string;
   modified_at?: ModifiedAt; // absent on legacy/fixture rows
 }
 
@@ -130,6 +136,9 @@ export interface AppointmentTypeWrite {
   /** Meeting location (§B18b). Phase 1 = the two live providers; absent → 'google_meet'. */
   conference_type?: 'google_meet' | 'zoom';
   routing_policy_id: string;
+  /** FK → config.programs `program_id`. Required on write (the program picker); the server
+   *  422s if it isn't a real program in config.programs (the shared-key guarantee). */
+  program_id: string;
 }
 
 /** POST/PATCH body for a RoutingPolicy. */
@@ -137,6 +146,16 @@ export interface RoutingPolicyWrite {
   routing_policy_id?: string;
   tie_breaker?: 'round_robin' | 'first_available';
   tag_conditions?: TagCondition[];
+}
+
+/**
+ * A program from `config.programs` (the widget's canonical taxonomy), projected for pickers +
+ * the "Who handles bookings" read-out. `program_id` is the shared key; `program_name` is the
+ * human label (always resolved live from config — never frozen on other records).
+ */
+export interface Program {
+  program_id: string;
+  program_name: string;
 }
 
 /**
@@ -239,6 +258,12 @@ export async function fetchAppointmentTypes(): Promise<AppointmentType[]> {
     '/scheduling/appointment-types',
   );
   return data.appointment_types ?? [];
+}
+
+/** Programs projected from config.programs (feeds the appointment-type program picker). */
+export async function fetchPrograms(): Promise<Program[]> {
+  const data = await schedulingGet<{ programs?: Program[] }>('/scheduling/programs');
+  return data.programs ?? [];
 }
 
 export async function createAppointmentType(
