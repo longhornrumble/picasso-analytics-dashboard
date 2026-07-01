@@ -122,6 +122,18 @@ export interface RoutingPolicy {
   tie_breaker?: 'round_robin' | 'first_available';
   /** AND across conditions; [] = solo (everyone eligible). */
   tag_conditions?: TagCondition[];
+  /**
+   * FK → config.programs `program_id`. When set, this team handles that program's bookings
+   * (program↔team is 1:1) — which is what makes the program "bookable" in "Who handles bookings".
+   * Absent on legacy/unbound teams (forward-compat: an unbound team never surfaces in §1).
+   */
+  program_id?: string;
+  /**
+   * Whether the bound program is currently bookable. Non-destructive on/off: "Stop making
+   * bookable" flips it false but keeps the team + staff tags + appointment-type FKs, so
+   * re-publishing restores the setup. Absent → treated as bookable (true) when program_id is set.
+   */
+  bookable?: boolean;
   modified_at?: ModifiedAt;
 }
 
@@ -146,6 +158,10 @@ export interface RoutingPolicyWrite {
   routing_policy_id?: string;
   tie_breaker?: 'round_robin' | 'first_available';
   tag_conditions?: TagCondition[];
+  /** Bind the team to a config program (1:1; server 422s an unknown program, 409s a double-bind). */
+  program_id?: string;
+  /** Toggle bookable state (create → defaults true when program_id is set). */
+  bookable?: boolean;
 }
 
 /**

@@ -1,25 +1,21 @@
 /**
- * "Who handles bookings" — group staff by PROGRAM for the coverage read-out.
+ * "Who handles bookings" (§1) — pure logic over the bookable-program ↔ team model.
  *
- * Program membership is DERIVED (never stored on staff) by walking the real routing chain, so
- * the read-out reflects who actually gets routed a program's bookings:
+ * A config program is *bookable* when a routing policy (its Team) is bound to it (`program_id`)
+ * and not unpublished (`bookable !== false`). That team is 1:1 with the program:
  *
- *   Program (config.programs)
- *     └─ Appointment Type (program_id)         ← Part 1 binding
- *          └─ Handled-By-Team (routing_policy_id)
- *               └─ team tag  (routing policy's single `tag_conditions[0].values[0]`)
- *                    └─ members (staff whose scheduling_tags include that tag)
+ *   Program (config.programs)  ─1:1─  Team (RoutingPolicy: program_id + tag name + tie_breaker)
+ *        └─ members = staff whose scheduling_tags include the team's tag name
  *
- * Pure over its inputs — no React/API — so grouping/sort/coverage are unit-testable and the
- * Edit modal reuses `programTagMap` for the inverse write (assign a person to a program = add
- * that program's team tag to their scheduling_tags).
+ * Assigning a person to a program = adding that program's team tag to their scheduling_tags
+ * (inverse for removal). Everything here is pure over its inputs (no React/API) so grouping,
+ * coverage, sort, and the assignment math are unit-testable.
  *
- * Schema-discipline: tolerate missing fields everywhere (an appointment type without a
- * program_id, a routing policy without a tag, a staffer without scheduling_tags all degrade to
- * "not part of any program group" rather than throwing).
+ * Schema-discipline: tolerate missing fields — a policy without a tag, a staffer without
+ * scheduling_tags, a program without a name all degrade gracefully rather than throwing.
  */
 import type { TeamMember } from '../../types/analytics';
-import type { Program, AppointmentType, RoutingPolicy } from '../../services/schedulingApi';
+import type { Program, RoutingPolicy } from '../../services/schedulingApi';
 
 export interface ProgramColor {
   fg: string;
@@ -27,14 +23,13 @@ export interface ProgramColor {
 }
 
 /**
- * Curated categorical program palette (handoff seed values + brand-safe extensions). Each hue
- * is AA-safe as TEXT on white, mutually distinct, and avoids the semantic disposition hues
- * (booked-green is the brand anchor at slot 0 by design; no red/amber/completed-blue). Assigned
- * by program order; CYCLES on overflow — safe because color is always paired with the program
- * name + square marker, so two programs sharing a hue stay unambiguous.
+ * Categorical program palette — a program's marker/dot color. Assigned deterministically by a
+ * stable hash of program_id (same program → same color across renders/sessions, no persistence).
+ * Always paired with the program name + square marker, so a repeated hue on overflow stays
+ * unambiguous. NOT a semantic token family (those are the coverage pills); decorative only.
  */
 export const PROGRAM_PALETTE: ProgramColor[] = [
-  { fg: '#1C7A45', bg: '#ECFDF5' }, // emerald (brand anchor)
+  { fg: '#1C7A45', bg: '#ECFDF5' }, // emerald
   { fg: '#6D4ED6', bg: '#F1EDFC' }, // violet
   { fg: '#A13670', bg: '#FBEAF2' }, // plum-rose
   { fg: '#0E7490', bg: '#E0F2F7' }, // cyan
@@ -44,18 +39,21 @@ export const PROGRAM_PALETTE: ProgramColor[] = [
   { fg: '#A21CAF', bg: '#FDF4FF' }, // magenta
 ];
 
-export function colorForIndex(i: number): ProgramColor {
-  return PROGRAM_PALETTE[((i % PROGRAM_PALETTE.length) + PROGRAM_PALETTE.length) % PROGRAM_PALETTE.length];
+/** Deterministic program → color: a stable hash of program_id into the palette. */
+export function programColor(programId: string): ProgramColor {
+  let h = 0;
+  for (let i = 0; i < programId.length; i++) h = (h * 31 + programId.charCodeAt(i)) >>> 0;
+  return PROGRAM_PALETTE[h % PROGRAM_PALETTE.length];
+}
+
+/** The team's display name (= its single tag), or '' for an unconditioned "Everyone" team. */
+function teamTagOf(policy: RoutingPolicy): string {
+  return policy.tag_conditions?.[0]?.values?.[0] ?? '';
 }
 
 /** Effective bookable = the person's calendar is connected AND they aren't force-paused. */
 export function effectiveBookable(m: TeamMember): boolean {
   return m.calendar_connected === true && m.bookable_override !== 'off';
-}
-
-/** A team (routing policy) is exactly one tag (post-unification); null when unconditioned. */
-function teamTagOf(policy: RoutingPolicy): string | null {
-  return policy.tag_conditions?.[0]?.values?.[0] ?? null;
 }
 
 function initialsOf(m: TeamMember): string {
@@ -66,28 +64,68 @@ function initialsOf(m: TeamMember): string {
     .join('');
 }
 
+/** A config program made bookable by a bound team (routing policy). */
+export interface BookableProgram {
+  program_id: string;
+  program_name: string;
+  routing_policy_id: string;
+  /** The team's display name (= its tag); '' when it's an "Everyone" team. */
+  teamName: string;
+  /** The scheduling_tag staff carry to join this team ('' = Everyone → all staff). */
+  teamTag: string;
+  assignment: 'round_robin' | 'first_available';
+  /** The backing policy row (for If-Match on edit / unpublish). */
+  policy: RoutingPolicy;
+  color: ProgramColor;
+}
+
 /**
- * program_id → the team tag(s) that handle it (the teams its appointment types route to).
- * The Edit modal uses this to translate "assign to program" into "add this tag".
+ * The bookable programs, in config order: a config program is bookable iff a routing policy is
+ * bound to it (`program_id`) and not unpublished (`bookable !== false`). Joined to config so the
+ * program_name always resolves live. A program bound by two policies (shouldn't happen — the
+ * server enforces 1:1) keeps the first.
  */
-export function programTagMap(
-  appointmentTypes: AppointmentType[],
-  routingPolicies: RoutingPolicy[],
-): Map<string, string[]> {
-  const policyTag = new Map<string, string>();
-  for (const p of routingPolicies) {
-    const t = teamTagOf(p);
-    if (t) policyTag.set(p.routing_policy_id, t);
+export function bookablePrograms(programs: Program[], policies: RoutingPolicy[]): BookableProgram[] {
+  const boundByProgram = new Map<string, RoutingPolicy>();
+  for (const p of policies) {
+    if (!p.program_id || p.bookable === false) continue;
+    if (!boundByProgram.has(p.program_id)) boundByProgram.set(p.program_id, p);
   }
-  const out = new Map<string, Set<string>>();
-  for (const at of appointmentTypes) {
-    if (!at.program_id) continue;
-    const tag = policyTag.get(at.routing_policy_id);
-    if (!tag) continue;
-    if (!out.has(at.program_id)) out.set(at.program_id, new Set());
-    out.get(at.program_id)!.add(tag);
+  const out: BookableProgram[] = [];
+  for (const prog of programs) {
+    const policy = boundByProgram.get(prog.program_id);
+    if (!policy) continue;
+    out.push({
+      program_id: prog.program_id,
+      program_name: prog.program_name,
+      routing_policy_id: policy.routing_policy_id,
+      teamName: teamTagOf(policy) || 'Everyone',
+      teamTag: teamTagOf(policy),
+      assignment: policy.tie_breaker ?? 'round_robin',
+      policy,
+      color: programColor(prog.program_id),
+    });
   }
-  return new Map([...out].map(([pid, tags]) => [pid, [...tags]]));
+  return out;
+}
+
+/** Config programs NOT yet bookable — the "Add a bookable program" pick-list. */
+export function unbookablePrograms(programs: Program[], policies: RoutingPolicy[]): Program[] {
+  const bookableIds = new Set(bookablePrograms(programs, policies).map((b) => b.program_id));
+  return programs.filter((p) => !bookableIds.has(p.program_id));
+}
+
+/** Does a staffer belong to this team? (Everyone team → everyone; else tag membership.) */
+function isMemberOf(m: TeamMember, teamTag: string): boolean {
+  if (!teamTag) return true; // Everyone
+  return (m.scheduling_tags ?? []).includes(teamTag);
+}
+
+/** The bookable programs a person belongs to (via team-tag membership). */
+export function memberProgramIds(m: TeamMember, bps: BookableProgram[]): Set<string> {
+  const s = new Set<string>();
+  for (const b of bps) if (isMemberOf(m, b.teamTag)) s.add(b.program_id);
+  return s;
 }
 
 export type MemberStatus = 'bookable' | 'paused' | 'needs_calendar';
@@ -104,54 +142,29 @@ export interface BookingMemberRow {
   secondary: string;
 }
 
-export interface BookingGroup {
-  program_id: string;
-  program_name: string;
-  color: ProgramColor;
-  members: BookingMemberRow[];
-  bookableCount: number;
-  memberCount: number;
-}
-
 const STATUS_LABEL: Record<MemberStatus, string> = {
   bookable: 'Bookable',
   paused: 'Booking paused',
   needs_calendar: 'Connect calendar to be bookable',
 };
 
+export interface BookingGroup extends BookableProgram {
+  members: BookingMemberRow[];
+  bookableCount: number;
+  memberCount: number;
+}
+
 /**
- * Group staff by program, thinnest-coverage-first (ascending effective-bookable count) so a
- * gap is the first thing the eye lands on. Every program appears — one with no appointment
- * type / no members surfaces as an empty group ("No bookable staff"), which is the point.
+ * Group staff by bookable program, thinnest-coverage-first (ascending effective-bookable count)
+ * so a gap is the first thing the eye lands on. A person who covers multiple programs appears
+ * under each. Ties keep config order (the sort is stable).
  */
 export function buildBookingGroups(input: {
-  programs: Program[];
-  appointmentTypes: AppointmentType[];
-  routingPolicies: RoutingPolicy[];
+  bookablePrograms: BookableProgram[];
   staff: TeamMember[];
 }): BookingGroup[] {
-  const { programs, appointmentTypes, routingPolicies, staff } = input;
-
-  const programTags = programTagMap(appointmentTypes, routingPolicies);
-  const programName = new Map(programs.map((p) => [p.program_id, p.program_name]));
-
-  // tag → programs (inverse), then member → the programs they cover (via their tags).
-  const tagPrograms = new Map<string, Set<string>>();
-  for (const [pid, tags] of programTags) {
-    for (const tag of tags) {
-      if (!tagPrograms.has(tag)) tagPrograms.set(tag, new Set());
-      tagPrograms.get(tag)!.add(pid);
-    }
-  }
-  const memberPrograms = new Map<string, Set<string>>();
-  for (const m of staff) {
-    const pids = new Set<string>();
-    for (const tag of m.scheduling_tags ?? []) {
-      const ps = tagPrograms.get(tag);
-      if (ps) for (const pid of ps) pids.add(pid);
-    }
-    memberPrograms.set(m.employee_id, pids);
-  }
+  const { bookablePrograms: bps, staff } = input;
+  const programName = new Map(bps.map((b) => [b.program_id, b.program_name]));
 
   const mkRow = (m: TeamMember, currentProgramId: string): BookingMemberRow => {
     const connected = m.calendar_connected === true;
@@ -161,7 +174,7 @@ export function buildBookingGroups(input: {
     if (status === 'needs_calendar') secondary = 'No calendar connected';
     else if (status === 'paused') secondary = 'Paused — calendar still connected';
     else {
-      const others = [...(memberPrograms.get(m.employee_id) ?? [])]
+      const others = [...memberProgramIds(m, bps)]
         .filter((pid) => pid !== currentProgramId)
         .map((pid) => programName.get(pid) ?? pid);
       const calEmail = m.calendar_email_override || m.email;
@@ -180,54 +193,63 @@ export function buildBookingGroups(input: {
     };
   };
 
-  const groups: BookingGroup[] = programs.map((prog, i) => {
-    const members = staff.filter((m) => memberPrograms.get(m.employee_id)?.has(prog.program_id));
-    const rows = members.map((m) => mkRow(m, prog.program_id));
+  const groups: BookingGroup[] = bps.map((b) => {
+    const members = staff.filter((m) => isMemberOf(m, b.teamTag));
+    const rows = members.map((m) => mkRow(m, b.program_id));
     return {
-      program_id: prog.program_id,
-      program_name: prog.program_name,
-      color: colorForIndex(i),
+      ...b,
       members: rows,
       bookableCount: rows.filter((r) => r.bookable).length,
       memberCount: rows.length,
     };
   });
 
-  // Stable thinnest-first: ascending bookable count; ties keep config order (map above is stable).
   return groups.sort((a, b) => a.bookableCount - b.bookableCount);
 }
 
-export interface CoveragePill {
+export type CoverageTone = 'none' | 'gap' | 'ok';
+export interface Coverage {
   label: string;
-  fg: string;
-  bg: string;
-}
-
-/** Coverage pill styling by effective-bookable count: 0 danger, 1 warning (the gap), ≥2 success. */
-export function coveragePill(bookableCount: number, memberCount: number): CoveragePill {
-  if (bookableCount === 0) return { label: 'No bookable staff', fg: '#B42318', bg: '#FEE4E2' };
-  const label = `${bookableCount} of ${memberCount} bookable`;
-  if (bookableCount === 1) return { label, fg: '#B54708', bg: '#FEF3C7' };
-  return { label, fg: '#1C7A45', bg: '#ECFDF5' };
+  tone: CoverageTone;
 }
 
 /**
- * Compute the new scheduling_tags for a person after the Edit modal toggles program checkboxes.
- * Start from their current tags; for each program the modal offered, add its team tag(s) when
- * checked, remove them when unchecked. Programs with no team tag (no appointment type yet) are
- * simply not offerable and never appear here. Returns a de-duped, order-stable list.
+ * Coverage pill by effective-bookable count: 0 → danger ("No bookable staff"), 1 → warning (the
+ * gap signal), ≥2 → success. Returns a semantic `tone` the component maps to token classes (never
+ * a raw hex — the caller owns the primary/warning/danger token mapping).
+ */
+export function coverage(bookableCount: number, memberCount: number): Coverage {
+  if (bookableCount === 0) return { label: 'No bookable staff', tone: 'none' };
+  const label = `${bookableCount} of ${memberCount} bookable`;
+  return { label, tone: bookableCount === 1 ? 'gap' : 'ok' };
+}
+
+/**
+ * Recompute a person's scheduling_tags after the person-Edit modal toggles program checkboxes.
+ * Non-bookable-program tags (skills, unbound teams) are preserved untouched; for each bookable
+ * program, its team tag is present iff the program is checked. De-duped, order-stable.
  */
 export function applyProgramSelection(
   currentTags: string[],
-  offeredPrograms: string[],
-  checkedPrograms: Set<string>,
-  programTags: Map<string, string[]>,
+  bps: BookableProgram[],
+  checkedProgramIds: Set<string>,
 ): string[] {
-  const tags = new Set(currentTags);
-  for (const pid of offeredPrograms) {
-    const pt = programTags.get(pid) ?? [];
-    if (checkedPrograms.has(pid)) for (const t of pt) tags.add(t);
-    else for (const t of pt) tags.delete(t);
+  const managed = new Set(bps.map((b) => b.teamTag).filter(Boolean));
+  const tags = new Set(currentTags.filter((t) => !managed.has(t)));
+  for (const b of bps) {
+    if (b.teamTag && checkedProgramIds.has(b.program_id)) tags.add(b.teamTag);
   }
+  return [...tags];
+}
+
+/**
+ * Recompute a person's scheduling_tags after the Assign-people modal toggles ONE program's
+ * roster: add the team tag when checked, remove it when unchecked. Other tags untouched.
+ */
+export function applyAssignment(currentTags: string[], teamTag: string, checked: boolean): string[] {
+  const tags = new Set(currentTags);
+  if (!teamTag) return [...tags]; // Everyone team — membership isn't tag-driven
+  if (checked) tags.add(teamTag);
+  else tags.delete(teamTag);
   return [...tags];
 }

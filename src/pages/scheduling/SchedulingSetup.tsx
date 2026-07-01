@@ -1,21 +1,18 @@
 /**
- * SchedulingSetup — the Customer-Portal "Scheduling" Settings sub-tab (E13/E13b, SEAM-5).
+ * SchedulingSetup — the Customer-Portal "Scheduling" Settings sub-tab.
  *
- * Presented as a 3-stage lifecycle "spine" (per the "Scheduling Settings" design import):
- *   1. What can be booked  — Appointment Types + Teams (= RoutingPolicies, D4: never "tag")
- *   2. Who handles bookings — the per-staff roster (StaffSchedulingSection)
+ * Presented as a 3-stage lifecycle "spine" (per the "Scheduling Settings" design):
+ *   1. Who handles bookings — bookable programs + coverage (StaffSchedulingSection)
+ *   2. What can be booked   — the appointment types a prospect can book, each tied to a program
+ *                             and routed to that program's team
  *   3. Messages we send     — lifecycle-notice copy (NotificationTemplatesEditor slide-over)
  *
- * Tenant admins manage Appointment Types + Teams via the locked Analytics_Dashboard_API
- * endpoints, ADMIN-only (also enforced server-side). Optimistic-locked via If-Match. Members see
- * only their own per-staff self-card (StaffSchedulingSection), no spine.
- *
- * Teams unification (2026-06-29): a team IS its name — naming a team here is the only place a
- * team name is authored (the separate "Team Names" vocabulary manager is retired). A team can be
- * deleted (blocked while an appointment type still routes to it); deleting/renaming cascades to
- * staff tags server-side.
+ * A program becomes bookable in §1 (which creates its Team); §2 only picks among bookable
+ * programs — the team is that program's team (program↔team is 1:1). Admins manage appointment
+ * types via the locked Analytics_Dashboard_API endpoints (ADMIN-only, also server-enforced),
+ * optimistic-locked via If-Match. Members see only their own self-card (StaffSchedulingSection).
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/useAuth';
 import {
   fetchAppointmentTypes,
@@ -23,9 +20,6 @@ import {
   fetchPrograms,
   createAppointmentType,
   updateAppointmentType,
-  createRoutingPolicy,
-  updateRoutingPolicy,
-  deleteRoutingPolicy,
   fetchSchedulingActivation,
   initCalendarConnection,
   fetchCalendarConnectionStatus,
@@ -40,24 +34,17 @@ import { StaffSchedulingSection } from '../../components/scheduling/StaffSchedul
 import { NotificationTemplatesEditor } from '../../components/scheduling/NotificationTemplatesEditor';
 import { Select } from '../../components/shared/Select';
 import { lastEditedLabel } from '../../lib/scheduling/formatModifiedAt';
+import { bookablePrograms, programColor } from '../../lib/scheduling/whoHandlesBookings';
 
 /** A routing policy's team label = its first tag value, or "Everyone" when unconditioned. */
 function teamLabel(p: RoutingPolicy): string {
-  const tag = p.tag_conditions?.[0]?.values?.[0];
-  return tag ?? 'Everyone';
-}
-
-/** Human blurb for a team's assignment rule. */
-function teamRule(p: RoutingPolicy): string {
-  return (p.tie_breaker ?? 'round_robin') === 'first_available'
-    ? 'First available'
-    : 'Round-robin — shares bookings across the team';
+  return p.tag_conditions?.[0]?.values?.[0] ?? 'Everyone';
 }
 
 /**
- * The conference modality a booking joins at start, mirroring the backend §B18b
- * CONFERENCE_LABELS. Absent → 'google_meet' (the server default), so a booking always
- * has somewhere to meet — the Booking_Commit_Handler mints the Meet/Zoom link.
+ * The conference modality a booking joins at start (§B18b). Absent → 'google_meet'. Phase 1 ships
+ * the two live providers; phone / in-person is a future provider (roadmap), so the picker lists
+ * only what the backend accepts today.
  */
 const CONFERENCE_LABELS: Record<string, string> = {
   google_meet: 'Google Meet',
@@ -68,8 +55,6 @@ function conferenceLabel(a: AppointmentType): string {
 }
 
 function errMessage(e: unknown): string {
-  // The scheduling endpoints return specific, user-facing messages (duplicate name,
-  // "Everyone" already exists, "team is in use by appointment type(s)…", stale lock).
   if (e instanceof SchedulingApiError) return e.message;
   return e instanceof Error ? e.message : 'Something went wrong';
 }
@@ -144,17 +129,17 @@ function PageHeader() {
   );
 }
 
-function MeetingIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-    </svg>
-  );
-}
 function PlusIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+function ChevronRightIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-slate-300 shrink-0">
+      <path d="M9 6l6 6-6 6" />
     </svg>
   );
 }
@@ -164,33 +149,22 @@ export function SchedulingSetup() {
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [appts, setAppts] = useState<AppointmentType[]>([]);
   const [policies, setPolicies] = useState<RoutingPolicy[]>([]);
-  // Programs from config.programs (the widget's canonical taxonomy) — feeds the appt-type
-  // program picker (value = program_id, label = program_name).
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  // Inline delete-confirm: the routing_policy_id awaiting confirmation, or null.
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // 3-step onboarding gate — the setup is blocked until both prerequisites are met:
-  //   (1) admin approves scheduling for the org  (2) connect your calendar  (3) set up
+  // 3-step onboarding gate — blocked until (1) org approves scheduling (2) calendar connected.
   const [readiness, setReadiness] =
     useState<'loading' | 'needs_activation' | 'needs_connection' | 'ready'>('loading');
 
-  // Appointment-type form: null = closed; {id?} = editing existing (id present) or creating.
+  // Appointment-type form: null = closed; {_id} = editing existing, else creating.
   const [apptForm, setApptForm] = useState<
     (AppointmentTypeWrite & { _id?: string; _ifMatch?: string }) | null
   >(null);
-  // Team form: null = closed; {_id} = editing existing, else creating.
-  const [teamForm, setTeamForm] = useState<
-    { tag: string; tie_breaker: 'round_robin' | 'first_available'; _id?: string; _ifMatch?: string } | null
-  >(null);
 
   const load = useCallback(async (isActive: () => boolean) => {
-    // Teams + Appointment Types are admin-only endpoints; members skip them and see
-    // only the per-staff self-card (StaffSchedulingSection) rendered below.
     if (!isAdmin) {
       if (isActive()) setLoading(false);
       return;
@@ -223,13 +197,10 @@ export function SchedulingSetup() {
         const act = await fetchSchedulingActivation();
         enabled = act.enabled;
       } catch {
-        // Backward-compat: an API without the activation endpoint (e.g. prod before
-        // lambda#347) → fall back to the dashboard_scheduling entitlement.
         enabled = user?.features?.dashboard_scheduling === true;
       }
       if (!active) return;
       if (!enabled) { setReadiness('needs_activation'); return; }
-      // Activated → is the viewer's own calendar connected?
       let connected = false;
       try {
         const init = await initCalendarConnection();
@@ -245,7 +216,6 @@ export function SchedulingSetup() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load admin config only once past the gate.
   useEffect(() => {
     if (readiness !== 'ready') return;
     let active = true;
@@ -257,7 +227,13 @@ export function SchedulingSetup() {
 
   const reload = () => load(() => true);
 
-  const policyById = (id: string) => policies.find((p) => p.routing_policy_id === id);
+  // Only bookable programs are pickable for an appointment type (make a program bookable in §1).
+  const bps = useMemo(() => bookablePrograms(programs, policies), [programs, policies]);
+  const programName = (id?: string) => programs.find((p) => p.program_id === id)?.program_name ?? id ?? 'Program';
+  const apptTeamLabel = (a: AppointmentType) => {
+    const p = policies.find((x) => x.routing_policy_id === a.routing_policy_id);
+    return p ? teamLabel(p) : 'Unassigned';
+  };
 
   async function saveAppt() {
     if (!apptForm) return;
@@ -276,45 +252,7 @@ export function SchedulingSetup() {
     }
   }
 
-  // Delete a team. The server blocks (409) if an appointment type still routes to it
-  // ("team is in use by appointment type(s)…") and cascade-untags its name from staff on success.
-  async function deleteTeam(p: RoutingPolicy) {
-    setSaving(true);
-    setSaveError(null);
-    try {
-      await deleteRoutingPolicy(p.routing_policy_id, ifMatchToken(p));
-      setConfirmDeleteId(null);
-      await reload();
-    } catch (e) {
-      setConfirmDeleteId(null);
-      setSaveError(errMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function saveTeam() {
-    if (!teamForm) return;
-    setSaving(true);
-    setSaveError(null);
-    const tag = teamForm.tag.trim();
-    const body = {
-      tie_breaker: teamForm.tie_breaker,
-      tag_conditions: tag ? [{ operator: 'in_any' as const, values: [tag] }] : [],
-    };
-    try {
-      if (teamForm._id) await updateRoutingPolicy(teamForm._id, body, teamForm._ifMatch ?? '*');
-      else await createRoutingPolicy(body);
-      setTeamForm(null);
-      await reload();
-    } catch (e) {
-      setSaveError(errMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // ─── onboarding gate (blocks setup until org-on + calendar connected) ───────
+  // ─── onboarding gate ────────────────────────────────────────────────────────
   if (readiness === 'loading') {
     return (
       <div className="flex items-center justify-center py-16" role="status" aria-live="polite">
@@ -369,12 +307,8 @@ export function SchedulingSetup() {
 
   const inputCls =
     'w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
-  const sectionLabel = 'text-[11px] font-bold tracking-[0.05em] uppercase text-slate-400';
-  const editLink = 'text-[13px] font-bold text-primary-700 hover:text-primary-800 shrink-0';
-  const addRow =
-    'flex items-center gap-2 border border-dashed border-slate-300 rounded-xl px-[15px] py-3 text-[13.5px] font-semibold text-primary-700 hover:border-primary-400 hover:bg-primary-50/40 w-full text-left';
 
-  // Members see only their own per-staff card — no admin Teams / Appointment Types config.
+  // Members see only their own per-staff card — no admin Appointment Types config.
   if (!isAdmin) {
     return (
       <div className="flex flex-col gap-6">
@@ -384,109 +318,124 @@ export function SchedulingSetup() {
     );
   }
 
-  // ---- Stage 1 body: loading / error / content ----
-  let stage1: React.ReactNode;
+  // ---- §2 "What can be booked" body: loading / error / content ----
+  let whatCanBeBooked: React.ReactNode;
   if (loading) {
-    stage1 = (
+    whatCanBeBooked = (
       <div className="flex items-center justify-center py-10" role="status" aria-live="polite">
         <div className="w-7 h-7 rounded-full animate-spin border-4 border-primary-200 border-t-primary-500" />
-        <span className="sr-only">Loading scheduling setup…</span>
+        <span className="sr-only">Loading appointment types…</span>
       </div>
     );
   } else if (loadError) {
-    stage1 = (
-      <p className="text-sm text-red-600 py-8 text-center" role="alert">
-        Couldn't load scheduling setup: {loadError}
+    whatCanBeBooked = (
+      <p className="text-sm text-danger-600 py-8 text-center" role="alert">
+        Couldn't load appointment types: {loadError}
       </p>
     );
   } else {
-    stage1 = (
+    const noBookable = bps.length === 0;
+    whatCanBeBooked = (
       <>
         <div className="text-[17px] font-bold text-slate-900">What can be booked</div>
-        <div className="text-[13px] text-slate-500 mt-0.5">The appointment types people can pick, and who handles each.</div>
+        <div className="text-[13px] text-slate-500 mt-0.5">
+          The calls a prospect can book from the chat widget. Each is tied to a program and routed to that program's team.
+        </div>
 
         {saveError && (
-          <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mt-4" role="alert">
+          <p className="text-sm text-danger-700 bg-danger-50 border border-danger-100 rounded-lg px-3 py-2 mt-4" role="alert">
             {saveError}
           </p>
         )}
 
-        {/* Appointment types */}
-        <div className={`${sectionLabel} mt-[18px] mb-2.5`}>Appointment types</div>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 mt-4">
           {appts.map((a) => (
-            <div key={a.appointment_type_id} className="flex items-center gap-3 border border-slate-100 rounded-xl px-[15px] py-3">
-              <span className="w-[34px] h-[34px] rounded-[9px] bg-primary-50 flex items-center justify-center shrink-0 text-primary-700">
-                <MeetingIcon />
-              </span>
+            <button
+              key={a.appointment_type_id}
+              onClick={() => {
+                setApptForm({
+                  _id: a.appointment_type_id,
+                  _ifMatch: ifMatchToken(a),
+                  name: a.name,
+                  duration_minutes: a.duration_minutes,
+                  buffer_before_minutes: a.buffer_before_minutes ?? 0,
+                  buffer_after_minutes: a.buffer_after_minutes ?? 0,
+                  lead_time_minutes: a.lead_time_minutes ?? 0,
+                  conference_type: a.conference_type ?? 'google_meet',
+                  routing_policy_id: a.routing_policy_id,
+                  program_id: a.program_id ?? '',
+                });
+                setSaveError(null);
+              }}
+              className="w-full flex items-center gap-3 border border-slate-100 rounded-xl px-[15px] py-3 text-left hover:border-slate-200 hover:bg-slate-50 transition-colors"
+            >
+              <span aria-hidden="true" className="w-[9px] h-[9px] rounded-[3px] shrink-0" style={{ background: a.program_id ? programColor(a.program_id).fg : '#94A3B8' }} />
               <div className="flex-1 min-w-0">
-                <div className="text-[14.5px] font-bold text-slate-900">{a.name}</div>
-                <div className="text-[12.5px] text-slate-500">
-                  {a.duration_minutes} min · {conferenceLabel(a)} · {policyById(a.routing_policy_id) ? teamLabel(policyById(a.routing_policy_id)!) : a.routing_policy_id}
+                <div className="text-[14.5px] font-bold text-slate-900 truncate">{a.name || programName(a.program_id)}</div>
+                <div className="text-[12.5px] text-slate-500 truncate">
+                  {programName(a.program_id)} · {a.duration_minutes} min · {conferenceLabel(a)} · {apptTeamLabel(a)}
                 </div>
                 {lastEditedLabel(a.modified_at) && (
                   <div className="text-[11px] text-slate-400">{lastEditedLabel(a.modified_at)}</div>
                 )}
               </div>
-              <button
-                onClick={() => {
-                  setApptForm({
-                    _id: a.appointment_type_id,
-                    _ifMatch: ifMatchToken(a),
-                    name: a.name,
-                    duration_minutes: a.duration_minutes,
-                    buffer_before_minutes: a.buffer_before_minutes ?? 0,
-                    buffer_after_minutes: a.buffer_after_minutes ?? 0,
-                    lead_time_minutes: a.lead_time_minutes ?? 0,
-                    conference_type: a.conference_type ?? 'google_meet',
-                    routing_policy_id: a.routing_policy_id,
-                    program_id: a.program_id ?? '',
-                  });
-                  setSaveError(null);
-                }}
-                className={editLink}
-              >
-                Edit
-              </button>
-            </div>
+              <ChevronRightIcon />
+            </button>
           ))}
           {appts.length === 0 && !apptForm && (
             <p className="text-sm text-slate-400">No appointment types yet.</p>
           )}
           <button
             onClick={() => { setApptForm({ ...blankAppt }); setSaveError(null); }}
-            disabled={policies.length === 0 || programs.length === 0}
-            title={policies.length === 0 ? 'Add a team first' : programs.length === 0 ? 'No programs defined in config' : undefined}
-            className={`${addRow} disabled:text-slate-300 disabled:border-slate-200 disabled:hover:bg-transparent`}
+            disabled={noBookable}
+            title={noBookable ? 'Make a program bookable first (in “Who handles bookings”)' : undefined}
+            className="flex items-center gap-2 border border-dashed border-slate-300 rounded-xl px-[15px] py-3 text-[13.5px] font-semibold text-primary-700 hover:border-primary-400 hover:bg-primary-50/40 w-full text-left disabled:text-slate-300 disabled:border-slate-200 disabled:hover:bg-transparent"
           >
             <PlusIcon />
             Add appointment type
           </button>
+          {noBookable && appts.length === 0 && (
+            <p className="text-xs text-slate-400">
+              No bookable programs yet — make one bookable in “Who handles bookings” above.
+            </p>
+          )}
         </div>
 
         {apptForm && (
-          <div className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-3 mt-2">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col gap-3 mt-3">
             <div>
               <Select
                 label="Program"
                 placeholder="Select a program…"
                 value={apptForm.program_id}
                 onChange={(v) => {
-                  const prog = programs.find((p) => p.program_id === v);
-                  // Bind the program AND adopt its name as this appointment type's display name
-                  // (kept on the row for confirmation emails + the booking snapshot). The name
-                  // shown in the read-out resolves live from config; this is the stored value.
-                  setApptForm({ ...apptForm, program_id: v, name: prog?.program_name ?? '' });
+                  const bp = bps.find((b) => b.program_id === v);
+                  // Bind the program AND its team (program↔team is 1:1); default the event title
+                  // to the program name if the admin hasn't set one yet.
+                  setApptForm({
+                    ...apptForm,
+                    program_id: v,
+                    routing_policy_id: bp?.routing_policy_id ?? apptForm.routing_policy_id,
+                    name: apptForm.name.trim() ? apptForm.name : (bp?.program_name ?? ''),
+                  });
                 }}
-                options={programs.map((p) => ({ value: p.program_id, label: p.program_name }))}
+                options={bps.map((b) => ({ value: b.program_id, label: b.program_name }))}
               />
               <label htmlFor="at-program-id" className="block text-xs font-medium text-slate-600 mb-1 mt-2">Program ID</label>
-              <input id="at-program-id" className={`${inputCls} bg-slate-50 text-slate-500`}
+              <input id="at-program-id" className={`${inputCls} bg-slate-50 text-slate-500 font-mono`}
                 value={apptForm.program_id} readOnly aria-readonly="true" placeholder="—" />
-              {programs.length === 0 && (
-                <p className="text-xs text-amber-600 mt-1">No programs defined in this tenant’s config yet.</p>
-              )}
+              <p className="text-xs text-slate-400 mt-1">
+                Programs come from your configuration, so the widget and backend can never drift.
+              </p>
             </div>
+
+            <div>
+              <label htmlFor="at-title" className="block text-xs font-medium text-slate-600 mb-1">Event title</label>
+              <input id="at-title" className={inputCls} value={apptForm.name} maxLength={200}
+                placeholder="What the prospect sees on their calendar invite"
+                onChange={(e) => setApptForm({ ...apptForm, name: e.target.value })} />
+            </div>
+
             <Select
               label="Location"
               value={apptForm.conference_type ?? 'google_meet'}
@@ -518,121 +467,24 @@ export function SchedulingSetup() {
                   onChange={(e) => setApptForm({ ...apptForm, buffer_after_minutes: Number(e.target.value) })} />
               </div>
             </div>
-            <Select
-              label="Handled by team"
-              placeholder="Select a team…"
-              value={apptForm.routing_policy_id}
-              onChange={(v) => setApptForm({ ...apptForm, routing_policy_id: v })}
-              options={policies.map((p) => ({ value: p.routing_policy_id, label: teamLabel(p) }))}
-            />
+            <div>
+              <Select
+                label="Handled by team"
+                placeholder="Select a team…"
+                value={apptForm.routing_policy_id}
+                onChange={(v) => setApptForm({ ...apptForm, routing_policy_id: v })}
+                options={bps.map((b) => ({ value: b.routing_policy_id, label: b.teamName }))}
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Only teams from bookable programs are listed — manage teams in “Who handles bookings”.
+              </p>
+            </div>
             <div className="flex gap-2">
-              <button onClick={saveAppt} disabled={saving || !apptForm.program_id || !apptForm.routing_policy_id}
+              <button onClick={saveAppt} disabled={saving || !apptForm.program_id || !apptForm.routing_policy_id || !apptForm.name.trim()}
                 className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg disabled:opacity-50">
                 {saving ? 'Saving…' : 'Save'}
               </button>
               <button onClick={() => { setApptForm(null); setSaveError(null); }} className="px-3 py-1.5 text-sm text-slate-500">Cancel</button>
-            </div>
-          </div>
-        )}
-
-        {/* Teams (a team = its name + how it assigns; naming a team authors the name) */}
-        <div className={`${sectionLabel} mt-5 mb-2.5`}>Teams</div>
-        <div className="flex flex-col gap-2">
-          {policies.map((p) => (
-            <div key={p.routing_policy_id} className="flex items-center gap-3 border border-slate-100 rounded-xl px-[15px] py-3">
-              <div className="flex-1 min-w-0">
-                <div className="text-[14.5px] font-bold text-slate-900">{teamLabel(p)}</div>
-                <div className="text-[12.5px] text-slate-500">{teamRule(p)}</div>
-                {lastEditedLabel(p.modified_at) && (
-                  <div className="text-[11px] text-slate-400">{lastEditedLabel(p.modified_at)}</div>
-                )}
-              </div>
-              {confirmDeleteId === p.routing_policy_id ? (
-                <div className="flex items-center gap-2.5 shrink-0">
-                  <span className="text-[12.5px] text-slate-500">Delete this team?</span>
-                  <button
-                    onClick={() => deleteTeam(p)}
-                    disabled={saving}
-                    className="text-[13px] font-bold text-red-600 hover:text-red-700 disabled:opacity-50"
-                  >
-                    {saving ? 'Deleting…' : 'Yes, delete'}
-                  </button>
-                  <button
-                    onClick={() => setConfirmDeleteId(null)}
-                    className="text-[13px] text-slate-500 hover:text-slate-700"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3 shrink-0">
-                  <button
-                    onClick={() => {
-                      setTeamForm({
-                        _id: p.routing_policy_id,
-                        _ifMatch: ifMatchToken(p),
-                        tag: p.tag_conditions?.[0]?.values?.[0] ?? '',
-                        tie_breaker: p.tie_breaker ?? 'round_robin',
-                      });
-                      setConfirmDeleteId(null);
-                      setSaveError(null);
-                    }}
-                    aria-label={`Edit team ${teamLabel(p)}`}
-                    className={editLink}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => { setConfirmDeleteId(p.routing_policy_id); setTeamForm(null); setSaveError(null); }}
-                    aria-label={`Delete team ${teamLabel(p)}`}
-                    className="text-[13px] font-bold text-red-600 hover:text-red-700"
-                  >
-                    Delete
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-          {policies.length === 0 && !teamForm && (
-            <p className="text-sm text-slate-400">No teams yet. Add one so appointment types have somewhere to route.</p>
-          )}
-          <button onClick={() => { setTeamForm({ tag: '', tie_breaker: 'round_robin' }); setConfirmDeleteId(null); setSaveError(null); }} className={addRow}>
-            <PlusIcon />
-            Add team
-          </button>
-        </div>
-
-        {teamForm && (
-          <div className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-3 mt-2">
-            <div>
-              <label htmlFor="team-name" className="block text-[11.5px] font-bold tracking-[0.03em] uppercase text-slate-600 mb-[7px]">Team name</label>
-              <input
-                id="team-name"
-                className={inputCls}
-                value={teamForm.tag}
-                maxLength={50}
-                placeholder="e.g. Volunteer Coordinators"
-                onChange={(e) => setTeamForm({ ...teamForm, tag: e.target.value })}
-              />
-              <p className="text-[12px] text-slate-400 mt-[8px]">
-                Leave blank for an “Everyone” team (all bookable staff). Staff are tagged with this
-                name to join the team.
-              </p>
-            </div>
-            <Select
-              label="Assignment"
-              value={teamForm.tie_breaker}
-              onChange={(v) => setTeamForm({ ...teamForm, tie_breaker: v as 'round_robin' | 'first_available' })}
-              options={[
-                { value: 'round_robin', label: 'Round-robin (share evenly)' },
-                { value: 'first_available', label: 'First available' },
-              ]}
-            />
-            <div className="flex gap-2">
-              <button onClick={saveTeam} disabled={saving} className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg disabled:opacity-50">
-                {saving ? 'Saving…' : teamForm._id ? 'Save changes' : 'Save team'}
-              </button>
-              <button onClick={() => { setTeamForm(null); setSaveError(null); }} className="px-3 py-1.5 text-sm text-slate-500">Cancel</button>
             </div>
           </div>
         )}
@@ -644,8 +496,8 @@ export function SchedulingSetup() {
     <div className="flex flex-col">
       <PageHeader />
       <div className="mt-7">
-        <StageCard n={1}>{stage1}</StageCard>
-        <StageCard n={2}><StaffSchedulingSection /></StageCard>
+        <StageCard n={1}><StaffSchedulingSection /></StageCard>
+        <StageCard n={2}>{whatCanBeBooked}</StageCard>
         <StageCard n={3} last><NotificationTemplatesEditor /></StageCard>
       </div>
     </div>

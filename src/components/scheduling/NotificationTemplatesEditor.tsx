@@ -45,6 +45,12 @@ interface MomentMeta {
   icon: string;
   /** Preview CTA button label; '' = no CTA. */
   cta: string;
+  /**
+   * Whether this moment renders a CTA button — an EXPLICIT per-template flag, not inferred from
+   * the message id or a live {{actionUrl}} scan. (Design-review rule: a button is meaningless
+   * without a link; the confirmation's reschedule link is auto-appended, so it carries a CTA.)
+   */
+  hasCta: boolean;
   /** Optional always-included note shown under the body. */
   note?: string;
 }
@@ -59,19 +65,19 @@ const BAN = 'M4.93 4.93l14.14 14.14M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
 const MOMENT_META: MomentMeta[] = [
   {
     id: 'confirmation', name: 'Booking confirmation', group: 'Confirm & remind', icon: MAIL,
-    desc: 'Sent the moment a booking is confirmed.', cta: 'View / reschedule',
+    desc: 'Sent the moment a booking is confirmed.', cta: 'View / reschedule', hasCta: true,
     note: 'The calendar invite, .ics file and reschedule link are always included automatically.',
   },
   { id: 'reminder_24h', name: 'Reminder — 24 hours before', group: 'Confirm & remind', icon: BELL,
-    desc: 'Sent the day before the appointment.', cta: '' },
+    desc: 'Sent the day before the appointment.', cta: '', hasCta: false },
   { id: 'reminder_1h', name: 'Reminder — 1 hour before', group: 'Confirm & remind', icon: CLOCK,
-    desc: 'Sent about an hour before the appointment.', cta: '' },
+    desc: 'Sent about an hour before the appointment.', cta: '', hasCta: false },
   { id: 'reschedule_link', name: 'Reschedule link', group: 'When plans change', icon: SWAP,
-    desc: 'Sent when someone needs to change their time.', cta: 'Reschedule' },
+    desc: 'Sent when someone needs to change their time.', cta: 'Reschedule', hasCta: true },
   { id: 'reoffer', name: 'Time no longer available', group: 'When plans change', icon: SWAP,
-    desc: 'Sent when the chosen slot was taken before booking finished.', cta: 'Pick a new time' },
+    desc: 'Sent when the chosen slot was taken before booking finished.', cta: 'Pick a new time', hasCta: true },
   { id: 'cancel_notice', name: 'Cancellation notice', group: 'When plans change', icon: BAN,
-    desc: 'Sent when a booking is canceled.', cta: 'Book a new time' },
+    desc: 'Sent when a booking is canceled.', cta: 'Book a new time', hasCta: true },
 ];
 
 const GROUPS: MomentMeta['group'][] = ['Confirm & remind', 'When plans change'];
@@ -349,7 +355,9 @@ function Slideover({
   const eff = (field: keyof TemplateCopy) => (draft[field].trim() ? draft[field] : t.default[field]);
   const previewSubject = resolveSample(eff('subject'), org);
   const previewBody = resolveSample(eff('body_text').replace(/\{\{\s*actionUrl\s*\}\}/g, ''), org);
-  const hasCta = !!meta.cta && (meta.id === 'confirmation' || /\{\{\s*actionUrl\s*\}\}/.test(eff('body_text')));
+  // Fix #3: the CTA button renders from the template's explicit `hasCta` flag — never inferred
+  // from the message id or a live {{actionUrl}} scan (both were the mock's shortcut).
+  const hasCta = meta.hasCta;
   const smsText = draft.sms_text.trim() ? draft.sms_text : (t.sms_default ?? '');
   const previewSms = resolveSample(smsText, org);
 

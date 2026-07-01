@@ -1,30 +1,30 @@
 import { describe, it, expect } from 'vitest';
 import {
+  bookablePrograms,
+  unbookablePrograms,
   buildBookingGroups,
-  programTagMap,
-  coveragePill,
+  coverage,
   applyProgramSelection,
-  colorForIndex,
+  applyAssignment,
+  memberProgramIds,
+  programColor,
   effectiveBookable,
-  PROGRAM_PALETTE,
 } from '../whoHandlesBookings';
 import type { TeamMember } from '../../../types/analytics';
-import type { Program, AppointmentType, RoutingPolicy } from '../../../services/schedulingApi';
+import type { Program, RoutingPolicy } from '../../../services/schedulingApi';
 
 const programs: Program[] = [
   { program_id: 'p1', program_name: 'Love Box' },
   { program_id: 'p2', program_name: 'Dare to Dream' },
-  { program_id: 'p3', program_name: 'Donor' }, // no appointment type → empty group
+  { program_id: 'p3', program_name: 'Donor Relations' }, // bound but unpublished → not bookable
+  { program_id: 'p4', program_name: 'Tracking Only' }, // never made bookable
 ];
 
-const routingPolicies: RoutingPolicy[] = [
-  { routing_policy_id: 'rp1', tag_conditions: [{ operator: 'in_any', values: ['lovebox_team'] }] },
-  { routing_policy_id: 'rp2', tag_conditions: [{ operator: 'in_any', values: ['d2d_team'] }] },
-];
-
-const appointmentTypes: AppointmentType[] = [
-  { appointment_type_id: 'a1', name: 'Love Box', duration_minutes: 30, routing_policy_id: 'rp1', program_id: 'p1' },
-  { appointment_type_id: 'a2', name: 'Dare to Dream', duration_minutes: 30, routing_policy_id: 'rp2', program_id: 'p2' },
+const policies: RoutingPolicy[] = [
+  { routing_policy_id: 'rp1', program_id: 'p1', bookable: true, tie_breaker: 'round_robin', tag_conditions: [{ operator: 'in_any', values: ['Love Box'] }] },
+  { routing_policy_id: 'rp2', program_id: 'p2', tie_breaker: 'first_available', tag_conditions: [{ operator: 'in_any', values: ['Dare Team'] }] },
+  { routing_policy_id: 'rp3', program_id: 'p3', bookable: false, tie_breaker: 'round_robin', tag_conditions: [{ operator: 'in_any', values: ['Donor Team'] }] },
+  { routing_policy_id: 'rp4', tag_conditions: [{ operator: 'in_any', values: ['spanish'] }] }, // unbound plain team
 ];
 
 function mkStaff(over: Partial<TeamMember> & { employee_id: string }): TeamMember {
@@ -43,11 +43,11 @@ function mkStaff(over: Partial<TeamMember> & { employee_id: string }): TeamMembe
 }
 
 const staff: TeamMember[] = [
-  mkStaff({ employee_id: 'chris', name: 'Chris', role: 'admin', scheduling_tags: ['lovebox_team', 'd2d_team'], calendar_connected: true }),
-  mkStaff({ employee_id: 'kate', name: 'Kate', scheduling_tags: ['lovebox_team'], calendar_connected: true, calendar_email_override: 'kate@cal.org' }),
-  mkStaff({ employee_id: 'sam', name: 'Sam', scheduling_tags: ['d2d_team'], calendar_connected: false }),
-  mkStaff({ employee_id: 'pat', name: 'Pat', scheduling_tags: ['d2d_team'], calendar_connected: true, bookable_override: 'off' }),
-  mkStaff({ employee_id: 'skill', name: 'Skill Only', scheduling_tags: ['spanish'], calendar_connected: true }), // non-program tag → no group
+  mkStaff({ employee_id: 'chris', name: 'Chris', role: 'admin', scheduling_tags: ['Love Box', 'Dare Team'], calendar_connected: true }),
+  mkStaff({ employee_id: 'kate', name: 'Kate', scheduling_tags: ['Love Box'], calendar_connected: true, calendar_email_override: 'kate@cal.org' }),
+  mkStaff({ employee_id: 'sam', name: 'Sam', scheduling_tags: ['Dare Team'], calendar_connected: false }),
+  mkStaff({ employee_id: 'pat', name: 'Pat', scheduling_tags: ['Dare Team'], calendar_connected: true, bookable_override: 'off' }),
+  mkStaff({ employee_id: 'skill', name: 'Skill Only', scheduling_tags: ['spanish'], calendar_connected: true }),
 ];
 
 describe('effectiveBookable', () => {
@@ -58,92 +58,93 @@ describe('effectiveBookable', () => {
   });
 });
 
-describe('programTagMap', () => {
-  it('maps each program to its team tag(s) via appointment-type → routing policy', () => {
-    const m = programTagMap(appointmentTypes, routingPolicies);
-    expect(m.get('p1')).toEqual(['lovebox_team']);
-    expect(m.get('p2')).toEqual(['d2d_team']);
-    expect(m.has('p3')).toBe(false); // no appointment type
+describe('bookablePrograms', () => {
+  const bps = bookablePrograms(programs, policies);
+  it('includes only bound + published programs, in config order', () => {
+    expect(bps.map((b) => b.program_id)).toEqual(['p1', 'p2']); // p3 unpublished, p4 unbound
+  });
+  it('carries the team name + assignment from the bound policy', () => {
+    expect(bps[0]).toMatchObject({ program_id: 'p1', teamName: 'Love Box', teamTag: 'Love Box', assignment: 'round_robin', routing_policy_id: 'rp1' });
+    expect(bps[1]).toMatchObject({ program_id: 'p2', assignment: 'first_available' });
+  });
+});
+
+describe('unbookablePrograms', () => {
+  it('lists config programs not currently bookable (the Add pick-list)', () => {
+    expect(unbookablePrograms(programs, policies).map((p) => p.program_id).sort()).toEqual(['p3', 'p4']);
+  });
+});
+
+describe('memberProgramIds', () => {
+  const bps = bookablePrograms(programs, policies);
+  it('maps a person to the bookable programs whose team tag they carry', () => {
+    expect([...memberProgramIds(staff[0], bps)].sort()).toEqual(['p1', 'p2']); // chris
+    expect([...memberProgramIds(staff[4], bps)]).toEqual([]); // skill-only tag → none
   });
 });
 
 describe('buildBookingGroups', () => {
-  const groups = buildBookingGroups({ programs, appointmentTypes, routingPolicies, staff });
+  const groups = buildBookingGroups({ bookablePrograms: bookablePrograms(programs, policies), staff });
 
-  it('includes every program and sorts thinnest-coverage-first', () => {
-    expect(groups.map((g) => g.program_id)).toEqual(['p3', 'p2', 'p1']); // 0, 1, 2 bookable
-  });
-
-  it('empty program surfaces as a coverage gap', () => {
-    const donor = groups.find((g) => g.program_id === 'p3')!;
-    expect(donor.memberCount).toBe(0);
-    expect(donor.bookableCount).toBe(0);
-    expect(coveragePill(donor.bookableCount, donor.memberCount).label).toBe('No bookable staff');
+  it('groups by program, thinnest-coverage-first', () => {
+    expect(groups.map((g) => g.program_id)).toEqual(['p2', 'p1']); // p2=1 bookable, p1=2
   });
 
   it('coverage counts use effective bookable (connected && !paused)', () => {
-    const d2d = groups.find((g) => g.program_id === 'p2')!;
-    expect(d2d.memberCount).toBe(3); // chris, sam, pat
-    expect(d2d.bookableCount).toBe(1); // only chris (sam=needs_calendar, pat=paused)
-    const lb = groups.find((g) => g.program_id === 'p1')!;
-    expect(lb.bookableCount).toBe(2); // chris + kate
+    const p2 = groups.find((g) => g.program_id === 'p2')!;
+    expect(p2.memberCount).toBe(3); // chris, sam, pat
+    expect(p2.bookableCount).toBe(1); // only chris (sam=needs_calendar, pat=paused)
+    const p1 = groups.find((g) => g.program_id === 'p1')!;
+    expect(p1.bookableCount).toBe(2); // chris + kate
   });
 
   it('a person on multiple programs appears under each', () => {
-    const inLoveBox = groups.find((g) => g.program_id === 'p1')!.members.some((m) => m.employee_id === 'chris');
-    const inD2D = groups.find((g) => g.program_id === 'p2')!.members.some((m) => m.employee_id === 'chris');
-    expect(inLoveBox && inD2D).toBe(true);
+    const inP1 = groups.find((g) => g.program_id === 'p1')!.members.some((m) => m.employee_id === 'chris');
+    const inP2 = groups.find((g) => g.program_id === 'p2')!.members.some((m) => m.employee_id === 'chris');
+    expect(inP1 && inP2).toBe(true);
   });
 
-  it('a non-program (skill) tag forms no group and no membership', () => {
-    const anywhere = groups.some((g) => g.members.some((m) => m.employee_id === 'skill'));
-    expect(anywhere).toBe(false);
-  });
-
-  it('derives the four secondary-line cases', () => {
-    const d2d = groups.find((g) => g.program_id === 'p2')!;
-    const lb = groups.find((g) => g.program_id === 'p1')!;
-    const row = (g: typeof d2d, id: string) => g.members.find((m) => m.employee_id === id)!;
-    expect(row(d2d, 'chris').secondary).toBe('Also covers Love Box'); // bookable + multi-program
-    expect(row(lb, 'kate').secondary).toBe('Books to kate@cal.org'); // bookable + single program
-    expect(row(d2d, 'sam').secondary).toBe('No calendar connected'); // not connected
-    expect(row(d2d, 'pat').secondary).toBe('Paused — calendar still connected'); // paused
-  });
-
-  it('sets the 3-state status + admin flag', () => {
-    const d2d = groups.find((g) => g.program_id === 'p2')!;
-    const chris = d2d.members.find((m) => m.employee_id === 'chris')!;
-    expect(chris.status).toBe('bookable');
-    expect(chris.isAdmin).toBe(true);
-    expect(d2d.members.find((m) => m.employee_id === 'sam')!.status).toBe('needs_calendar');
-    expect(d2d.members.find((m) => m.employee_id === 'pat')!.status).toBe('paused');
+  it('derives the four secondary-line cases + 3-state status + admin flag', () => {
+    const p2 = groups.find((g) => g.program_id === 'p2')!;
+    const p1 = groups.find((g) => g.program_id === 'p1')!;
+    const row = (g: typeof p2, id: string) => g.members.find((m) => m.employee_id === id)!;
+    expect(row(p2, 'chris').secondary).toBe('Also covers Love Box');
+    expect(row(p1, 'kate').secondary).toBe('Books to kate@cal.org');
+    expect(row(p2, 'sam').secondary).toBe('No calendar connected');
+    expect(row(p2, 'pat').secondary).toBe('Paused — calendar still connected');
+    expect(row(p2, 'chris').status).toBe('bookable');
+    expect(row(p2, 'chris').isAdmin).toBe(true);
+    expect(row(p2, 'sam').status).toBe('needs_calendar');
+    expect(row(p2, 'pat').status).toBe('paused');
   });
 });
 
-describe('coveragePill', () => {
-  it('0 → danger, 1 → warning, ≥2 → success', () => {
-    expect(coveragePill(0, 3).fg).toBe('#B42318');
-    expect(coveragePill(1, 3).fg).toBe('#B54708');
-    expect(coveragePill(2, 3).fg).toBe('#1C7A45');
+describe('coverage', () => {
+  it('0 → none, 1 → gap, ≥2 → ok', () => {
+    expect(coverage(0, 3)).toEqual({ label: 'No bookable staff', tone: 'none' });
+    expect(coverage(1, 3)).toEqual({ label: '1 of 3 bookable', tone: 'gap' });
+    expect(coverage(2, 3)).toEqual({ label: '2 of 3 bookable', tone: 'ok' });
   });
 });
 
 describe('applyProgramSelection', () => {
-  const ptags = programTagMap(appointmentTypes, routingPolicies);
-  it('adds a program\'s team tag when checked, removes it when unchecked', () => {
-    // Chris currently on both; uncheck Love Box → drops lovebox_team, keeps d2d_team.
-    const next = applyProgramSelection(['lovebox_team', 'd2d_team'], ['p1', 'p2'], new Set(['p2']), ptags);
-    expect(next.sort()).toEqual(['d2d_team']);
-  });
-  it('preserves unrelated (non-offered) tags', () => {
-    const next = applyProgramSelection(['spanish'], ['p1'], new Set(['p1']), ptags);
-    expect(next.sort()).toEqual(['lovebox_team', 'spanish']);
+  const bps = bookablePrograms(programs, policies);
+  it('adds checked programs\' tags, removes unchecked, preserves unmanaged tags', () => {
+    // Chris on both; uncheck Love Box → drop its tag, keep Dare + the unmanaged 'spanish'.
+    const next = applyProgramSelection(['Love Box', 'Dare Team', 'spanish'], bps, new Set(['p2']));
+    expect(next.sort()).toEqual(['Dare Team', 'spanish']);
   });
 });
 
-describe('colorForIndex', () => {
-  it('cycles the palette on overflow', () => {
-    expect(colorForIndex(0)).toEqual(PROGRAM_PALETTE[0]);
-    expect(colorForIndex(PROGRAM_PALETTE.length)).toEqual(PROGRAM_PALETTE[0]);
+describe('applyAssignment', () => {
+  it('adds a team tag when checked, removes it when unchecked, leaves others', () => {
+    expect(applyAssignment(['a'], 'Love Box', true).sort()).toEqual(['Love Box', 'a']);
+    expect(applyAssignment(['a', 'Love Box'], 'Love Box', false)).toEqual(['a']);
+  });
+});
+
+describe('programColor', () => {
+  it('is deterministic per program_id', () => {
+    expect(programColor('p1')).toEqual(programColor('p1'));
   });
 });
