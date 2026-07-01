@@ -64,3 +64,7 @@ export type { ToastApi, ToastOptions } from './useToast';
 
 // ErrorBoundary — Layer 0 safety net (catches render throws → banner Alert)
 export { ErrorBoundary } from './ErrorBoundary';
+
+// Toggle — the shared pill-shaped on/off switch (role=switch)
+export { Toggle } from './Toggle';
+export type { ToggleProps } from './Toggle';
