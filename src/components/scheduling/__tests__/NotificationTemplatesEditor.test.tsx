@@ -152,12 +152,15 @@ describe('NotificationTemplatesEditor (E14) — message list', () => {
     });
   });
 
-  it('shows the SMS field with a segment hint and the held-delivery note', async () => {
+  it('shows the SMS field with the "sent alongside" hint, a segment count, and the STOP note', async () => {
     render(<NotificationTemplatesEditor />);
     await waitFor(() => expect(screen.getByText('Reschedule link')).toBeInTheDocument());
     const dialog = await openMoment(/Reschedule link/);
     expect(within(dialog).getByLabelText(/text message/i)).toBeInTheDocument();
-    expect(within(dialog).getByText(/segment/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Sent alongside the email/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/\d+\/160 · \d+ segment/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/STOP\/HELP line is appended/i)).toBeInTheDocument();
+    // SMS isn't live — the UI must say so (not removed when mirroring the mock).
     expect(within(dialog).getByText(/SMS delivery isn't live yet/i)).toBeInTheDocument();
   });
 

@@ -381,7 +381,8 @@ function Slideover({
   const previewSms = resolveSample(smsText, org);
 
   const vars = t.available_variables ?? [];
-  const smsVars = t.sms_available_variables ?? [];
+  const smsLen = draft.sms_text.length;
+  const smsSegments = smsLen <= 160 ? 1 : Math.ceil(smsLen / 153);
 
   return (
     <div className="fixed inset-0 z-[60]">
@@ -494,36 +495,7 @@ function Slideover({
             </>
           )}
 
-          {/* SMS */}
-          <div className="border-t border-slate-100 mt-5 pt-[18px]">
-            <div className="flex items-center justify-between mb-2">
-              <label htmlFor={`sms-${meta.id}`} className="text-[11.5px] font-bold tracking-[0.03em] text-slate-600">TEXT MESSAGE (SMS)</label>
-              <span className="text-[11.5px] text-slate-400">Optional</span>
-            </div>
-            <textarea
-              id={`sms-${meta.id}`}
-              rows={3}
-              maxLength={SMS_MAX}
-              className={`${inputCls} text-[13.5px]`}
-              placeholder={t.sms_default ?? ''}
-              value={draft.sms_text}
-              onChange={(e) => onField('sms_text', e.target.value)}
-            />
-            <p className="text-[11.5px] text-slate-400 mt-1.5">
-              {draft.sms_text.length}/{SMS_MAX} · ~{Math.max(1, Math.ceil(draft.sms_text.length / 160))} segment{draft.sms_text.length > 160 ? 's' : ''}
-              {smsVars.length > 0 && (
-                <> · vars: {smsVars.map((v) => (
-                  <code key={v} className="bg-slate-100 rounded px-1 mx-0.5">{v}</code>
-                ))}</>
-              )}
-            </p>
-            {smsNote && <p className="text-[11.5px] text-slate-400 mt-1">{smsNote}</p>}
-            <p className="text-[11.5px] text-amber-600 mt-1">
-              SMS delivery isn't live yet — saved copy applies once it goes on.
-            </p>
-          </div>
-
-          {/* live preview */}
+          {/* email live preview — directly under Edit HTML (mirrors the mock order) */}
           <div className="mt-[22px]">
             <div className="flex items-center gap-2 mb-2.5">
               <span className="text-[11px] font-bold tracking-[0.05em] uppercase text-slate-400">Live preview</span>
@@ -543,10 +515,40 @@ function Slideover({
                 )}
               </div>
             </div>
+          </div>
+
+          {/* SMS — below the email preview; its own preview groups directly beneath the field */}
+          <div className="border-t border-slate-100 mt-5 pt-[18px]">
+            <div className="flex items-center justify-between mb-2">
+              <label htmlFor={`sms-${meta.id}`} className="text-[11.5px] font-bold tracking-[0.03em] text-slate-600">TEXT MESSAGE (SMS)</label>
+              <span className="text-[11.5px] text-slate-400">Sent alongside the email</span>
+            </div>
+            <textarea
+              id={`sms-${meta.id}`}
+              rows={3}
+              maxLength={SMS_MAX}
+              className={`${inputCls} text-[13.5px]`}
+              placeholder={t.sms_default ?? ''}
+              value={draft.sms_text}
+              onChange={(e) => onField('sms_text', e.target.value)}
+            />
+            <div className="flex items-start justify-between gap-4 mt-1.5">
+              {smsNote && <p className="text-[11.5px] text-slate-400">{smsNote}</p>}
+              <span className="text-[11.5px] text-slate-400 shrink-0 whitespace-nowrap">
+                {smsLen}/160 · {smsSegments} segment{smsSegments > 1 ? 's' : ''}
+              </span>
+            </div>
+            {/* SMS delivery is not live yet — state it plainly (the copy is still saved for when it goes on). */}
+            <p className="text-[11.5px] font-semibold text-warning-700 mt-1.5">
+              SMS delivery isn't live yet — saved copy applies once it goes on.
+            </p>
             {previewSms && (
-              <div className="mt-2.5 flex justify-start">
-                <div className="max-w-[78%] bg-primary-50 rounded-[16px_16px_16px_4px] px-3.5 py-2.5 text-[13px] leading-snug text-primary-900">
-                  {previewSms}
+              <div className="mt-3.5">
+                <div className="text-[11px] font-bold tracking-[0.05em] uppercase text-slate-400 mb-2">SMS preview</div>
+                <div className="flex justify-start">
+                  <div className="max-w-[78%] bg-primary-50 rounded-[16px_16px_16px_4px] px-3.5 py-2.5 text-[13px] leading-snug text-primary-900">
+                    {previewSms}
+                  </div>
                 </div>
               </div>
             )}
