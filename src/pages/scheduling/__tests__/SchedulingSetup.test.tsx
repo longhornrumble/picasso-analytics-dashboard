@@ -198,6 +198,17 @@ describe('SchedulingSetup — §2 What can be booked', () => {
     );
   });
 
+  it('saves the Comments (agenda) field on an appointment type', async () => {
+    api.updateAppointmentType.mockResolvedValue(APPT);
+    render(<SchedulingSetup />);
+    await waitFor(() => expect(screen.getByText('Discovery Call')).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: /Discovery Call/i }));
+    await userEvent.type(screen.getByLabelText('Comments'), 'Bring your questions.');
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    await waitFor(() => expect(api.updateAppointmentType).toHaveBeenCalledTimes(1));
+    expect(api.updateAppointmentType.mock.calls[0][1]).toMatchObject({ agenda: 'Bring your questions.' });
+  });
+
   it('deletes an appointment type from the editor after a confirm, with its If-Match token', async () => {
     api.deleteAppointmentType.mockResolvedValue(undefined);
     render(<SchedulingSetup />);
