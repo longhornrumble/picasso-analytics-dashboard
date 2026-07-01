@@ -36,13 +36,11 @@ import {
   bookablePrograms,
   unbookablePrograms,
   buildBookingGroups,
-  coverage,
   memberProgramIds,
   applyProgramSelection,
   applyAssignment,
   programColor,
   type BookableProgram,
-  type CoverageTone,
 } from '../../lib/scheduling/whoHandlesBookings';
 
 function errMessage(e: unknown): string {
@@ -57,13 +55,6 @@ function errMessage(e: unknown): string {
 const ASSIGNMENT_LABEL: Record<'round_robin' | 'first_available', string> = {
   round_robin: 'Round-robin',
   first_available: 'First available',
-};
-
-/** Coverage pill token classes by tone (never raw hex — semantic families). */
-const COVERAGE_CLASS: Record<CoverageTone, string> = {
-  none: 'text-danger-700 bg-danger-100',
-  gap: 'text-warning-700 bg-warning-100',
-  ok: 'text-primary-700 bg-primary-50',
 };
 
 function initials(m: TeamMember): string {
@@ -449,15 +440,11 @@ export function StaffSchedulingSection() {
         <p className="text-sm text-slate-400 py-6 text-center">No programs defined for this tenant yet.</p>
       ) : (
         groups.map((g) => {
-          const cov = coverage(g.bookableCount, g.memberCount);
           return (
             <div key={g.program_id} className="mt-[18px]">
               <div className="flex items-center gap-2.5 mb-0.5">
                 <span aria-hidden="true" className="w-[11px] h-[11px] rounded-[3px] shrink-0" style={{ background: g.color.fg }} />
                 <span className="text-[13.5px] font-bold text-slate-900">{g.program_name}</span>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${COVERAGE_CLASS[cov.tone]}`}>
-                  {cov.label}
-                </span>
                 <span className="ml-auto flex items-center gap-3.5 shrink-0">
                   <button onClick={() => openAssign(g)} className="text-[12.5px] font-bold text-primary-700 hover:text-primary-800">Assign people</button>
                   <button onClick={() => openProgEdit(g)} className="text-[12.5px] font-bold text-slate-500 hover:text-slate-700">Edit</button>

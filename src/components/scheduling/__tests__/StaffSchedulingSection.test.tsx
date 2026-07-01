@@ -62,7 +62,7 @@ afterEach(() => {
 describe('StaffSchedulingSection — admin (Who handles bookings)', () => {
   beforeEach(() => mockUser.mockReturnValue({ role: 'admin', email: 'admin@x' }));
 
-  it('renders bookable programs grouped, with members, coverage, and thinnest-first order', async () => {
+  it('renders bookable programs grouped, with members, and thinnest-first order (no coverage pill)', async () => {
     render(<StaffSchedulingSection />);
     await waitFor(() => expect(screen.getByRole('heading', { name: /who handles bookings/i })).toBeInTheDocument());
     expect(screen.getByText('Love Box')).toBeInTheDocument();
@@ -71,11 +71,11 @@ describe('StaffSchedulingSection — admin (Who handles bookings)', () => {
     expect(screen.getByText('Alex')).toBeInTheDocument();
     // Donor Relations has no team → not a group, but IS in the "Add a bookable program" pick-list.
     expect(screen.queryByText('Donor Relations')).toBeNull();
-    // status + coverage
+    // Per-person status still shows; the group coverage pill was removed.
     expect(screen.getByText(/Connect calendar to be bookable/)).toBeInTheDocument(); // Alex
-    expect(screen.getByText('No bookable staff')).toBeInTheDocument(); // Dare (0)
-    expect(screen.getByText('1 of 1 bookable')).toBeInTheDocument(); // Love Box
-    // thinnest-first: Dare (0) before Love Box (1)
+    expect(screen.queryByText(/of \d+ bookable/)).toBeNull();
+    expect(screen.queryByText('No bookable staff')).toBeNull();
+    // thinnest-first: Dare (0 bookable) before Love Box (1)
     const dare = screen.getByText('Dare to Dream');
     const lb = screen.getByText('Love Box');
     expect(dare.compareDocumentPosition(lb) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
