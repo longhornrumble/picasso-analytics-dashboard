@@ -6,6 +6,7 @@ import { SchedulingApiError } from '../../../services/schedulingApi';
 const api = {
   fetchAppointmentTypes: vi.fn(),
   fetchRoutingPolicies: vi.fn(),
+  fetchPrograms: vi.fn(),
   createAppointmentType: vi.fn(),
   updateAppointmentType: vi.fn(),
   createRoutingPolicy: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock('../../../services/schedulingApi', async () => {
     ...actual, // keep ifMatchToken + SchedulingApiError real
     fetchAppointmentTypes: () => api.fetchAppointmentTypes(),
     fetchRoutingPolicies: () => api.fetchRoutingPolicies(),
+    fetchPrograms: () => api.fetchPrograms(),
     createAppointmentType: (...a: unknown[]) => api.createAppointmentType(...a),
     updateAppointmentType: (...a: unknown[]) => api.updateAppointmentType(...a),
     createRoutingPolicy: (...a: unknown[]) => api.createRoutingPolicy(...a),
@@ -59,12 +61,20 @@ const APPT = {
   name: 'Discovery',
   duration_minutes: 30,
   routing_policy_id: 'rp1',
+  program_id: 'discovery_program', // bound to the Discovery program
   modified_at: { at: '2026-06-06T00:00:00.000002Z', by: 'admin@x' },
 };
+// Programs from config.programs (the appt-type picker source). Two so a create test can pick a
+// program distinct from the existing appointment type's.
+const PROGRAMS = [
+  { program_id: 'discovery_program', program_name: 'Discovery' },
+  { program_id: 'interview_program', program_name: 'Interview' },
+];
 
 beforeEach(() => {
   api.fetchAppointmentTypes.mockResolvedValue([APPT]);
   api.fetchRoutingPolicies.mockResolvedValue([POLICY]);
+  api.fetchPrograms.mockResolvedValue(PROGRAMS);
   api.fetchTagVocabulary.mockResolvedValue(['volunteer_coordinators']);
   api.deleteRoutingPolicy.mockResolvedValue(undefined);
   api.fetchNotificationTemplates.mockResolvedValue({ moments: {}, stop_footer_note: '' });
@@ -146,14 +156,14 @@ describe('SchedulingSetup (E13b)', () => {
     await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole('button', { name: /add appointment type/i }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Interview');
+    await chooseFromSelect('Program', 'Interview'); // sets program_id + name = the program name
     await chooseFromSelect('Handled by team', 'volunteer_coordinators'); // value rp1
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => expect(api.createAppointmentType).toHaveBeenCalledTimes(1));
     expect(api.createAppointmentType).toHaveBeenCalledWith(
-      // Location defaults to Google Meet when the admin doesn't change it.
-      expect.objectContaining({ name: 'Interview', routing_policy_id: 'rp1', duration_minutes: 30, conference_type: 'google_meet' }),
+      // Location defaults to Google Meet when the admin doesn't change it; name comes from the program.
+      expect.objectContaining({ name: 'Interview', program_id: 'interview_program', routing_policy_id: 'rp1', duration_minutes: 30, conference_type: 'google_meet' }),
     );
     expect(api.fetchAppointmentTypes).toHaveBeenCalledTimes(2); // initial + reload
   });
@@ -164,14 +174,14 @@ describe('SchedulingSetup (E13b)', () => {
     await waitFor(() => expect(screen.getByText('Discovery')).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole('button', { name: /add appointment type/i }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Consult');
+    await chooseFromSelect('Program', 'Interview');
     await chooseFromSelect('Location', 'Zoom');
     await chooseFromSelect('Handled by team', 'volunteer_coordinators'); // value rp1
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => expect(api.createAppointmentType).toHaveBeenCalledTimes(1));
     expect(api.createAppointmentType).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Consult', conference_type: 'zoom', routing_policy_id: 'rp1' }),
+      expect.objectContaining({ name: 'Interview', program_id: 'interview_program', conference_type: 'zoom', routing_policy_id: 'rp1' }),
     );
   });
 
@@ -186,8 +196,8 @@ describe('SchedulingSetup (E13b)', () => {
     await waitFor(() => expect(api.updateAppointmentType).toHaveBeenCalledTimes(1));
     expect(api.updateAppointmentType).toHaveBeenCalledWith(
       'a1',
-      // edit seeds conference_type from the row (absent → google_meet) and sends it back
-      expect.objectContaining({ name: 'Discovery', routing_policy_id: 'rp1', conference_type: 'google_meet' }),
+      // edit seeds conference_type + program_id from the row and sends them back
+      expect.objectContaining({ name: 'Discovery', program_id: 'discovery_program', routing_policy_id: 'rp1', conference_type: 'google_meet' }),
       '2026-06-06T00:00:00.000002Z', // ifMatchToken(APPT)
     );
   });
